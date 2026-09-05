@@ -26,8 +26,11 @@ export class BootScene extends Phaser.Scene {
     this.makeBuilding('bldg_forest_cabin', 0x5d4037, 0x81c784, 0x3e2723, false);
     this.makeDoor();
     this.makeTrailIcons();
-    const skip = new URLSearchParams(location.search).get('skiptitle') === '1';
-    this.scene.start(skip ? 'Game' : 'Title');
+    const params = new URLSearchParams(location.search);
+    const skip = params.get('skiptitle') === '1';
+    const cont = params.get('continue') === '1';
+    if (cont) this.registry.set('loadSave', true);
+    this.scene.start(skip || cont ? 'Game' : 'Title');
   }
 
   private g(): Phaser.GameObjects.Graphics {

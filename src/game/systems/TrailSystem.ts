@@ -22,6 +22,9 @@ export class TrailSystem {
   private nextId = 1;
   private lastDropDist = 0;
   private readonly dropEvery = 70;
+  private readonly MAX_CLUES = 60;
+  private pathDirty = false;
+  private pathRedrawCooldown = 0;
   private fallbackMarker?: Phaser.GameObjects.Container;
   private layer: Phaser.GameObjects.Container;
   private pathGfx?: Phaser.GameObjects.Graphics;
@@ -79,7 +82,12 @@ export class TrailSystem {
       discovered: false,
     };
     this.clues.push(clue);
-    this.redrawSoftPath();
+    // Cap trail length — unbounded graphics was freezing phones
+    while (this.clues.length > this.MAX_CLUES) {
+      const old = this.clues.shift();
+      old?.sprite.destroy(true);
+    }
+    this.pathDirty = true;
     return clue;
   }
 
@@ -210,6 +218,16 @@ export class TrailSystem {
   clearFallback(): void {
     this.fallbackMarker?.destroy();
     this.fallbackMarker = undefined;
+  }
+
+  /** Call each frame — cheap path redraw throttle. */
+  updateThrottle(delta: number): void {
+    this.pathRedrawCooldown -= delta;
+    if (this.pathDirty && this.pathRedrawCooldown <= 0) {
+      this.redrawSoftPath();
+      this.pathDirty = false;
+      this.pathRedrawCooldown = 250;
+    }
   }
 
   markNearbyDiscovered(px: number, py: number, radius = 60): number {

@@ -87,6 +87,7 @@ export class GameScene extends Phaser.Scene {
   private jobs = new JobSystem();
   private inventory = new InventorySystem();
   private facing = 1;
+  private lastToast = '';
   private garageCredited = false;
   private mysteries = new MysterySystem();
   private police = new PoliceSystem();
@@ -205,6 +206,13 @@ export class GameScene extends Phaser.Scene {
         this.paused = false;
         this.mapOpen = false;
       },
+      recover: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.player?.setVelocity(0, 0);
+        this.persistSave();
+        setDomStatus('Recovered + saved. Continue!');
+      },
       interact: () => {
         this.paused = false;
         this.mapOpen = false;
@@ -247,7 +255,7 @@ export class GameScene extends Phaser.Scene {
     if (this.registry.get('loadSave')) {
       this.applySave();
     }
-    this.time.addEvent({ delay: 8000, loop: true, callback: () => this.persistSave() });
+    this.time.addEvent({ delay: 3000, loop: true, callback: () => this.persistSave() });
   }
 
   private persistSave(): void {
@@ -295,23 +303,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildOutdoorWorld(): void {
-    // Tiled grass background
-    for (let x = 0; x < WORLD.width; x += 64) {
-      for (let y = 0; y < WORLD.height; y += 64) {
-        const tile = this.add.image(x + 32, y + 32, 'tile_grass').setDepth(0);
-        this.worldLayer.add(tile);
-      }
-    }
+    // One TileSprite instead of 2000+ images (was freezing phones)
+    const grass = this.add
+      .tileSprite(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 'tile_grass')
+      .setDepth(0);
+    this.worldLayer.add(grass);
 
-    // Roads with asphalt tiles
+    // Roads as few rectangles + dashed line (not hundreds of tiles)
     for (const road of ROADS) {
-      for (let x = road.x; x < road.x + road.w; x += 64) {
-        for (let y = road.y; y < road.y + road.h; y += 64) {
-          const tile = this.add.image(x + 32, y + 32, 'tile_road').setDepth(1);
-          this.worldLayer.add(tile);
-        }
-      }
-      // curb outline
+      const asphalt = this.add
+        .rectangle(road.x + road.w / 2, road.y + road.h / 2, road.w, road.h, 0x455a64, 1)
+        .setDepth(1);
+      this.worldLayer.add(asphalt);
       const curb = this.add
         .rectangle(road.x + road.w / 2, road.y + road.h / 2, road.w + 4, road.h + 4)
         .setStrokeStyle(2, 0xffee58, 0.25)
@@ -624,6 +627,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    try {
     // Always apply DOM/keyboard movement — never let pause eat controls
     this.handleMovement();
     if (this.paused || this.mapOpen) {
@@ -652,8 +656,20 @@ export class GameScene extends Phaser.Scene {
       audio.success();
     }
     const hudLine = this.interactPrompt || this.statusLine || PHASE_HINTS[this.phase];
-    setDomStatus(hudLine);
+    if (hudLine && hudLine !== this.lastToast) {
+      this.lastToast = hudLine;
+      setDomStatus(hudLine);
+    }
     setDomMeta(this.inventory.summary() + " · " + this.mysteries.summary(), `Job: ${this.jobs.title()}`);
+    this.trail.updateThrottle(delta);
+    } catch (err) {
+      console.error('[E-CRAFT] frame error', err);
+      this.paused = false;
+      this.mapOpen = false;
+      this.player?.setVelocity(0, 0);
+      setDomStatus('Glitch recovered — keep playing (progress autosaved)');
+      try { this.persistSave(); } catch { /* ignore */ }
+    }
   }
 
   private updateObjectiveMarker(): void {
@@ -1281,6 +1297,7 @@ export class GameScene extends Phaser.Scene {
       this.setPhase(MissionPhase.CanDrive);
       this.statusLine = 'Driving! Use WASD / pad — go east to the forest.';
     }
+    this.persistSave();
     audio.drive();
     // Kick forward so player instantly feels driving
     this.player.setVelocity(420, 0);
@@ -1472,6 +1489,7 @@ export class GameScene extends Phaser.Scene {
     this.statusLine = 'Sasquatch DOWN! Tap GET IN CAR to load him.';
     setDomStatus(this.statusLine);
     this.trail.clearFallback();
+    this.persistSave();
   }
 
   private enterLair(): void {

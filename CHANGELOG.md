@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.8 — 2026-09-05 — ANTI-FREEZE
+
+### Fixed
+- Trail clue cap (was growing forever → phone freeze)
+- Grass/road no longer spawn 2000+ tile images
+- Frame try/catch + UNFREEZE / SAVE button
+- Autosave every 3s + on capture/car
+- Toast no longer spam every frame
+- Continue via `?continue=1`
+
+
 ## 1.0.7 — 2026-09-05 — RACE CAR + BOTH CARS DRIVE
 
 ### Added
