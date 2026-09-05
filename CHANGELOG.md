@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1 — 2026-09-05 — REAL PLAYER WALK CYCLE
+
+### Fixed / Added
+- Officer no longer slides — **6-frame walk cycle** with alternating legs, boots planting, arm swing, body bob
+- Idle pose when standing still
+- Walk anim resumes after exiting cars / house / jail
+
+
 ## 1.2.0 — 2026-09-05 — YOUR HOUSE + SLEEP
 
 ### Added

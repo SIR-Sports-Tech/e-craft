@@ -91,37 +91,112 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makePlayer(): void {
-    // Larger readable security officer (64x64)
-    const g = this.g();
-    // shadow
-    g.fillStyle(0x000000, 0.25);
-    g.fillEllipse(32, 58, 28, 10);
-    // legs
-    g.fillStyle(0x1a237e, 1);
-    g.fillRoundedRect(22, 42, 8, 14, 2);
-    g.fillRoundedRect(34, 42, 8, 14, 2);
-    // body / jacket
-    g.fillStyle(0x1565c0, 1);
-    g.fillRoundedRect(18, 26, 28, 22, 6);
-    // arms
-    g.fillStyle(0x0d47a1, 1);
-    g.fillRoundedRect(10, 28, 10, 16, 3);
-    g.fillRoundedRect(44, 28, 10, 16, 3);
-    // head
-    g.fillStyle(0xffcc80, 1);
-    g.fillCircle(32, 18, 12);
-    // helmet
-    g.fillStyle(0x0d47a1, 1);
-    g.fillEllipse(32, 12, 26, 16);
-    g.fillStyle(0x4fc3f7, 1);
-    g.fillRoundedRect(22, 14, 20, 7, 2);
-    // badge
-    g.fillStyle(0xffe082, 1);
-    g.fillCircle(32, 36, 4);
-    g.lineStyle(2, 0xffffff, 0.35);
-    g.strokeRoundedRect(18, 26, 28, 22, 6);
-    g.generateTexture('player', 64, 64);
-    g.destroy();
+    // Security officer walk cycle — legs + feet actually step (not a slide)
+    const fw = 64;
+    const fh = 64;
+    const frames = 6;
+    const sheet = this.make.graphics({ x: 0, y: 0 });
+
+    const drawFrame = (g: Phaser.GameObjects.Graphics, ox: number, frame: number) => {
+      // Walk cycle phase 0..5 — alternating stride with plant / lift feet
+      const phase = frame / frames;
+      const swing = Math.sin(phase * Math.PI * 2); // -1..1
+      const swing2 = Math.sin(phase * Math.PI * 2 + Math.PI); // opposite leg
+      const bob = Math.abs(Math.sin(phase * Math.PI * 2)) * -2;
+      const leftStride = swing * 7;
+      const rightStride = swing2 * 7;
+      // Lift planted foot slightly when swinging forward
+      const leftLift = Math.max(0, swing) * 4;
+      const rightLift = Math.max(0, swing2) * 4;
+      const leftArm = swing2 * 5;
+      const rightArm = swing * 5;
+
+      // ground shadow (stretches a bit with stride)
+      g.fillStyle(0x000000, 0.28);
+      g.fillEllipse(ox + 32, fh - 3, 30 + Math.abs(swing) * 2, 9);
+
+      // LEFT LEG (navy pants)
+      g.fillStyle(0x1a237e, 1);
+      g.fillRoundedRect(ox + 22 + leftStride * 0.35, 40 + bob - leftLift * 0.3, 9, 16 + leftLift * 0.2, 2);
+      // left boot / foot — clear heel-toe plant
+      g.fillStyle(0x212121, 1);
+      g.fillEllipse(ox + 26 + leftStride, 58 + bob - leftLift, 14, 7);
+      g.fillStyle(0x424242, 1);
+      g.fillEllipse(ox + 30 + leftStride, 57 + bob - leftLift, 6, 4);
+
+      // RIGHT LEG
+      g.fillStyle(0x1a237e, 1);
+      g.fillRoundedRect(ox + 33 + rightStride * 0.35, 40 + bob - rightLift * 0.3, 9, 16 + rightLift * 0.2, 2);
+      // right boot
+      g.fillStyle(0x212121, 1);
+      g.fillEllipse(ox + 38 + rightStride, 58 + bob - rightLift, 14, 7);
+      g.fillStyle(0x424242, 1);
+      g.fillEllipse(ox + 42 + rightStride, 57 + bob - rightLift, 6, 4);
+
+      // torso / jacket (slight counter-rotate feel via bob)
+      g.fillStyle(0x1565c0, 1);
+      g.fillRoundedRect(ox + 18, 24 + bob, 28, 22, 6);
+      // badge
+      g.fillStyle(0xffe082, 1);
+      g.fillCircle(ox + 32, 34 + bob, 4);
+      g.lineStyle(2, 0xffffff, 0.35);
+      g.strokeRoundedRect(ox + 18, 24 + bob, 28, 22, 6);
+
+      // arms swing opposite to legs
+      g.fillStyle(0x0d47a1, 1);
+      g.fillRoundedRect(ox + 8 + leftArm * 0.2, 26 + bob + leftArm * 0.15, 10, 16, 3);
+      g.fillRoundedRect(ox + 46 + rightArm * 0.2, 26 + bob + rightArm * 0.15, 10, 16, 3);
+      // hands
+      g.fillStyle(0xffcc80, 1);
+      g.fillCircle(ox + 13 + leftArm * 0.25, 44 + bob + leftArm * 0.2, 4);
+      g.fillCircle(ox + 51 + rightArm * 0.25, 44 + bob + rightArm * 0.2, 4);
+
+      // head
+      g.fillStyle(0xffcc80, 1);
+      g.fillCircle(ox + 32, 16 + bob, 12);
+      // helmet
+      g.fillStyle(0x0d47a1, 1);
+      g.fillEllipse(ox + 32, 10 + bob, 26, 16);
+      g.fillStyle(0x4fc3f7, 1);
+      g.fillRoundedRect(ox + 22, 12 + bob, 20, 7, 2);
+      // eyes
+      g.fillStyle(0x212121, 1);
+      g.fillCircle(ox + 28, 18 + bob, 1.6);
+      g.fillCircle(ox + 36, 18 + bob, 1.6);
+    };
+
+    for (let i = 0; i < frames; i++) drawFrame(sheet, i * fw, i);
+    sheet.generateTexture('player_sheet_img', fw * frames, fh);
+    sheet.destroy();
+
+    const srcImg = this.textures.get('player_sheet_img').getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    if (this.textures.exists('player_sheet')) this.textures.remove('player_sheet');
+    this.textures.addSpriteSheet('player_sheet', srcImg as HTMLImageElement, {
+      frameWidth: fw,
+      frameHeight: fh,
+    });
+
+    // Idle / static alias used by title + fallbacks
+    const one = this.make.graphics({ x: 0, y: 0 });
+    drawFrame(one, 0, 0);
+    if (this.textures.exists('player')) this.textures.remove('player');
+    one.generateTexture('player', fw, fh);
+    one.destroy();
+
+    if (this.anims.exists('player-walk')) this.anims.remove('player-walk');
+    if (this.anims.exists('player-idle')) this.anims.remove('player-idle');
+    this.anims.create({
+      key: 'player-walk',
+      frames: this.anims.generateFrameNumbers('player_sheet', { start: 0, end: frames - 1 }),
+      frameRate: 11,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'player-idle',
+      frames: [{ key: 'player_sheet', frame: 0 }],
+      frameRate: 1,
+      repeat: -1,
+    });
   }
 
   private makeRobot(): void {

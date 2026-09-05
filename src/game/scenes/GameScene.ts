@@ -129,11 +129,12 @@ export class GameScene extends Phaser.Scene {
     this.objectiveMarker = new ObjectiveMarker(this);
     this.construction = new ConstructionSystem(this, this.worldLayer);
 
-    this.player = this.physics.add.sprite(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y, 'player');
+    this.player = this.physics.add.sprite(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y, 'player_sheet', 0);
     this.player.setCollideWorldBounds(true).setDepth(10).setScale(0.95);
     this.player.setDrag(0);
     this.player.setMaxVelocity(700);
     this.player.body!.setSize(28, 40).setOffset(10, 12);
+    this.player.play('player-idle');
 
     this.robot = this.physics.add.sprite(SPAWN.playerOutdoor.x - 40, SPAWN.playerOutdoor.y, 'robot');
     this.robot.setVisible(false).setDepth(9).setScale(0.9);
@@ -885,6 +886,8 @@ export class GameScene extends Phaser.Scene {
       hour: this.dayNight?.getHour?.() ?? 12,
       trailClues: this.trail.getClues().length,
       tracking: this.trail.isTracking(),
+      playerAnim: this.player?.anims?.currentAnim?.key ?? null,
+      onFoot: !this.flags.inVehicle && this.player?.texture?.key === 'player_sheet',
     };
   }
 
@@ -1007,6 +1010,7 @@ export class GameScene extends Phaser.Scene {
     if (vx === 0 && vy === 0) {
       this.player.setVelocity(0, 0);
       if (this.dust) this.dust.emitting = false;
+      this.updatePlayerAnim(false);
       return;
     }
     const len = Math.hypot(vx, vy) || 1;
@@ -1024,14 +1028,15 @@ export class GameScene extends Phaser.Scene {
       const car = this.activeCarKey === 'race_car' ? this.raceCar : this.vehicle;
       car.setPosition(this.player.x, this.player.y);
       if (this.player.texture.key !== this.activeCarKey) {
+        this.player.anims.stop();
         this.player.setTexture(this.activeCarKey);
         this.player.setScale(1.05);
         const body = this.player.body as Phaser.Physics.Arcade.Body;
         body.setSize(70, 36).setOffset(10, 12);
       }
-    } else if (this.player.texture.key !== 'player') {
-      this.player.setTexture('player');
-      this.player.setScale(0.95);
+    } else {
+      this.ensurePlayerOnFootSheet();
+      this.updatePlayerAnim(true);
     }
 
     if (this.flags.sasquatchInVehicle && this.flags.inVehicle) {
@@ -1305,6 +1310,30 @@ export class GameScene extends Phaser.Scene {
       else if (body.velocity.x > 8) this.sasquatch.setFlipX(false);
     } else if (this.sasquatch.anims.currentAnim?.key !== 'sasquatch-idle') {
       this.sasquatch.play('sasquatch-idle', true);
+    }
+  }
+
+  /** Put officer back on walk sheet after driving / texture swaps. */
+  private ensurePlayerOnFootSheet(): void {
+    if (this.flags.inVehicle) return;
+    if (this.player.texture.key !== 'player_sheet') {
+      this.player.setTexture('player_sheet', 0);
+      this.player.setScale(0.95);
+      const body = this.player.body as Phaser.Physics.Arcade.Body;
+      body.setSize(28, 40).setOffset(10, 12);
+    }
+  }
+
+  /** Real walk cycle — legs/feet move when walking, idle when stopped. */
+  private updatePlayerAnim(moving: boolean): void {
+    if (this.flags.inVehicle) {
+      this.player.anims.stop();
+      return;
+    }
+    this.ensurePlayerOnFootSheet();
+    const key = moving ? 'player-walk' : 'player-idle';
+    if (this.player.anims.currentAnim?.key !== key) {
+      this.player.play(key, true);
     }
   }
 
@@ -1582,10 +1611,8 @@ export class GameScene extends Phaser.Scene {
       const car = this.activeCarKey === 'race_car' ? this.raceCar : this.vehicle;
       car.setPosition(this.player.x, this.player.y);
       car.setVisible(true);
-      this.player.setTexture('player');
-      this.player.setScale(0.95);
-      const body = this.player.body as Phaser.Physics.Arcade.Body;
-      body.setSize(28, 40).setOffset(10, 12);
+      this.ensurePlayerOnFootSheet();
+      this.updatePlayerAnim(false);
       if (this.flags.sasquatchInVehicle) {
         this.sasquatch.setPosition(this.player.x + 40, this.player.y);
       }
@@ -1603,6 +1630,7 @@ export class GameScene extends Phaser.Scene {
     this.player.setPosition(car.x, car.y);
     car.setVisible(false);
     other.setVisible(true);
+    this.player.anims.stop();
     this.player.setTexture(kind);
     this.player.setScale(1.05);
     this.player.setDrag(0);
@@ -1891,7 +1919,8 @@ export class GameScene extends Phaser.Scene {
     this.flags.inHouse = false;
     this.flags.inLair = false;
     this.flags.inVehicle = false;
-    this.player.setTexture('player');
+    this.ensurePlayerOnFootSheet();
+    this.updatePlayerAnim(false);
     this.showIndoor('jail');
     this.worldLayer.setVisible(false);
     this.trailLayer.setVisible(false);
@@ -1912,8 +1941,8 @@ export class GameScene extends Phaser.Scene {
     if (this.flags.inJailBuilding) this.exitJail();
     if (this.flags.inVehicle) {
       this.flags.inVehicle = false;
-      this.player.setTexture('player');
-      this.player.setScale(0.95);
+      this.ensurePlayerOnFootSheet();
+      this.updatePlayerAnim(false);
     }
     this.enterHouse();
   }
@@ -1923,8 +1952,8 @@ export class GameScene extends Phaser.Scene {
     this.flags.inLair = false;
     this.flags.inJailBuilding = false;
     this.flags.inVehicle = false;
-    this.player.setTexture('player');
-    this.player.setScale(0.95);
+    this.ensurePlayerOnFootSheet();
+    this.updatePlayerAnim(false);
     this.showIndoor('house');
     this.worldLayer.setVisible(false);
     this.trailLayer.setVisible(false);
