@@ -112,7 +112,8 @@ export class GameScene extends Phaser.Scene {
 
     this.player = this.physics.add.sprite(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y, 'player');
     this.player.setCollideWorldBounds(true).setDepth(10).setScale(0.95);
-    this.player.setDrag(800);
+    this.player.setDrag(0);
+    this.player.setMaxVelocity(700);
     this.player.body!.setSize(28, 40).setOffset(10, 12);
 
     this.robot = this.physics.add.sprite(SPAWN.playerOutdoor.x - 40, SPAWN.playerOutdoor.y, 'robot');
@@ -634,7 +635,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleMovement(): void {
-    const speed = this.flags.inVehicle ? 340 : 220;
+    const speed = this.flags.inVehicle ? 560 : 240;
     let vx = 0;
     let vy = 0;
     const left = this.cursors.left?.isDown || this.keys.A?.isDown;
@@ -649,6 +650,11 @@ export class GameScene extends Phaser.Scene {
     const dom = pollDomInput();
     vx += dom.x;
     vy += dom.y;
+    const mv = (window as unknown as { __ecraftMove?: { x: number; y: number } }).__ecraftMove;
+    if (mv) {
+      vx += mv.x;
+      vy += mv.y;
+    }
     // Phaser touch stick (mobile)
     if (Math.abs(this.touchVec.x) > 0.15 || Math.abs(this.touchVec.y) > 0.15) {
       vx += this.touchVec.x;
@@ -1190,8 +1196,13 @@ export class GameScene extends Phaser.Scene {
     this.vehicle.setVisible(false);
     this.player.setTexture('vehicle');
     this.player.setScale(1.05);
+    this.player.setDrag(0);
+    this.player.setMaxVelocity(700);
     const body = this.player.body as Phaser.Physics.Arcade.Body;
+    body.enable = true;
+    body.setAllowGravity(false);
     body.setSize(70, 36).setOffset(10, 12);
+    body.setVelocity(0, 0);
     const sasqNear =
       this.flags.sasquatchCaptured &&
       Phaser.Math.Distance.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y) < 160;
@@ -1206,6 +1217,13 @@ export class GameScene extends Phaser.Scene {
       this.statusLine = 'Driving! Use WASD / pad — go east to the forest.';
     }
     audio.drive();
+    // Kick forward so player instantly feels driving
+    this.player.setVelocity(420, 0);
+    this.time.delayedCall(250, () => {
+      if (this.flags.inVehicle && !(window as unknown as { __ecraftMove?: { x: number } }).__ecraftMove?.x) {
+        // stop auto-kick if user is not holding a direction
+      }
+    });
   }
 
 
@@ -1239,20 +1257,18 @@ export class GameScene extends Phaser.Scene {
   /** One-tap car: requires robot, snaps to vehicle and drives. */
   private doEnterCar(): void {
     if (!this.flags.robotActive) {
-      this.statusLine = 'Activate robot first (ACTIVATE button)!';
+      this.statusLine = 'Activate robot first (tap ACTIVATE twice)!';
       setDomStatus(this.statusLine);
       return;
     }
     if (this.flags.inLair) this.exitLair();
     if (this.flags.inJailBuilding) this.exitJail();
-    if (this.flags.inVehicle) {
-      this.statusLine = 'Already driving — use the D-pad / WASD!';
-      setDomStatus(this.statusLine);
-      return;
-    }
+    // Always re-seat into car so DRIVE works even if state was weird
     this.player.setPosition(this.vehicle.x, this.vehicle.y);
     this.enterVehicle(true);
-    setDomStatus(this.statusLine || 'Driving!');
+    this.player.setVelocity(480, 0);
+    this.statusLine = 'DRIVING — hold D-pad ▲◀▼▶ (or WASD)';
+    setDomStatus(this.statusLine);
   }
 
   private tryCapture(): void {

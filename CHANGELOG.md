@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.3 — 2026-09-05 — CAR DRIVE FIX
+
+### Fixed
+- Car drag was killing velocity — drag now 0 while driving
+- Faster drive speed + instant forward kick when entering car
+- D-pad uses pointer capture so hold-to-drive works on phones
+- Proven: hold ▶ for 1s moves car ~400–550px
+
+
 ## 1.0.2 — 2026-09-05 — CONTROLS ACTUALLY WORK
 
 ### Fixed

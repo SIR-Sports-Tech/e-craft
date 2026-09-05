@@ -14,6 +14,20 @@ export type DomInputState = {
 };
 
 const pressed = new Set<string>();
+/** Persistent axis written by pad (survives flaky keyup/pointerleave). */
+const move = { x: 0, y: 0 };
+(window as unknown as { __ecraftMove: { x: number; y: number } }).__ecraftMove = move;
+
+function recomputeMove(): void {
+  let x = 0;
+  let y = 0;
+  if (pressed.has('KeyA') || pressed.has('ArrowLeft')) x -= 1;
+  if (pressed.has('KeyD') || pressed.has('ArrowRight')) x += 1;
+  if (pressed.has('KeyW') || pressed.has('ArrowUp')) y -= 1;
+  if (pressed.has('KeyS') || pressed.has('ArrowDown')) y += 1;
+  move.x = x;
+  move.y = y;
+}
 
 type EcraftApi = {
   interact?: () => void;
@@ -29,13 +43,8 @@ function api(): EcraftApi | undefined {
 }
 
 function keyToAxis(): { x: number; y: number } {
-  let x = 0;
-  let y = 0;
-  if (pressed.has('KeyA') || pressed.has('ArrowLeft')) x -= 1;
-  if (pressed.has('KeyD') || pressed.has('ArrowRight')) x += 1;
-  if (pressed.has('KeyW') || pressed.has('ArrowUp')) y -= 1;
-  if (pressed.has('KeyS') || pressed.has('ArrowDown')) y += 1;
-  return { x, y };
+  recomputeMove();
+  return { x: move.x, y: move.y };
 }
 
 function flash(btn: HTMLElement): void {
@@ -134,21 +143,26 @@ export function installDomOverlay(): void {
       right: 'ArrowRight',
     };
     const code = map[dir];
-    const down = (e: Event) => {
+    const down = (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       api()?.unpause?.();
+      try { btn.setPointerCapture(e.pointerId); } catch {}
       pressed.add(code);
+      recomputeMove();
       flash(btn);
     };
-    const up = (e: Event) => {
+    const up = (e: PointerEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       pressed.delete(code);
+      recomputeMove();
+      try { btn.releasePointerCapture(e.pointerId); } catch {}
     };
     btn.addEventListener('pointerdown', down);
     btn.addEventListener('pointerup', up);
-    btn.addEventListener('pointerleave', up);
     btn.addEventListener('pointercancel', up);
+    // Do NOT clear on pointerleave while captured — that was killing drive input
   });
 
   const bindAction = (id: string, fn: () => void, label: string) => {
@@ -180,6 +194,7 @@ export function installDomOverlay(): void {
     'keydown',
     (e) => {
       pressed.add(e.code);
+      recomputeMove();
       api()?.unpause?.();
       if (e.code === 'KeyE') api()?.interact?.();
       if (e.code === 'Space') {
@@ -191,8 +206,14 @@ export function installDomOverlay(): void {
     },
     { passive: false },
   );
-  window.addEventListener('keyup', (e) => pressed.delete(e.code));
-  window.addEventListener('blur', () => pressed.clear());
+  window.addEventListener('keyup', (e) => {
+    pressed.delete(e.code);
+    recomputeMove();
+  });
+  window.addEventListener('blur', () => {
+    pressed.clear();
+    recomputeMove();
+  });
 }
 
 /** Movement only — actions are direct-wired above. */
