@@ -241,11 +241,16 @@ export class UIScene extends Phaser.Scene {
     });
 
     this.layoutTouch(this.scale.width, this.scale.height);
-    // Show touch UI always on coarse pointers / small screens; keep visible for tablets
-    const showTouch = this.sys.game.device.os.android || this.sys.game.device.os.iOS || this.scale.width < 1000;
-    this.touchRoot.setVisible(true);
-    if (!showTouch) {
-      this.touchRoot.setAlpha(0.55);
+    // Desktop keyboard play: hide touch overlay so it cannot steal input
+    const touchDevice =
+      this.sys.game.device.os.android ||
+      this.sys.game.device.os.iOS ||
+      (this.sys.game.device.input.touch && this.scale.width < 900);
+    this.touchRoot.setVisible(!!touchDevice);
+    this.touchRoot.setActive(!!touchDevice);
+    if (!touchDevice) {
+      // Ensure no residual stick vector on desktop
+      this.gameScene.setTouchVector(0, 0);
     }
   }
 

@@ -6,6 +6,22 @@
 - Citizen dialogue (Pike, Jun, Ada, Remy)
 # Changelog
 
+## 0.2.1 — 2026-09-05 — CONTROLS + ART FIX
+
+### Fixed
+- **Controls:** removed bob-tween fighting WASD; desktop no longer shows touch overlay that stole input; keyboard focus on game; faster move speed
+- Title: bigger NEW GAME button + **Enter/Space** to start
+- Scale mode FIT for stable layout
+
+### Improved
+- Larger clearer original sprites (officer, robot, sasquatch, car, buildings, trees)
+
+### Test
+- http://127.0.0.1:5173/?skiptitle=1 (jump into game)
+- http://127.0.0.1:5173/ (title screen)
+- Preview: http://127.0.0.1:4173/?skiptitle=1
+
+
 ## 0.2.0 — 2026-09-05 — TEST BUILD
 
 ### Added

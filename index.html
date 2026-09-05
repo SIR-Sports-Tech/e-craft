@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>E-CRAFT v0.1 — Sasquatch Security Mission</title>
+    <title>E-CRAFT v0.2.1 — Test Build</title>
     <style>
       html, body {
         margin: 0;
@@ -11,22 +11,33 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: #0b1020;
+        background: #071018;
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
         touch-action: none;
+        user-select: none;
       }
       #app {
         width: 100%;
         height: 100%;
+        outline: none;
       }
       canvas {
         display: block;
         margin: 0 auto;
+        outline: none;
       }
     </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app" tabindex="0"></div>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      // Keep keyboard focus on the game
+      window.addEventListener('load', () => {
+        const el = document.getElementById('app');
+        el && el.focus();
+        document.body.addEventListener('click', () => el && el.focus());
+      });
+    </script>
   </body>
 </html>

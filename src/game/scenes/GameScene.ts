@@ -125,6 +125,7 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
+    this.input.keyboard!.enabled = true;
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.keys = this.input.keyboard!.addKeys({
       W: Phaser.Input.Keyboard.KeyCodes.W,
@@ -140,7 +141,7 @@ export class GameScene extends Phaser.Scene {
     }) as typeof this.keys;
 
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
-    this.cameras.main.setZoom(1);
+    this.cameras.main.setZoom(1.2);
 
     this.scene.launch('UI', { game: this });
     this.setPhase(MissionPhase.AtSecurityHQ);
@@ -151,19 +152,6 @@ export class GameScene extends Phaser.Scene {
       complete: () => this.debugCompleteMission(),
       save: () => this.persistSave(),
     };
-
-    // Idle bob animation for living feel
-    this.tweens.add({
-      targets: this.player,
-      y: this.player.y - 2,
-      duration: 450,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-      onUpdate: () => {
-        /* physics overrides y while moving; bob is subtle when idle only */
-      },
-    });
 
     if (this.registry.get('loadSave')) {
       this.applySave();
@@ -527,15 +515,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleMovement(): void {
-    const speed = this.flags.inVehicle ? 280 : 170;
+    const speed = this.flags.inVehicle ? 320 : 200;
     let vx = 0;
     let vy = 0;
-    if (this.cursors.left.isDown || this.keys.A.isDown) vx -= 1;
-    if (this.cursors.right.isDown || this.keys.D.isDown) vx += 1;
-    if (this.cursors.up.isDown || this.keys.W.isDown) vy -= 1;
-    if (this.cursors.down.isDown || this.keys.S.isDown) vy += 1;
-    vx += this.touchVec.x;
-    vy += this.touchVec.y;
+    const left = this.cursors.left?.isDown || this.keys.A?.isDown;
+    const right = this.cursors.right?.isDown || this.keys.D?.isDown;
+    const up = this.cursors.up?.isDown || this.keys.W?.isDown;
+    const down = this.cursors.down?.isDown || this.keys.S?.isDown;
+    if (left) vx -= 1;
+    if (right) vx += 1;
+    if (up) vy -= 1;
+    if (down) vy += 1;
+    // Touch stick only if meaningful deflection (avoid drift)
+    if (Math.abs(this.touchVec.x) > 0.15 || Math.abs(this.touchVec.y) > 0.15) {
+      vx += this.touchVec.x;
+      vy += this.touchVec.y;
+    }
+    if (vx === 0 && vy === 0) {
+      this.player.setVelocity(0, 0);
+      return;
+    }
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * speed, (vy / len) * speed);
 

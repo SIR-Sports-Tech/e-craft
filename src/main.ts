@@ -7,9 +7,9 @@ import { UIScene } from './game/scenes/UIScene';
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'app',
-  backgroundColor: '#0b1020',
+  backgroundColor: '#0a1628',
   scale: {
-    mode: Phaser.Scale.RESIZE,
+    mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: 1280,
     height: 720,

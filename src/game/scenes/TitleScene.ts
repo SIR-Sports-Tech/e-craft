@@ -49,11 +49,11 @@ export class TitleScene extends Phaser.Scene {
 
     const mkBtn = (y: number, label: string, color: number, onClick: () => void) => {
       const c = this.add.container(w / 2, y);
-      const r = this.add.rectangle(0, 0, 280, 52, color, 0.95).setStrokeStyle(2, 0xffffff, 0.35);
-      const t = this.add.text(0, 0, label, { fontSize: '22px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+      const r = this.add.rectangle(0, 0, 320, 64, color, 0.95).setStrokeStyle(2, 0xffffff, 0.35);
+      const t = this.add.text(0, 0, label, { fontSize: '26px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
       c.add([r, t]);
-      c.setSize(280, 52);
-      c.setInteractive(new Phaser.Geom.Rectangle(-140, -26, 280, 52), Phaser.Geom.Rectangle.Contains);
+      c.setSize(320, 64);
+      c.setInteractive(new Phaser.Geom.Rectangle(-160, -32, 320, 64), Phaser.Geom.Rectangle.Contains);
       c.on('pointerover', () => r.setScale(1.04));
       c.on('pointerout', () => r.setScale(1));
       c.on('pointerdown', () => {
@@ -78,11 +78,28 @@ export class TitleScene extends Phaser.Scene {
     }
 
     this.add
-      .text(w / 2, h - 40, 'WASD move · E interact · Space capture · M map · Esc pause', {
+      .text(w / 2, h - 56, 'Click NEW GAME  ·  or press Enter / Space', {
+        fontSize: '16px',
+        color: '#ffe082',
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(w / 2, h - 28, 'In-game: WASD move · E interact · Space capture · M map · Esc pause', {
         fontSize: '13px',
         color: '#b0bec5',
       })
       .setOrigin(0.5);
+
+    this.input.keyboard?.once('keydown-ENTER', () => {
+      audio.interact();
+      this.registry.set('loadSave', false);
+      this.scene.start('Game');
+    });
+    this.input.keyboard?.once('keydown-SPACE', () => {
+      audio.interact();
+      this.registry.set('loadSave', false);
+      this.scene.start('Game');
+    });
 
     void bg;
   }
