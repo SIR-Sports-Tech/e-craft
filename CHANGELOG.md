@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0 — 2026-09-05 — FIRST PLAN COMPLETE
+
+### Done
+- Full Sasquatch Security Mission acceptance sequence
+- Automated E2E (`npm run test:acceptance`) PASSED
+- Phone LAN play + Chrome DOM controls
+- Trail never permanently lost
+- Reward `$10,000 TRILLION BILLION`
+- Free explore after mission
+
+
 ## 0.2.4 — 2026-09-05
 
 ### Added

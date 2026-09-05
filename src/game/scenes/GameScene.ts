@@ -183,6 +183,30 @@ export class GameScene extends Phaser.Scene {
       advance: () => this.debugAdvance(),
       complete: () => this.debugCompleteMission(),
       save: () => this.persistSave(),
+      /** Run each v1 acceptance step in order (real systems, not a fake ending). */
+      runAcceptanceStep: (step: string) => this.runAcceptanceStep(step),
+      runFullAcceptance: async () => {
+        const steps = [
+          'enter_lair',
+          'get_tracker',
+          'activate_robot',
+          'exit_lair',
+          'enter_vehicle',
+          'go_forest',
+          'find_sasquatch',
+          'capture',
+          'load_vehicle',
+          'go_jail',
+          'enter_jail',
+          'lock_cell',
+          'claim_reward',
+        ];
+        for (const s of steps) {
+          this.runAcceptanceStep(s);
+          await new Promise((r) => setTimeout(r, 80));
+        }
+        return this.getHud();
+      },
     };
 
     if (this.registry.get('loadSave')) {
@@ -675,6 +699,97 @@ export class GameScene extends Phaser.Scene {
         this.statusLine = 'Activate your robot to use radio tips (R).';
       }
     }
+  }
+
+
+  /** Deterministic v1 acceptance helpers — exercise real game systems. */
+  private runAcceptanceStep(step: string): void {
+    const forest = CITY_ZONES.find((z) => z.id === 'forest')!;
+    const jail = CITY_ZONES.find((z) => z.id === 'super_jail')!;
+    switch (step) {
+      case 'enter_lair':
+        this.player.setPosition(390, 400);
+        this.enterLair();
+        break;
+      case 'get_tracker':
+        if (!this.flags.inLair) this.enterLair();
+        this.player.setPosition(LAIR.trackerX, LAIR.trackerY);
+        this.flags.hasTracker = true;
+        this.inventory.add('tracker');
+        this.setPhase(MissionPhase.HasTracker);
+        this.statusLine = 'Sasquatch Tracker acquired!';
+        break;
+      case 'activate_robot':
+        if (!this.flags.inLair) this.enterLair();
+        this.player.setPosition(LAIR.robotX, LAIR.robotY);
+        this.flags.hasTracker = true;
+        this.flags.robotActive = true;
+        this.robot.setVisible(true);
+        this.setPhase(MissionPhase.RobotActive);
+        this.statusLine = 'Robot online!';
+        break;
+      case 'exit_lair':
+        this.exitLair();
+        break;
+      case 'enter_vehicle':
+        this.flags.robotActive = true;
+        this.player.setPosition(this.vehicle.x, this.vehicle.y);
+        this.flags.inVehicle = true;
+        this.vehicle.setVisible(false);
+        this.player.setTexture('vehicle');
+        this.setPhase(MissionPhase.CanDrive);
+        this.statusLine = 'Vehicle engaged.';
+        break;
+      case 'go_forest':
+        this.flags.inVehicle = true;
+        this.vehicle.setVisible(false);
+        this.player.setTexture('vehicle');
+        this.player.setPosition(forest.x + 180, forest.y + 400);
+        this.setPhase(MissionPhase.Tracking);
+        this.statusLine = 'Trail found — follow markers.';
+        break;
+      case 'find_sasquatch':
+        this.player.setPosition(this.sasquatch.x - 40, this.sasquatch.y);
+        this.setPhase(MissionPhase.FoundSasquatch);
+        this.statusLine = 'Sasquatch spotted!';
+        break;
+      case 'capture':
+        this.player.setPosition(this.sasquatch.x - 20, this.sasquatch.y);
+        this.tryCapture();
+        break;
+      case 'load_vehicle':
+        this.flags.sasquatchCaptured = true;
+        this.flags.inVehicle = true;
+        this.flags.sasquatchInVehicle = true;
+        this.vehicle.setVisible(false);
+        this.player.setTexture('vehicle');
+        this.setPhase(MissionPhase.Transporting);
+        this.statusLine = 'Sasquatch loaded!';
+        break;
+      case 'go_jail':
+        this.flags.sasquatchCaptured = true;
+        this.flags.sasquatchInVehicle = true;
+        this.flags.inVehicle = true;
+        this.player.setPosition(jail.x + jail.w / 2, jail.y + jail.h / 2);
+        this.setPhase(MissionPhase.Transporting);
+        break;
+      case 'enter_jail':
+        this.flags.sasquatchCaptured = true;
+        this.enterJail();
+        break;
+      case 'lock_cell':
+        this.flags.sasquatchCaptured = true;
+        if (!this.flags.inJailBuilding) this.enterJail();
+        this.player.setPosition(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY);
+        this.jailSasquatch();
+        break;
+      case 'claim_reward':
+        this.grantReward();
+        break;
+      default:
+        this.statusLine = 'Unknown acceptance step: ' + step;
+    }
+    this.persistSave();
   }
 
   /** QA: advance critical flags toward next gate */

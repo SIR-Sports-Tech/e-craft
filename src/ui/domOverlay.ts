@@ -78,7 +78,7 @@ export function installDomOverlay(): void {
   root.id = 'ecraft-dom-root';
   root.innerHTML = `
     <div class="panel">
-      <h1>E-CRAFT v0.2.3 · Keep Building</h1>
+      <h1>E-CRAFT v1.0 · Sasquatch Mission</h1>
       <p id="ecraft-dom-status">Click the game, then use WASD or the pad to move.</p>
       <div class="hint">WASD · E interact · Space capture · R robot tip · M map · Esc pause</div>
       <div class="hint" id="ecraft-dom-inv" style="margin-top:4px;color:#b2dfdb"></div>

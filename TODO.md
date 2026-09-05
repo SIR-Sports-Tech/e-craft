@@ -1,11 +1,12 @@
 # E-CRAFT TODO
 
-## v0.1 (current)
+## v1.0 (COMPLETE — first plan)
 - [x] Repo + Phaser 3 + TS + Vite
 - [x] Full Sasquatch mission playable
 - [x] Trail never permanently lost
 - [x] Touch controls
 - [x] README / CHANGELOG / TODO
+- [x] Full Sasquatch mission acceptance E2E (`npm run test:acceptance`)
 - [x] Manual/automated smoke (Playwright canvas boot + F10)
 - [x] Polish vehicle load UX (follow + wider load radius)
 

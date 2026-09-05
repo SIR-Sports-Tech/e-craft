@@ -1,4 +1,6 @@
-# E-CRAFT v0.1 — Sasquatch Security Mission
+# E-CRAFT v1.0 — Sasquatch Security Mission
+
+**Status: v1.0 COMPLETE** for the first playable plan.
 
 Original free-to-play, family-friendly living-world game prototype.
 

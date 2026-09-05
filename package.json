@@ -1,7 +1,7 @@
 {
   "name": "e-craft",
   "private": true,
-  "version": "0.2.4",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/mission-smoke.mjs",
-    "smoke:browser": "node scripts/playwright-smoke.mjs"
+    "smoke:browser": "node scripts/playwright-smoke.mjs",
+    "test:acceptance": "node scripts/e2e-acceptance.mjs"
   },
   "devDependencies": {
     "playwright": "^1.63.0",
