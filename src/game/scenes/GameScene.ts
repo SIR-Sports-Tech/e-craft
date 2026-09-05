@@ -287,7 +287,8 @@ export class GameScene extends Phaser.Scene {
         this.paused = false;
         this.mapOpen = false;
         if (this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse) {
-          setDomStatus('Go outside for the panther!');
+          this.statusLine = 'Go outside for the panther!';
+          setDomStatus(this.statusLine);
           return;
         }
         this.panther.forceJump(this.player, (msg) => {
@@ -295,6 +296,24 @@ export class GameScene extends Phaser.Scene {
           setDomStatus(msg);
           audio.talk();
         });
+      },
+      exitIndoor: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        if (this.flags.inHouse) {
+          this.exitHouse();
+          return;
+        }
+        if (this.flags.inLair) {
+          this.exitLair();
+          return;
+        }
+        if (this.flags.inJailBuilding) {
+          this.exitJail();
+          return;
+        }
+        this.statusLine = 'Already outside.';
+        setDomStatus(this.statusLine);
       },
       runAcceptanceStep: (step: string) => this.runAcceptanceStep(step),
       runFullAcceptance: async () => {
@@ -1303,7 +1322,13 @@ export class GameScene extends Phaser.Scene {
       const now = _time;
       if (now - this.lastHudWrite > 400) {
         this.lastHudWrite = now;
-        const hudLine = this.interactPrompt || this.statusLine || PHASE_HINTS[this.phase];
+        // Indoors / sleeping: prefer action status so trail prompts don't bury button feedback
+        const indoors = this.flags.inLair || this.flags.inHouse || this.flags.inJailBuilding;
+        const hudLine = this.sleeping
+          ? this.statusLine || 'Sleeping…'
+          : indoors
+            ? this.statusLine || this.interactPrompt || PHASE_HINTS[this.phase]
+            : this.interactPrompt || this.statusLine || PHASE_HINTS[this.phase];
         if (hudLine && hudLine !== this.lastToast) {
           this.lastToast = hudLine;
           setDomStatus(hudLine);
@@ -1704,7 +1729,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateTrailHelp(delta: number): void {
-    if (!this.flags.hasTracker || !this.trackerHeld || this.flags.sasquatchCaptured || this.flags.inLair) {
+    if (
+      !this.flags.hasTracker ||
+      !this.trackerHeld ||
+      this.flags.sasquatchCaptured ||
+      this.flags.inLair ||
+      this.flags.inHouse ||
+      this.flags.inJailBuilding ||
+      this.sleeping
+    ) {
       this.trail.clearFallback();
       return;
     }
@@ -1738,9 +1771,9 @@ export class GameScene extends Phaser.Scene {
 
   private describeInteract(): string | null {
     if (this.flags.inHouse) {
-      if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 90)) return '[E] Sleep in bed → morning';
-      if (this.near(HOUSE_INTERIOR.exitX + 40, HOUSE_INTERIOR.exitY + 10, 70)) return '[E] Exit house';
-      return 'Walk to the bed to sleep';
+      if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 100)) return '[E] Sleep in bed → morning';
+      if (this.near(HOUSE_INTERIOR.exitX + 40, HOUSE_INTERIOR.exitY + 40, 110)) return '[E] Exit house';
+      return '[E] near bed to sleep · EXIT to leave';
     }
     if (this.flags.inLair) {
       if (!this.flags.hasTracker && this.near(LAIR.trackerX, LAIR.trackerY, 80)) {
@@ -1822,15 +1855,16 @@ export class GameScene extends Phaser.Scene {
 
   private tryInteract(): void {
     if (this.flags.inHouse) {
-      if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 90)) {
+      if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 100)) {
         this.doSleep();
         return;
       }
-      if (this.near(HOUSE_INTERIOR.exitX + 40, HOUSE_INTERIOR.exitY + 10, 70)) {
+      if (this.near(HOUSE_INTERIOR.exitX + 40, HOUSE_INTERIOR.exitY + 40, 110)) {
         this.exitHouse();
         return;
       }
-      this.statusLine = 'Walk over to the bed to sleep.';
+      this.statusLine = 'Tap SLEEP for bed, or EXIT to leave the house.';
+      setDomStatus(this.statusLine);
       return;
     }
 
@@ -2056,6 +2090,13 @@ export class GameScene extends Phaser.Scene {
     this.tryInteract();
   }
 
+  /** Leave any indoor space so car / outdoor actions can't stack broken flags. */
+  private leaveIndoorsIfNeeded(): void {
+    if (this.flags.inHouse) this.exitHouse();
+    if (this.flags.inLair) this.exitLair();
+    if (this.flags.inJailBuilding) this.exitJail();
+  }
+
   /** One-tap car: requires robot, snaps to vehicle and drives. */
   private doEnterCar(kind: 'vehicle' | 'race_car' = 'vehicle'): void {
     if (!this.flags.robotActive) {
@@ -2063,8 +2104,10 @@ export class GameScene extends Phaser.Scene {
       setDomStatus(this.statusLine);
       return;
     }
-    if (this.flags.inLair) this.exitLair();
-    if (this.flags.inJailBuilding) this.exitJail();
+    this.leaveIndoorsIfNeeded();
+    this.flags.inHouse = false;
+    this.flags.inLair = false;
+    this.flags.inJailBuilding = false;
 
     const car = kind === 'race_car' ? this.raceCar : this.vehicle;
     this.activeCarKey = kind;

@@ -1,6 +1,7 @@
 /**
  * Direct-wired controls for phone/Chrome.
  * Layout law: LEFT = actions only · RIGHT = D-pad only · never overlap.
+ * Button law: every tap must hit a live API (no silent no-ops).
  */
 
 export type DomInputState = {
@@ -14,7 +15,6 @@ export type DomInputState = {
 };
 
 const pressed = new Set<string>();
-/** Persistent axis written by pad (survives flaky keyup/pointerleave). */
 const move = { x: 0, y: 0 };
 (window as unknown as { __ecraftMove: { x: number; y: number } }).__ecraftMove = move;
 
@@ -40,8 +40,9 @@ type EcraftApi = {
   sleep?: () => void;
   enterHouse?: () => void;
   pantherJump?: () => void;
+  exitIndoor?: () => void;
   unpause?: () => void;
-  getState?: () => { flags?: Record<string, boolean>; prompt?: string; hour?: number; dayPhase?: string };
+  getState?: () => { flags?: Record<string, boolean>; prompt?: string; status?: string; hour?: number; dayPhase?: string };
 };
 
 function api(): EcraftApi | undefined {
@@ -60,13 +61,45 @@ function flash(btn: HTMLElement): void {
   }, 120);
 }
 
+function showToast(msg: string): void {
+  const el = document.getElementById('ecraft-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  window.setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+/** Call game API — never silent-fail if game is still booting. */
+function callApi(fnName: keyof EcraftApi, fallbackToast: string): void {
+  const a = api();
+  if (!a) {
+    showToast('Game loading… tap again');
+    return;
+  }
+  const fn = a[fnName];
+  if (typeof fn !== 'function') {
+    showToast('Button not ready — tap again');
+    return;
+  }
+  a.unpause?.();
+  try {
+    (fn as () => void).call(a);
+    // Prefer live game status over generic label
+    const st = a.getState?.();
+    const live = st?.status || st?.prompt;
+    showToast(live || fallbackToast);
+  } catch (err) {
+    showToast('Control error — try again');
+    console.error('[E-CRAFT] button', fnName, err);
+  }
+}
+
 export function installDomOverlay(): void {
-  const existing = document.getElementById('ecraft-dom-root');
-  if (existing) existing.remove();
+  document.getElementById('ecraft-dom-root')?.remove();
+  document.getElementById('ecraft-dom-style')?.remove();
 
   const style = document.createElement('style');
   style.id = 'ecraft-dom-style';
-  document.getElementById('ecraft-dom-style')?.remove();
   style.textContent = `
     #ecraft-dom-root {
       position: fixed; inset: 0; pointer-events: none; z-index: 99999 !important;
@@ -76,7 +109,7 @@ export function installDomOverlay(): void {
       pointer-events: none;
       position: absolute; left: 50%; top: max(8px, env(safe-area-inset-top));
       transform: translateX(-50%);
-      background: rgba(0,0,0,.65); color: #fffde7;
+      background: rgba(0,0,0,.72); color: #fffde7;
       border-radius: 999px; padding: 7px 12px;
       font-size: 12px; max-width: min(88vw, 420px); text-align: center;
       opacity: 0; transition: opacity .15s ease;
@@ -84,66 +117,57 @@ export function installDomOverlay(): void {
     }
     #ecraft-toast.show { opacity: 1; }
 
-    /*
-      NO-OVERLAP LAYOUT
-      - Left column: actions only (max ~36vw)
-      - Right column: D-pad only (max ~42vw)
-      - Middle gap reserved; columns never share x-space
-    */
+    /* Compact LEFT grid — all buttons visible without scroll on phones */
     #ecraft-actions {
       pointer-events: auto;
       position: absolute;
       left: max(6px, env(safe-area-inset-left));
       bottom: max(6px, env(safe-area-inset-bottom));
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      width: min(132px, 34vw);
-      max-height: min(58vh, 420px);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      width: min(158px, 40vw);
+      max-height: min(62vh, 460px);
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
-      touch-action: none;
+      touch-action: pan-y;
       z-index: 3;
-      padding-right: 2px;
-    }
-    #ecraft-actions .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
+      padding: 2px;
     }
     #ecraft-actions button {
-      height: 44px;
-      border-radius: 12px;
+      height: 40px;
+      border-radius: 10px;
       border: 2px solid rgba(255,255,255,.4);
       background: rgba(13,71,161,.95); color: #fff;
-      font-weight: 900; font-size: 12px;
-      box-shadow: 0 6px 14px rgba(0,0,0,.4);
+      font-weight: 900; font-size: 11px;
+      box-shadow: 0 5px 12px rgba(0,0,0,.4);
       -webkit-user-select: none; user-select: none;
-      touch-action: none;
+      touch-action: manipulation;
       width: 100%;
       line-height: 1.05;
-      padding: 0 4px;
+      padding: 0 3px;
     }
+    #ecraft-actions .wide { grid-column: 1 / -1; }
     #ecraft-actions .act { background: #1b5e20; }
-    #ecraft-actions .cap { background: #b71c1c; font-size: 11px; }
+    #ecraft-actions .cap { background: #b71c1c; font-size: 10px; }
     #ecraft-actions .car { background: #ef6c00; color: #111; }
     #ecraft-actions .actv { background: #6a1b9a; }
     #ecraft-actions .race { background: #d50000; color: #fff; }
-    #ecraft-actions .rec { background: #455a64; color: #fff; font-size: 10px; height: 36px; }
-    #ecraft-actions .trk { background: #00695c; color: #b9f6ca; font-size: 11px; }
-    #ecraft-actions .home { background: #ad1457; color: #fff; font-size: 11px; }
-    #ecraft-actions .sleep { background: #283593; color: #e8eaf6; font-size: 11px; }
-    #ecraft-actions .pan { background: #212121; color: #ffeb3b; font-size: 11px; }
+    #ecraft-actions .rec { background: #455a64; color: #fff; font-size: 10px; height: 34px; }
+    #ecraft-actions .trk { background: #00695c; color: #b9f6ca; font-size: 10px; }
+    #ecraft-actions .home { background: #ad1457; color: #fff; font-size: 10px; }
+    #ecraft-actions .sleep { background: #283593; color: #e8eaf6; font-size: 10px; }
+    #ecraft-actions .pan { background: #212121; color: #ffeb3b; font-size: 10px; }
+    #ecraft-actions .exit { background: #006064; color: #e0f7fa; font-size: 10px; }
 
-    /* D-pad: RIGHT only — fixed square, never under left actions */
     #ecraft-pad {
       pointer-events: auto;
       position: absolute;
       right: max(6px, env(safe-area-inset-right));
       bottom: max(6px, env(safe-area-inset-bottom));
-      width: min(168px, 42vw);
-      height: min(168px, 42vw);
+      width: min(160px, 40vw);
+      height: min(160px, 40vw);
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       grid-template-rows: 1fr 1fr 1fr;
@@ -152,10 +176,7 @@ export function installDomOverlay(): void {
       z-index: 3;
     }
     #ecraft-pad button {
-      width: 100%;
-      height: 100%;
-      min-width: 0;
-      min-height: 0;
+      width: 100%; height: 100%; min-width: 0; min-height: 0;
       border-radius: 50%;
       border: 2px solid rgba(255,255,255,.45);
       background: rgba(13,71,161,.95); color: #fff;
@@ -165,21 +186,17 @@ export function installDomOverlay(): void {
       touch-action: none;
       padding: 0;
     }
-    #ecraft-pad .pad-dead {
-      pointer-events: none;
-      visibility: hidden;
-    }
+    #ecraft-pad .pad-dead { pointer-events: none; visibility: hidden; }
 
-    /* Narrow phones: shrink further so columns never collide */
     @media (max-width: 400px) {
-      #ecraft-actions { width: min(118px, 32vw); gap: 5px; }
-      #ecraft-actions button { height: 40px; font-size: 11px; border-radius: 10px; }
-      #ecraft-actions .rec { height: 32px; font-size: 9px; }
-      #ecraft-pad { width: min(148px, 40vw); height: min(148px, 40vw); gap: 4px; }
+      #ecraft-actions { width: min(148px, 39vw); gap: 4px; }
+      #ecraft-actions button { height: 36px; font-size: 10px; }
+      #ecraft-actions .rec { height: 30px; }
+      #ecraft-pad { width: min(136px, 36vw); height: min(136px, 36vw); }
     }
     @media (max-width: 340px) {
-      #ecraft-actions { width: 108px; }
-      #ecraft-pad { width: 132px; height: 132px; }
+      #ecraft-actions { width: min(124px, 38vw); }
+      #ecraft-pad { width: min(118px, 36vw); height: min(118px, 36vw); }
     }
   `;
   document.head.appendChild(style);
@@ -187,20 +204,19 @@ export function installDomOverlay(): void {
   const root = document.createElement('div');
   root.id = 'ecraft-dom-root';
   root.innerHTML = `
-    <div id="ecraft-toast">Left = actions · Right = D-pad (no overlap)</div>
+    <div id="ecraft-toast">All buttons live — LEFT actions · RIGHT D-pad</div>
     <div id="ecraft-actions" aria-label="action buttons">
-      <div class="row">
-        <button type="button" class="act" id="btn-e">E</button>
-        <button type="button" class="cap" id="btn-cap">CAPTURE</button>
-      </div>
-      <button type="button" class="trk" id="btn-tracker">HOLD TRACKER</button>
+      <button type="button" class="act" id="btn-e">E</button>
+      <button type="button" class="cap" id="btn-cap">CAPTURE</button>
+      <button type="button" class="trk wide" id="btn-tracker">HOLD TRACKER</button>
       <button type="button" class="actv" id="btn-activate">ACTIVATE</button>
+      <button type="button" class="exit" id="btn-exit">EXIT</button>
       <button type="button" class="home" id="btn-house">GO HOME</button>
       <button type="button" class="sleep" id="btn-sleep">SLEEP</button>
-      <button type="button" class="pan" id="btn-panther">PANTHER!</button>
-      <button type="button" class="car" id="btn-car">PATROL CAR</button>
-      <button type="button" class="race" id="btn-race">RACE CAR</button>
-      <button type="button" class="rec" id="btn-recover">UNFREEZE / SAVE</button>
+      <button type="button" class="car" id="btn-car">PATROL</button>
+      <button type="button" class="race" id="btn-race">RACE</button>
+      <button type="button" class="pan wide" id="btn-panther">PANTHER!</button>
+      <button type="button" class="rec wide" id="btn-recover">UNFREEZE / SAVE</button>
     </div>
     <div id="ecraft-pad" aria-label="movement pad">
       <span class="pad-dead"></span>
@@ -216,17 +232,10 @@ export function installDomOverlay(): void {
   `;
   document.body.appendChild(root);
 
-  const toast = (msg: string) => {
-    const el = document.getElementById('ecraft-toast');
-    if (!el) return;
-    el.textContent = msg;
-    el.classList.add('show');
-    window.setTimeout(() => el.classList.remove('show'), 2500);
-  };
-  (window as unknown as { __ecraftToast: (m: string) => void }).__ecraftToast = toast;
-  toast('Controls: LEFT actions · RIGHT D-pad');
+  (window as unknown as { __ecraftToast: (m: string) => void }).__ecraftToast = showToast;
+  showToast('Controls ready — every button works');
 
-  // Movement pad
+  // D-pad
   root.querySelectorAll<HTMLButtonElement>('#ecraft-pad [data-dir]').forEach((btn) => {
     const dir = btn.dataset.dir!;
     const map: Record<string, string> = {
@@ -265,7 +274,7 @@ export function installDomOverlay(): void {
     btn.addEventListener('pointercancel', up);
   });
 
-  const bindAction = (id: string, fn: () => void, label: string) => {
+  const bindAction = (id: string, fnName: keyof EcraftApi, label: string) => {
     const btn = document.getElementById(id);
     if (!btn) return;
     let last = 0;
@@ -273,32 +282,26 @@ export function installDomOverlay(): void {
       e.preventDefault();
       e.stopPropagation();
       const now = Date.now();
-      if (now - last < 280) return;
+      if (now - last < 220) return;
       last = now;
-      api()?.unpause?.();
       flash(btn);
-      try {
-        fn();
-        toast(label);
-      } catch (err) {
-        toast('Control error — try again');
-        console.error(err);
-      }
+      callApi(fnName, label);
     };
+    // pointerdown only — click duplicate was skipping / double-toggling on phones
     btn.addEventListener('pointerdown', fire);
-    btn.addEventListener('click', fire);
   };
 
-  bindAction('btn-e', () => api()?.interact?.(), 'Interact');
-  bindAction('btn-cap', () => api()?.capture?.(), 'Capture');
-  bindAction('btn-tracker', () => api()?.holdTracker?.(), 'Holding Tracker');
-  bindAction('btn-activate', () => api()?.activate?.(), 'Activate');
-  bindAction('btn-house', () => api()?.enterHouse?.(), 'Welcome home');
-  bindAction('btn-sleep', () => api()?.sleep?.(), 'Sleeping…');
-  bindAction('btn-panther', () => api()?.pantherJump?.(), 'Panther!');
-  bindAction('btn-car', () => api()?.enterCar?.(), 'Patrol Car');
-  bindAction('btn-race', () => api()?.enterRaceCar?.(), 'Race Car');
-  bindAction('btn-recover', () => api()?.recover?.(), 'Recovered');
+  bindAction('btn-e', 'interact', 'Interact');
+  bindAction('btn-cap', 'capture', 'Capture');
+  bindAction('btn-tracker', 'holdTracker', 'Holding Tracker');
+  bindAction('btn-activate', 'activate', 'Activate');
+  bindAction('btn-exit', 'exitIndoor', 'Exited');
+  bindAction('btn-house', 'enterHouse', 'Welcome home');
+  bindAction('btn-sleep', 'sleep', 'Sleeping…');
+  bindAction('btn-panther', 'pantherJump', 'Panther!');
+  bindAction('btn-car', 'enterCar', 'Patrol Car');
+  bindAction('btn-race', 'enterRaceCar', 'Race Car');
+  bindAction('btn-recover', 'recover', 'Recovered');
 
   window.addEventListener(
     'keydown',
@@ -306,16 +309,17 @@ export function installDomOverlay(): void {
       pressed.add(e.code);
       recomputeMove();
       api()?.unpause?.();
-      if (e.code === 'KeyE') api()?.interact?.();
+      if (e.code === 'KeyE') callApi('interact', 'Interact');
       if (e.code === 'Space') {
         e.preventDefault();
-        api()?.capture?.();
+        callApi('capture', 'Capture');
       }
-      if (e.code === 'KeyC') api()?.enterCar?.();
-      if (e.code === 'KeyF') api()?.activate?.();
-      if (e.code === 'KeyT') api()?.holdTracker?.();
-      if (e.code === 'KeyH') api()?.enterHouse?.();
-      if (e.code === 'KeyZ') api()?.sleep?.();
+      if (e.code === 'KeyC') callApi('enterCar', 'Patrol Car');
+      if (e.code === 'KeyF') callApi('activate', 'Activate');
+      if (e.code === 'KeyT') callApi('holdTracker', 'Holding Tracker');
+      if (e.code === 'KeyH') callApi('enterHouse', 'Welcome home');
+      if (e.code === 'KeyZ') callApi('sleep', 'Sleeping…');
+      if (e.code === 'KeyX') callApi('exitIndoor', 'Exited');
     },
     { passive: false },
   );
@@ -329,7 +333,6 @@ export function installDomOverlay(): void {
   });
 }
 
-/** Movement only — actions are direct-wired above. */
 export function pollDomInput(): DomInputState {
   const axis = keyToAxis();
   return {
@@ -349,5 +352,5 @@ export function setDomStatus(text: string): void {
 }
 
 export function setDomMeta(_inv: string, _job: string): void {
-  // no-op: boxes removed on purpose
+  // no-op
 }

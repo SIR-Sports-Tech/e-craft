@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.1 — 2026-09-05 — ALL BUTTONS WORK
+
+### Fixed
+- Cars no longer engage while still flagged “inside house” (broken stacked state)
+- Trail toasts no longer bury indoor button feedback
+- Button taps: pointerdown-only + live API status toast (no silent fails)
+- New **EXIT** button leaves house / lair / jail
+- Compact 2-column action grid so every control stays on-screen
+
+
 ## 1.4.0 — 2026-09-05 — REAL BUILDING INTERIORS
 
 ### Added
