@@ -8,9 +8,13 @@ import {
 import { TrailSystem } from '../systems/TrailSystem';
 import { ObjectiveMarker, objectiveFor } from '../systems/ObjectiveSystem';
 import { ConstructionSystem } from '../systems/ConstructionSystem';
+import { DayNightSystem } from '../systems/DayNightSystem';
+import { JobSystem } from '../systems/JobSystem';
+import { InventorySystem } from '../systems/InventorySystem';
+import { MysterySystem } from '../systems/MysterySystem';
 import { audio } from '../systems/AudioSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
-import { pollDomInput, setDomStatus } from '../../ui/domOverlay';
+import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
 import {
   CITY_ZONES,
   JAIL_INTERIOR,
@@ -76,6 +80,12 @@ export class GameScene extends Phaser.Scene {
   private citizens: { x: number; y: number; name: string; line: string }[] = [];
   private construction!: ConstructionSystem;
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
+  private dayNight!: DayNightSystem;
+  private jobs = new JobSystem();
+  private inventory = new InventorySystem();
+  private facing = 1;
+  private garageCredited = false;
+  private mysteries = new MysterySystem();
 
   constructor() {
     super('Game');
@@ -140,11 +150,13 @@ export class GameScene extends Phaser.Scene {
       ESC: Phaser.Input.Keyboard.KeyCodes.ESC,
       F9: Phaser.Input.Keyboard.KeyCodes.F9,
       F10: Phaser.Input.Keyboard.KeyCodes.F10,
+      R: Phaser.Input.Keyboard.KeyCodes.R,
     }) as typeof this.keys;
 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
     this.cameras.main.setZoom(1.15);
     this.cameras.main.setRoundPixels(true);
+    this.dayNight = new DayNightSystem(this, WORLD.width, WORLD.height);
     // Soft dust when moving (visual juice)
     const gfx = this.make.graphics({ x: 0, y: 0 });
     gfx.fillStyle(0xd7ccc8, 0.7);
@@ -253,6 +265,8 @@ export class GameScene extends Phaser.Scene {
       clinic: 'bldg_plaza',
       airfield: 'bldg_hq',
       shop: 'bldg_forest_cabin',
+      job_board: 'bldg_forest_cabin',
+      park: 'bldg_plaza',
       forest: 'bldg_forest_cabin',
       vehicle_bay: 'bldg_plaza',
     };
@@ -311,7 +325,7 @@ export class GameScene extends Phaser.Scene {
     // Placeholder citizens (living-city seed — original shapes only)
     const plaza = CITY_ZONES.find((z) => z.id === 'city_plaza')!;
     const citizenData = [
-      { name: 'Officer Pike', line: 'Stay safe out there, Chief!' },
+      { name: 'Officer Pike', line: 'Radio tip: Sasquatch trails run east into the forest. Stay on the markers!' },
       { name: 'Builder Jun', line: 'Say the word and I will build a robot garage.' },
       { name: 'Nurse Ada', line: 'The clinic is ready for any forest scrapes.' },
       { name: 'Pilot Remy', line: 'Sky patrol reports weird footprints east.' },
@@ -332,6 +346,29 @@ export class GameScene extends Phaser.Scene {
       this.worldLayer.add(body);
       this.worldLayer.add(name);
       this.citizens.push({ x: cx, y: cy, name: citizenData[i].name, line: citizenData[i].line });
+    }
+    const park = CITY_ZONES.find((z) => z.id === 'park');
+    if (park) {
+      const extras = [
+        { name: 'Mayor Cavan', line: 'Keep our city safe and kind, Chief!', x: park.x + 80, y: park.y + 100 },
+        { name: 'Kid Milo', line: 'Did you really see Bigfoot?!', x: park.x + 200, y: park.y + 140 },
+        { name: 'Scout Lila', line: 'Trail markers help everyone stay found.', x: park.x + 280, y: park.y + 90 },
+      ];
+      for (const e of extras) {
+        const body = this.add.image(e.x, e.y, 'citizen').setDepth(7).setScale(1.1);
+        const name = this.add
+          .text(e.x, e.y + 16, e.name, {
+            fontSize: '10px',
+            color: '#fff',
+            backgroundColor: '#00000066',
+            padding: { x: 3, y: 1 },
+          })
+          .setOrigin(0.5, 0)
+          .setDepth(7);
+        this.worldLayer.add(body);
+        this.worldLayer.add(name);
+        this.citizens.push({ x: e.x, y: e.y, name: e.name, line: e.line });
+      }
     }
 
     const doorIcon = this.add.image(320, 455, 'door').setDepth(5).setScale(1.2);
@@ -486,6 +523,10 @@ export class GameScene extends Phaser.Scene {
       world: { w: WORLD.width, h: WORLD.height },
       checklist,
       builds: this.construction.getOrders().map((o) => ({ id: o.id, label: o.label, progress: o.progress, done: o.done })),
+      jobTitle: this.jobs.title(),
+      jobBoard: this.jobs.boardLines(),
+      inventory: this.inventory.summary(),
+      hour: this.dayNight?.getHour?.() ?? 12,
     };
   }
 
@@ -521,8 +562,18 @@ export class GameScene extends Phaser.Scene {
     this.syncIndoorVisibility();
     this.updateObjectiveMarker();
     this.construction.update(delta);
+    this.dayNight.update(delta);
+    // Notify jobs when garage completes
+    const garage = this.construction.getOrders().find((o) => o.id === 'robot_garage' && o.done);
+    if (garage && !this.garageCredited) {
+      this.garageCredited = true;
+      this.jobs.onGarageBuilt();
+      this.statusLine = 'Builder Aide unlocked — Job Board updated!';
+      audio.success();
+    }
     const hudLine = this.interactPrompt || this.statusLine || PHASE_HINTS[this.phase];
     setDomStatus(hudLine);
+    setDomMeta(this.inventory.summary() + " · " + this.mysteries.summary(), `Job: ${this.jobs.title()}`);
   }
 
   private updateObjectiveMarker(): void {
@@ -554,6 +605,14 @@ export class GameScene extends Phaser.Scene {
     if (dom.capture) this.tryCapture();
     if (dom.map) this.mapOpen = !this.mapOpen;
     if (dom.pause) this.paused = !this.paused;
+    if (dom.radio) {
+      if (this.flags.robotActive) {
+        this.statusLine = 'Robot radio: ' + this.mysteries.revealNext();
+        audio.talk();
+      } else {
+        this.statusLine = 'Activate your robot to use radio tips (R).';
+      }
+    }
     // Phaser touch stick (mobile)
     if (Math.abs(this.touchVec.x) > 0.15 || Math.abs(this.touchVec.y) > 0.15) {
       vx += this.touchVec.x;
@@ -566,6 +625,10 @@ export class GameScene extends Phaser.Scene {
     }
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * speed, (vy / len) * speed);
+    if (vx !== 0) {
+      this.facing = vx < 0 ? -1 : 1;
+      if (!this.flags.inVehicle) this.player.setFlipX(this.facing < 0);
+    }
     if (this.dust) {
       this.dust.setPosition(this.player.x, this.player.y + 18);
       this.dust.emitting = !this.flags.inVehicle;
@@ -592,6 +655,14 @@ export class GameScene extends Phaser.Scene {
     if (just(this.keys.ESC)) this.paused = !this.paused;
     if (just((this.keys as any).F9)) this.debugAdvance();
     if (just((this.keys as any).F10)) this.debugCompleteMission();
+    if (just((this.keys as any).R)) {
+      if (this.flags.robotActive) {
+        this.statusLine = 'Robot radio: ' + this.mysteries.revealNext();
+        audio.talk();
+      } else {
+        this.statusLine = 'Activate your robot to use radio tips (R).';
+      }
+    }
   }
 
   /** QA: advance critical flags toward next gate */
@@ -802,6 +873,10 @@ export class GameScene extends Phaser.Scene {
     ) {
       return '[E] Enter SUPER JAIL with Sasquatch';
     }
+    const jobBoard = CITY_ZONES.find((z) => z.id === 'job_board');
+    if (jobBoard && pointInRect(this.player.x, this.player.y, jobBoard)) {
+      return '[E] Read Job Board';
+    }
     for (const c of this.citizens) {
       if (this.near(c.x, c.y, 40)) return `[E] Talk to ${c.name}`;
     }
@@ -826,6 +901,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.flags.hasTracker && this.near(LAIR.trackerX, LAIR.trackerY, 50)) {
         this.flags.hasTracker = true;
         this.setPhase(MissionPhase.HasTracker);
+        this.inventory.add('tracker');
         audio.pickup();
         this.statusLine = 'Sasquatch Tracker acquired!';
         return;
@@ -879,6 +955,12 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    const jobBoardZ = CITY_ZONES.find((z) => z.id === 'job_board');
+    if (jobBoardZ && pointInRect(this.player.x, this.player.y, jobBoardZ)) {
+      this.statusLine = this.jobs.boardLines().join(' | ');
+      audio.interact();
+      return;
+    }
     for (const c of this.citizens) {
       if (this.near(c.x, c.y, 40)) {
         audio.talk();
@@ -1066,8 +1148,10 @@ export class GameScene extends Phaser.Scene {
     }
     this.jailedSprite.setVisible(true);
     this.cellMarker?.setVisible(true);
+    this.inventory.add('keycard');
+    this.jobs.onMissionJailed();
     this.setPhase(MissionPhase.Jailed);
-    this.statusLine = 'Sasquatch secured in SUPER JAIL!';
+    this.statusLine = 'Sasquatch secured! Head of Security unlocked — check Job Board.';
     this.time.delayedCall(600, () => this.grantReward());
   }
 

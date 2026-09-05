@@ -1,6 +1,5 @@
 /**
- * Chrome-reliable DOM overlay: always-on keyboard capture + optional on-screen pad.
- * Phaser keyboard can miss focus in Chrome; this backs it up.
+ * Chrome-reliable DOM overlay: always-on keyboard capture + on-screen pad.
  */
 
 export type DomInputState = {
@@ -10,6 +9,7 @@ export type DomInputState = {
   capture: boolean;
   map: boolean;
   pause: boolean;
+  radio: boolean;
 };
 
 const pressed = new Set<string>();
@@ -17,6 +17,7 @@ let interactPulse = false;
 let capturePulse = false;
 let mapPulse = false;
 let pausePulse = false;
+let radioPulse = false;
 
 function keyToAxis(): { x: number; y: number } {
   let x = 0;
@@ -50,9 +51,7 @@ export function installDomOverlay(): void {
       margin: 0 0 4px; font-size: 15px; color: #4fc3f7; letter-spacing: .04em;
     }
     #ecraft-dom-root .panel p { margin: 0; font-size: 13px; line-height: 1.35; color: #fff9c4; }
-    #ecraft-dom-root .hint {
-      margin-top: 6px; font-size: 12px; color: #b0bec5;
-    }
+    #ecraft-dom-root .hint { margin-top: 6px; font-size: 12px; color: #b0bec5; }
     #ecraft-pad {
       pointer-events: auto;
       position: absolute; right: 16px; bottom: 16px;
@@ -67,10 +66,11 @@ export function installDomOverlay(): void {
     #ecraft-actions {
       pointer-events: auto;
       position: absolute; left: 16px; bottom: 16px;
-      display: flex; gap: 8px;
+      display: flex; gap: 8px; flex-wrap: wrap; max-width: 420px;
     }
     #ecraft-actions .cap { background: rgba(198,40,40,.9); }
     #ecraft-actions .go { background: rgba(46,125,50,.9); width: auto; padding: 0 14px; }
+    #ecraft-actions .rad { background: rgba(0,151,167,.9); width: auto; padding: 0 12px; }
   `;
   document.head.appendChild(style);
 
@@ -78,13 +78,16 @@ export function installDomOverlay(): void {
   root.id = 'ecraft-dom-root';
   root.innerHTML = `
     <div class="panel">
-      <h1>E-CRAFT v0.2.2 · Chrome Test Build</h1>
-      <p id="ecraft-dom-status">Click the game, then use WASD to move.</p>
-      <div class="hint">WASD/Arrows move · E interact · Space capture · M map · Esc pause</div>
+      <h1>E-CRAFT v0.2.3 · Keep Building</h1>
+      <p id="ecraft-dom-status">Click the game, then use WASD or the pad to move.</p>
+      <div class="hint">WASD · E interact · Space capture · R robot tip · M map · Esc pause</div>
+      <div class="hint" id="ecraft-dom-inv" style="margin-top:4px;color:#b2dfdb"></div>
+      <div class="hint" id="ecraft-dom-job" style="margin-top:2px;color:#ffe082"></div>
     </div>
     <div id="ecraft-actions">
       <button type="button" class="go" data-act="interact">E · Interact</button>
       <button type="button" class="cap" data-act="capture">Space · Capture</button>
+      <button type="button" class="rad" data-act="radio">R · Robot Tip</button>
     </div>
     <div id="ecraft-pad" aria-label="movement pad">
       <span></span><button type="button" data-dir="up">▲</button><span></span>
@@ -127,6 +130,7 @@ export function installDomOverlay(): void {
       const act = btn.dataset.act;
       if (act === 'interact') interactPulse = true;
       if (act === 'capture') capturePulse = true;
+      if (act === 'radio') radioPulse = true;
     });
   });
 
@@ -139,6 +143,7 @@ export function installDomOverlay(): void {
     }
     if (e.code === 'KeyM') mapPulse = true;
     if (e.code === 'Escape') pausePulse = true;
+    if (e.code === 'KeyR') radioPulse = true;
   });
   window.addEventListener('keyup', (e) => {
     pressed.delete(e.code);
@@ -155,15 +160,24 @@ export function pollDomInput(): DomInputState {
     capture: capturePulse,
     map: mapPulse,
     pause: pausePulse,
+    radio: radioPulse,
   };
   interactPulse = false;
   capturePulse = false;
   mapPulse = false;
   pausePulse = false;
+  radioPulse = false;
   return state;
 }
 
 export function setDomStatus(text: string): void {
   const el = document.getElementById('ecraft-dom-status');
   if (el) el.textContent = text;
+}
+
+export function setDomMeta(inv: string, job: string): void {
+  const i = document.getElementById('ecraft-dom-inv');
+  const j = document.getElementById('ecraft-dom-job');
+  if (i) i.textContent = inv;
+  if (j) j.textContent = job;
 }

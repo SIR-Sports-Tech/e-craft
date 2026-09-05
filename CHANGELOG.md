@@ -6,6 +6,16 @@
 - Citizen dialogue (Pike, Jun, Ada, Remy)
 # Changelog
 
+## 0.2.3 — 2026-09-05
+
+### Added
+- Day/night cycle
+- Job Board + Head of Security / Builder Aide
+- Inventory + mystery radio tips (R)
+- Friendship Park NPCs + lost kite side quest
+- Shop / Clinic / Sky Patrol interactions
+
+
 ## 0.2.2 — 2026-09-05 — CHROME BETTER BUILD
 
 ### Added
