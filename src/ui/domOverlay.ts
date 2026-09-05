@@ -75,28 +75,33 @@ export function installDomOverlay(): void {
       opacity: 0; transition: opacity .15s ease;
     }
     #ecraft-toast.show { opacity: 1; }
-    #ecraft-controls {
-      pointer-events: auto;
-      position: absolute; left: 10px; bottom: 10px;
-      display: flex; flex-direction: row; align-items: flex-end; gap: 12px;
-      touch-action: none;
-    }
-    #ecraft-pad {
-      pointer-events: auto;
-      position: relative; right: auto; bottom: auto;
-      display: grid; grid-template-columns: 64px 64px 64px; gap: 8px;
-      touch-action: none;
-      flex: 0 0 auto;
-    }
+    /* Action buttons: LEFT side only */
     #ecraft-actions {
       pointer-events: auto;
-      position: relative; left: auto; bottom: auto;
+      position: absolute; left: 10px; bottom: 10px;
       display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
       width: 168px;
       touch-action: none;
-      flex: 0 0 auto;
+      z-index: 2;
     }
-    #ecraft-dom-root button {
+    /* Round/D-pad controller: RIGHT side only — nothing else on the right */
+    #ecraft-pad {
+      pointer-events: auto;
+      position: absolute; right: 12px; bottom: 14px;
+      display: grid; grid-template-columns: 70px 70px 70px; gap: 8px;
+      touch-action: none;
+      z-index: 2;
+    }
+    #ecraft-pad button {
+      width: 70px; height: 70px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.45);
+      background: rgba(13,71,161,.95); color: #fff;
+      font-weight: 900; font-size: 18px;
+      box-shadow: 0 8px 18px rgba(0,0,0,.45);
+      -webkit-user-select: none; user-select: none;
+      touch-action: none;
+    }
+    #ecraft-actions button {
       height: 64px; border-radius: 16px;
       border: 2px solid rgba(255,255,255,.4);
       background: rgba(13,71,161,.95); color: #fff;
@@ -116,19 +121,17 @@ export function installDomOverlay(): void {
   root.id = 'ecraft-dom-root';
   root.innerHTML = `
     <div id="ecraft-toast">Tap ACTIVATE / E near objects · CAR to drive</div>
-    <div id="ecraft-controls">
-      <div id="ecraft-actions">
-        <button type="button" class="act" id="btn-e">E</button>
-        <button type="button" class="cap" id="btn-cap">CAPTURE</button>
-        <button type="button" class="actv" id="btn-activate">ACTIVATE</button>
-        <button type="button" class="car" id="btn-car">GET IN CAR / DRIVE</button>
-      </div>
-      <div id="ecraft-pad">
-        <span></span><button type="button" data-dir="up">▲</button><span></span>
-        <button type="button" data-dir="left">◀</button>
-        <button type="button" data-dir="down">▼</button>
-        <button type="button" data-dir="right">▶</button>
-      </div>
+    <div id="ecraft-actions">
+      <button type="button" class="act" id="btn-e">E</button>
+      <button type="button" class="cap" id="btn-cap">CAPTURE</button>
+      <button type="button" class="actv" id="btn-activate">ACTIVATE</button>
+      <button type="button" class="car" id="btn-car">GET IN CAR / DRIVE</button>
+    </div>
+    <div id="ecraft-pad" aria-label="movement pad">
+      <span></span><button type="button" data-dir="up">▲</button><span></span>
+      <button type="button" data-dir="left">◀</button>
+      <button type="button" data-dir="down">▼</button>
+      <button type="button" data-dir="right">▶</button>
     </div>
   `;
   document.body.appendChild(root);
