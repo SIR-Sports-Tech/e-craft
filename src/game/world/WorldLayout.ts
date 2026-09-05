@@ -114,6 +114,16 @@ export const CITY_ZONES: RectZone[] = [
     color: 0x2e7d32,
   },
   {
+    id: 'player_house',
+    label: 'Your House',
+    x: 720,
+    y: 780,
+    w: 220,
+    h: 180,
+    color: 0x6d4c41,
+    interact: 'enter_house',
+  },
+  {
     id: 'police_desk',
     label: 'City Police Desk',
     x: 900,
@@ -204,6 +214,21 @@ export const JAIL_INTERIOR = {
   exitY: 980,
 };
 
+/** Indoor: player's house — enter and sleep */
+export const HOUSE_INTERIOR = {
+  id: 'player_house_interior',
+  label: 'Your House',
+  x: 200,
+  y: 900,
+  w: 700,
+  h: 480,
+  color: 0x4e342e,
+  bedX: 560,
+  bedY: 1120,
+  exitX: 280,
+  exitY: 980,
+};
+
 /** Simple road rectangles (visual + driveable feel) */
 export const ROADS: RectZone[] = [
   { id: 'road_h1', label: 'Main Road', x: 100, y: 720, w: 2000, h: 80, color: 0x333340 },
@@ -218,6 +243,7 @@ export const SPAWN = {
   vehicle: { x: 300, y: 545 },
   raceCar: { x: 480, y: 545 },
   sasquatchForest: { x: 3000, y: 900 },
+  houseDoor: { x: 830, y: 980 },
 };
 
 export function pointInRect(

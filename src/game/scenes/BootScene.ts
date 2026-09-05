@@ -24,6 +24,8 @@ export class BootScene extends Phaser.Scene {
     this.makeBuilding('bldg_jail', 0x6b2b2b, 0xf5b7b1, 0x922b21, true);
     this.makeBuilding('bldg_plaza', 0x4a5568, 0xf6c28b, 0x718096, false);
     this.makeBuilding('bldg_forest_cabin', 0x5d4037, 0x81c784, 0x3e2723, false);
+    this.makeBuilding('bldg_house', 0xc62828, 0xfff8e1, 0x5d4037, false);
+    this.makeBed();
     this.makeDoor();
     this.makeTrailIcons();
     const params = new URLSearchParams(location.search);
@@ -424,6 +426,27 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0xffe082, 1);
     g.fillCircle(30, 28, 3);
     g.generateTexture('door', 40, 56);
+    g.destroy();
+  }
+
+  private makeBed(): void {
+    const g = this.g();
+    // frame
+    g.fillStyle(0x5d4037, 1);
+    g.fillRoundedRect(4, 18, 88, 44, 6);
+    // mattress
+    g.fillStyle(0xefebe9, 1);
+    g.fillRoundedRect(8, 22, 80, 28, 4);
+    // blanket
+    g.fillStyle(0x42a5f5, 1);
+    g.fillRoundedRect(28, 24, 56, 24, 4);
+    // pillow
+    g.fillStyle(0xfffde7, 1);
+    g.fillRoundedRect(10, 26, 18, 16, 4);
+    // headboard
+    g.fillStyle(0x4e342e, 1);
+    g.fillRect(4, 8, 88, 12);
+    g.generateTexture('bed', 96, 64);
     g.destroy();
   }
 

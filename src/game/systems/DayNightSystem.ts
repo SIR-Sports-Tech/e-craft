@@ -44,4 +44,13 @@ export class DayNightSystem {
     if (hour < 17) return 'day';
     return 'dusk';
   }
+
+  /** Sleep advances time to next morning (~7am). */
+  sleepUntilMorning(): { fromHour: number; toHour: number } {
+    const fromHour = this.getHour();
+    // t=0 → midnight; hour 7 → 7/24
+    this.t = 7 / 24;
+    this.overlay.setAlpha(0.08);
+    return { fromHour, toHour: this.getHour() };
+  }
 }

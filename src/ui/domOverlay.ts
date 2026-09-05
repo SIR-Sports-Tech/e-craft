@@ -37,8 +37,10 @@ type EcraftApi = {
   enterRaceCar?: () => void;
   recover?: () => void;
   holdTracker?: () => void;
+  sleep?: () => void;
+  enterHouse?: () => void;
   unpause?: () => void;
-  getState?: () => { flags?: Record<string, boolean>; prompt?: string };
+  getState?: () => { flags?: Record<string, boolean>; prompt?: string; hour?: number; dayPhase?: string };
 };
 
 function api(): EcraftApi | undefined {
@@ -129,6 +131,8 @@ export function installDomOverlay(): void {
     #ecraft-actions .race { background: #d50000; color: #fff; }
     #ecraft-actions .rec { background: #455a64; color: #fff; font-size: 10px; height: 36px; }
     #ecraft-actions .trk { background: #00695c; color: #b9f6ca; font-size: 11px; }
+    #ecraft-actions .home { background: #ad1457; color: #fff; font-size: 11px; }
+    #ecraft-actions .sleep { background: #283593; color: #e8eaf6; font-size: 11px; }
 
     /* D-pad: RIGHT only — fixed square, never under left actions */
     #ecraft-pad {
@@ -189,6 +193,8 @@ export function installDomOverlay(): void {
       </div>
       <button type="button" class="trk" id="btn-tracker">HOLD TRACKER</button>
       <button type="button" class="actv" id="btn-activate">ACTIVATE</button>
+      <button type="button" class="home" id="btn-house">GO HOME</button>
+      <button type="button" class="sleep" id="btn-sleep">SLEEP</button>
       <button type="button" class="car" id="btn-car">PATROL CAR</button>
       <button type="button" class="race" id="btn-race">RACE CAR</button>
       <button type="button" class="rec" id="btn-recover">UNFREEZE / SAVE</button>
@@ -284,6 +290,8 @@ export function installDomOverlay(): void {
   bindAction('btn-cap', () => api()?.capture?.(), 'Capture');
   bindAction('btn-tracker', () => api()?.holdTracker?.(), 'Holding Tracker');
   bindAction('btn-activate', () => api()?.activate?.(), 'Activate');
+  bindAction('btn-house', () => api()?.enterHouse?.(), 'Welcome home');
+  bindAction('btn-sleep', () => api()?.sleep?.(), 'Sleeping…');
   bindAction('btn-car', () => api()?.enterCar?.(), 'Patrol Car');
   bindAction('btn-race', () => api()?.enterRaceCar?.(), 'Race Car');
   bindAction('btn-recover', () => api()?.recover?.(), 'Recovered');
@@ -302,6 +310,8 @@ export function installDomOverlay(): void {
       if (e.code === 'KeyC') api()?.enterCar?.();
       if (e.code === 'KeyF') api()?.activate?.();
       if (e.code === 'KeyT') api()?.holdTracker?.();
+      if (e.code === 'KeyH') api()?.enterHouse?.();
+      if (e.code === 'KeyZ') api()?.sleep?.();
     },
     { passive: false },
   );

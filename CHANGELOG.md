@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0 — 2026-09-05 — YOUR HOUSE + SLEEP
+
+### Added
+- **Your House** near Friendship Park (red home)
+- Walk in with **E** / **GO HOME** button / keyboard `H`
+- Cozy interior with bed, lamp, window
+- **SLEEP** (bed E / SLEEP button / `Z`) fades out and skips time to **morning 7:00**
+- Exit house with E at the door
+
+
 ## 1.1.1 — 2026-09-05 — NO-OVERLAP TOUCH CONTROLS
 
 ### Fixed

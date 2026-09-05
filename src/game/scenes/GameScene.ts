@@ -18,6 +18,7 @@ import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
 import {
   CITY_ZONES,
+  HOUSE_INTERIOR,
   JAIL_INTERIOR,
   LAIR,
   ROADS,
@@ -54,6 +55,7 @@ export class GameScene extends Phaser.Scene {
     inVehicle: false,
     inLair: false,
     inJailBuilding: false,
+    inHouse: false,
     sasquatchCaptured: false,
     sasquatchInVehicle: false,
     sasquatchJailed: false,
@@ -79,6 +81,8 @@ export class GameScene extends Phaser.Scene {
   private hqDoorLabel?: Phaser.GameObjects.Text;
   private lairNodes: Phaser.GameObjects.GameObject[] = [];
   private jailNodes: Phaser.GameObjects.GameObject[] = [];
+  private houseNodes: Phaser.GameObjects.GameObject[] = [];
+  private sleeping = false;
   private objectiveMarker!: ObjectiveMarker;
   private citizens: { x: number; y: number; name: string; line: string }[] = [];
   private construction!: ConstructionSystem;
@@ -119,6 +123,7 @@ export class GameScene extends Phaser.Scene {
     this.buildOutdoorWorld();
     this.buildIndoorLair();
     this.buildIndoorJail();
+    this.buildIndoorHouse();
 
     this.trail = new TrailSystem(this, this.trailLayer);
     this.objectiveMarker = new ObjectiveMarker(this);
@@ -258,6 +263,16 @@ export class GameScene extends Phaser.Scene {
         this.mapOpen = false;
         this.toggleHoldTracker();
       },
+      sleep: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.doSleep();
+      },
+      enterHouse: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.doEnterHouse();
+      },
       runAcceptanceStep: (step: string) => this.runAcceptanceStep(step),
       runFullAcceptance: async () => {
         const steps = [
@@ -330,7 +345,9 @@ export class GameScene extends Phaser.Scene {
     if (!this.heldTracker) {
       this.heldTracker = this.add.image(0, 0, 'tracker').setDepth(14).setScale(0.7);
     }
-    this.heldTracker.setVisible(!this.flags.inVehicle && !this.flags.inLair && !this.flags.inJailBuilding);
+    this.heldTracker.setVisible(
+      !this.flags.inVehicle && !this.flags.inLair && !this.flags.inJailBuilding && !this.flags.inHouse,
+    );
 
     if (!this.trackerScanGfx) {
       this.trackerScanGfx = this.add.graphics().setDepth(13);
@@ -381,7 +398,7 @@ export class GameScene extends Phaser.Scene {
       if (this.trackerScanGfx) this.trackerScanGfx.clear();
       return;
     }
-    if (this.flags.inLair || this.flags.inJailBuilding) {
+    if (this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse) {
       if (this.heldTracker) this.heldTracker.setVisible(false);
       if (this.trackerArrow) this.trackerArrow.setVisible(false);
       if (this.trackerScanGfx) this.trackerScanGfx.clear();
@@ -456,7 +473,15 @@ export class GameScene extends Phaser.Scene {
     const data = loadGame();
     if (!data) return;
     this.phase = data.phase;
-    this.flags = { ...data.flags };
+    this.flags = {
+      ...this.flags,
+      ...data.flags,
+      inHouse: !!(data.flags as GameFlags).inHouse,
+      inLair: false,
+      inJailBuilding: !!(data.flags as GameFlags).inJailBuilding && !!(data.flags as GameFlags).sasquatchCaptured,
+    };
+    // Always wake up outdoors unless intentionally mid-jail transport
+    if (this.flags.inHouse) this.flags.inHouse = false;
     this.player.setPosition(data.player.x, data.player.y);
     if (this.flags.robotActive) {
       this.robot.setVisible(true);
@@ -515,11 +540,12 @@ export class GameScene extends Phaser.Scene {
       police_desk: 'bldg_hq',
       school: 'bldg_plaza',
       library: 'bldg_plaza',
-      market_row: 'bldg_shop',
+      market_row: 'bldg_plaza',
       docks: 'bldg_plaza',
       forest: 'bldg_forest_cabin',
       vehicle_bay: 'bldg_plaza',
       race_bay: 'bldg_plaza',
+      player_house: 'bldg_house',
     };
 
     for (const z of CITY_ZONES) {
@@ -746,6 +772,73 @@ export class GameScene extends Phaser.Scene {
       .setVisible(false);
     this.jailNodes = [floor, title, this.cellMarker, cellLbl, exit];
     for (const n of this.jailNodes) this.indoorLayer.add(n);
+  }
+
+  private buildIndoorHouse(): void {
+    const floor = this.add
+      .rectangle(
+        HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2,
+        HOUSE_INTERIOR.y + HOUSE_INTERIOR.h / 2,
+        HOUSE_INTERIOR.w,
+        HOUSE_INTERIOR.h,
+        HOUSE_INTERIOR.color,
+      )
+      .setStrokeStyle(4, 0xffcc80, 0.7)
+      .setVisible(false);
+    // cozy rug
+    const rug = this.add
+      .rectangle(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2, HOUSE_INTERIOR.y + HOUSE_INTERIOR.h / 2 + 40, 280, 160, 0x8d6e63, 0.55)
+      .setVisible(false);
+    const title = this.add
+      .text(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2, HOUSE_INTERIOR.y + 24, '🏠 Your House — sleep here!', {
+        fontSize: '18px',
+        color: '#ffe082',
+        backgroundColor: '#000000aa',
+        padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    const bed = this.add.image(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 'bed').setScale(1.35).setVisible(false);
+    const bedLbl = this.add
+      .text(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY + 44, 'BED — Sleep [E] / SLEEP', {
+        fontSize: '13px',
+        color: '#fffde7',
+        backgroundColor: '#1565c0cc',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    const window = this.add
+      .rectangle(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w - 90, HOUSE_INTERIOR.y + 120, 70, 50, 0x81d4fa, 0.55)
+      .setStrokeStyle(3, 0xfff8e1, 0.8)
+      .setVisible(false);
+    const lamp = this.add.circle(HOUSE_INTERIOR.bedX - 90, HOUSE_INTERIOR.bedY - 10, 10, 0xffe082, 0.9).setVisible(false);
+    const exit = this.add
+      .text(HOUSE_INTERIOR.exitX, HOUSE_INTERIOR.exitY, '[E] Exit house', {
+        fontSize: '13px',
+        color: '#a5d6a7',
+        backgroundColor: '#00000088',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0, 0)
+      .setVisible(false);
+    const tip = this.add
+      .text(
+        HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2,
+        HOUSE_INTERIOR.y + HOUSE_INTERIOR.h - 36,
+        'Walk to the bed and sleep to skip to morning',
+        {
+          fontSize: '12px',
+          color: '#cfd8dc',
+          backgroundColor: '#00000066',
+          padding: { x: 6, y: 3 },
+        },
+      )
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+
+    this.houseNodes = [floor, rug, title, bed, bedLbl, window, lamp, exit, tip];
+    for (const n of this.houseNodes) this.indoorLayer.add(n);
   }
 
   // —— Public API for UIScene ——
@@ -993,6 +1086,15 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'exit_lair':
         this.exitLair();
+        break;
+      case 'enter_house':
+        this.doEnterHouse();
+        break;
+      case 'sleep':
+        this.doSleep();
+        break;
+      case 'exit_house':
+        if (this.flags.inHouse) this.exitHouse();
         break;
       case 'enter_vehicle':
         this.flags.robotActive = true;
@@ -1248,6 +1350,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private describeInteract(): string | null {
+    if (this.flags.inHouse) {
+      if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 90)) return '[E] Sleep in bed → morning';
+      if (this.near(HOUSE_INTERIOR.exitX + 40, HOUSE_INTERIOR.exitY + 10, 70)) return '[E] Exit house';
+      return 'Walk to the bed to sleep';
+    }
     if (this.flags.inLair) {
       if (!this.flags.hasTracker && this.near(LAIR.trackerX, LAIR.trackerY, 80)) {
         return '[E] HOLD Sasquatch Tracker';
@@ -1278,6 +1385,10 @@ export class GameScene extends Phaser.Scene {
 
     const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
     const jail = CITY_ZONES.find((z) => z.id === 'super_jail')!;
+    const house = CITY_ZONES.find((z) => z.id === 'player_house')!;
+    if (pointInRect(this.player.x, this.player.y, house) || this.near(SPAWN.houseDoor.x, SPAWN.houseDoor.y, 70)) {
+      return '[E] Enter Your House (sleep)';
+    }
     if (!this.flags.hasTracker && pointInRect(this.player.x, this.player.y, hq)) {
       return '[E] Enter underground gadget lair';
     }
@@ -1323,6 +1434,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tryInteract(): void {
+    if (this.flags.inHouse) {
+      if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 90)) {
+        this.doSleep();
+        return;
+      }
+      if (this.near(HOUSE_INTERIOR.exitX + 40, HOUSE_INTERIOR.exitY + 10, 70)) {
+        this.exitHouse();
+        return;
+      }
+      this.statusLine = 'Walk over to the bed to sleep.';
+      return;
+    }
+
     if (this.flags.inLair) {
       if ((!this.flags.hasTracker || !this.trackerHeld) && this.near(LAIR.trackerX, LAIR.trackerY, 80)) {
         this.equipTracker();
@@ -1364,6 +1488,12 @@ export class GameScene extends Phaser.Scene {
 
     const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
     const jail = CITY_ZONES.find((z) => z.id === 'super_jail')!;
+    const house = CITY_ZONES.find((z) => z.id === 'player_house')!;
+
+    if (pointInRect(this.player.x, this.player.y, house) || this.near(SPAWN.houseDoor.x, SPAWN.houseDoor.y, 70)) {
+      this.enterHouse();
+      return;
+    }
 
     if (!this.flags.hasTracker && pointInRect(this.player.x, this.player.y, hq)) {
       this.enterLair();
@@ -1696,17 +1826,31 @@ export class GameScene extends Phaser.Scene {
     this.persistSave();
   }
 
+  private showIndoor(kind: 'lair' | 'jail' | 'house'): void {
+    this.indoorLayer.setVisible(true);
+    this.lairNodes.forEach((n) =>
+      (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(kind === 'lair'),
+    );
+    this.jailNodes.forEach((n) =>
+      (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(kind === 'jail'),
+    );
+    this.houseNodes.forEach((n) =>
+      (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(kind === 'house'),
+    );
+  }
+
   private enterLair(): void {
     this.flags.inLair = true;
-    this.indoorLayer.setVisible(true);
-    this.lairNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(true));
-    this.jailNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
+    this.flags.inHouse = false;
+    this.flags.inJailBuilding = false;
+    this.showIndoor('lair');
     this.worldLayer.setVisible(false);
     this.trailLayer.setVisible(false);
     this.vehicle.setVisible(false);
     if (this.raceCar) this.raceCar.setVisible(false);
     this.sasquatch.setVisible(false);
     this.robot.setVisible(false);
+    if (this.heldTracker) this.heldTracker.setVisible(false);
     this.player.setPosition(LAIR.exitX + 80, LAIR.exitY + 80);
     this.cameras.main.stopFollow();
     this.cameras.main.centerOn(LAIR.x + LAIR.w / 2, LAIR.y + LAIR.h / 2);
@@ -1744,22 +1888,120 @@ export class GameScene extends Phaser.Scene {
 
   private enterJail(): void {
     this.flags.inJailBuilding = true;
+    this.flags.inHouse = false;
+    this.flags.inLair = false;
     this.flags.inVehicle = false;
     this.player.setTexture('player');
-    this.indoorLayer.setVisible(true);
-    this.lairNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
-    this.jailNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(true));
+    this.showIndoor('jail');
     this.worldLayer.setVisible(false);
     this.trailLayer.setVisible(false);
     this.vehicle.setVisible(false);
     if (this.raceCar) this.raceCar.setVisible(false);
     this.sasquatch.setVisible(false);
     this.robot.setVisible(false);
+    if (this.heldTracker) this.heldTracker.setVisible(false);
     this.player.setPosition(JAIL_INTERIOR.exitX + 100, JAIL_INTERIOR.exitY + 100);
     this.cameras.main.stopFollow();
     this.cameras.main.centerOn(JAIL_INTERIOR.x + JAIL_INTERIOR.w / 2, JAIL_INTERIOR.y + JAIL_INTERIOR.h / 2);
     this.setPhase(MissionPhase.AtSuperJail);
     this.statusLine = 'Inside SUPER JAIL. Lock Sasquatch in the cell!';
+  }
+
+  private doEnterHouse(): void {
+    if (this.flags.inLair) this.exitLair();
+    if (this.flags.inJailBuilding) this.exitJail();
+    if (this.flags.inVehicle) {
+      this.flags.inVehicle = false;
+      this.player.setTexture('player');
+      this.player.setScale(0.95);
+    }
+    this.enterHouse();
+  }
+
+  private enterHouse(): void {
+    this.flags.inHouse = true;
+    this.flags.inLair = false;
+    this.flags.inJailBuilding = false;
+    this.flags.inVehicle = false;
+    this.player.setTexture('player');
+    this.player.setScale(0.95);
+    this.showIndoor('house');
+    this.worldLayer.setVisible(false);
+    this.trailLayer.setVisible(false);
+    this.vehicle.setVisible(false);
+    if (this.raceCar) this.raceCar.setVisible(false);
+    this.sasquatch.setVisible(false);
+    this.robot.setVisible(false);
+    if (this.heldTracker) this.heldTracker.setVisible(false);
+    this.player.setPosition(HOUSE_INTERIOR.exitX + 100, HOUSE_INTERIOR.exitY + 100);
+    this.cameras.main.stopFollow();
+    this.cameras.main.centerOn(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2, HOUSE_INTERIOR.y + HOUSE_INTERIOR.h / 2);
+    this.statusLine = 'Welcome home! Walk to the bed and SLEEP.';
+    setDomStatus(this.statusLine);
+    audio.interact();
+  }
+
+  private exitHouse(): void {
+    this.flags.inHouse = false;
+    this.indoorLayer.setVisible(false);
+    this.houseNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
+    this.worldLayer.setVisible(true);
+    this.trailLayer.setVisible(true);
+    if (!this.flags.inVehicle) {
+      this.vehicle.setVisible(true);
+      if (this.raceCar) this.raceCar.setVisible(true);
+    }
+    this.sasquatch.setVisible(!this.flags.sasquatchJailed);
+    if (this.flags.robotActive) this.robot.setVisible(true);
+    this.player.setPosition(SPAWN.houseDoor.x, SPAWN.houseDoor.y);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    if (this.flags.hasTracker) this.equipTracker(true);
+    this.statusLine = 'Left the house. Have a great day!';
+    setDomStatus(this.statusLine);
+  }
+
+  /** Enter house if needed, then sleep until morning. */
+  private doSleep(): void {
+    if (this.sleeping) return;
+    if (!this.flags.inHouse) this.doEnterHouse();
+    // Snap to bed for clarity
+    this.player.setPosition(HOUSE_INTERIOR.bedX - 20, HOUSE_INTERIOR.bedY + 10);
+    this.sleeping = true;
+    this.statusLine = 'Sleeping… zzz';
+    setDomStatus(this.statusLine);
+
+    const fade = this.add
+      .rectangle(
+        HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2,
+        HOUSE_INTERIOR.y + HOUSE_INTERIOR.h / 2,
+        HOUSE_INTERIOR.w + 40,
+        HOUSE_INTERIOR.h + 40,
+        0x000000,
+        0,
+      )
+      .setDepth(80);
+    this.tweens.add({
+      targets: fade,
+      alpha: 1,
+      duration: 500,
+      onComplete: () => {
+        const { fromHour, toHour } = this.dayNight.sleepUntilMorning();
+        this.tweens.add({
+          targets: fade,
+          alpha: 0,
+          duration: 600,
+          delay: 350,
+          onComplete: () => {
+            fade.destroy();
+            this.sleeping = false;
+            this.statusLine = `Good morning! Slept from ${fromHour}:00 → ${toHour}:00. Exit when ready.`;
+            setDomStatus(this.statusLine);
+            audio.success();
+            this.persistSave();
+          },
+        });
+      },
+    });
   }
 
   private exitJail(): void {
@@ -1823,7 +2065,7 @@ export class GameScene extends Phaser.Scene {
 
   private syncIndoorVisibility(): void {
     // Keep outdoor entities hidden while indoors
-    if (this.flags.inLair || this.flags.inJailBuilding) {
+    if (this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse) {
       this.worldLayer.setVisible(false);
       this.trailLayer.setVisible(false);
     }

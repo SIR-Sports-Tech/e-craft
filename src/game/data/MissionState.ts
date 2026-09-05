@@ -50,6 +50,7 @@ export interface GameFlags {
   inVehicle: boolean;
   inLair: boolean;
   inJailBuilding: boolean;
+  inHouse: boolean;
   sasquatchCaptured: boolean;
   sasquatchInVehicle: boolean;
   sasquatchJailed: boolean;
