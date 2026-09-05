@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+import path from 'path';
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+await page.goto('http://127.0.0.1:5173/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(2500);
+const out = path.resolve('docs/ecraft-v014-look.png');
+await page.screenshot({ path: out, fullPage: false });
+console.log('saved', out);
+await browser.close();

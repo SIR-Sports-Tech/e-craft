@@ -10,7 +10,8 @@
 - [x] Polish vehicle load UX (follow + wider load radius)
 
 ## Next (after v0.1 is solid)
-- [ ] Better original art (still original — no third-party IP)
+- [x] Better original art pass (procedural sprites v0.1.4)
+- [ ] Higher-fidelity art / animations later
 - [ ] NPC citizens + simple dialogue
 - [ ] Job board (Head of Security certification test)
 - [ ] Persistent construction tasks (“build a robot garage…”)

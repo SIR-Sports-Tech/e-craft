@@ -58,16 +58,20 @@ export class TrailSystem {
     const jitterX = x + Phaser.Math.Between(-18, 18);
     const jitterY = y + Phaser.Math.Between(-18, 18);
     const g = this.scene.add.container(jitterX, jitterY);
-    const blob = this.scene.add.circle(0, 0, 10, COLORS[kind], 0.95);
+    const iconKey = `trail_${kind}` as const;
+    const blob = this.scene.textures.exists(iconKey)
+      ? this.scene.add.image(0, 0, iconKey).setScale(1.4)
+      : this.scene.add.circle(0, 0, 10, COLORS[kind], 0.95);
+    const glow = this.scene.add.circle(0, 0, 16, COLORS[kind], 0.2);
     const label = this.scene.add
-      .text(0, 16, TRAIL_LABELS[kind], {
-        fontSize: '10px',
-        color: '#ffe8a8',
-        backgroundColor: '#00000088',
-        padding: { x: 3, y: 1 },
+      .text(0, 18, TRAIL_LABELS[kind], {
+        fontSize: '11px',
+        color: '#fffde7',
+        backgroundColor: '#000000aa',
+        padding: { x: 4, y: 2 },
       })
       .setOrigin(0.5, 0);
-    g.add([blob, label]);
+    g.add([glow, blob, label]);
     this.layer.add(g);
 
     const clue: TrailClue = {

@@ -95,15 +95,16 @@ export class GameScene extends Phaser.Scene {
     this.construction = new ConstructionSystem(this, this.worldLayer);
 
     this.player = this.physics.add.sprite(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y, 'player');
-    this.player.setCollideWorldBounds(true).setDepth(10);
+    this.player.setCollideWorldBounds(true).setDepth(10).setScale(0.95);
     this.player.setDrag(800);
+    this.player.body!.setSize(28, 40).setOffset(10, 12);
 
     this.robot = this.physics.add.sprite(SPAWN.playerOutdoor.x - 40, SPAWN.playerOutdoor.y, 'robot');
-    this.robot.setVisible(false).setDepth(9);
+    this.robot.setVisible(false).setDepth(9).setScale(0.9);
     this.robot.body!.enable = false;
 
     this.vehicle = this.physics.add.sprite(SPAWN.vehicle.x, SPAWN.vehicle.y, 'vehicle');
-    this.vehicle.setImmovable(true).setDepth(8);
+    this.vehicle.setImmovable(true).setDepth(8).setScale(1.05);
     this.vehicle.body!.enable = false;
 
     this.sasquatch = this.physics.add.sprite(
@@ -111,7 +112,7 @@ export class GameScene extends Phaser.Scene {
       SPAWN.sasquatchForest.y,
       'sasquatch',
     );
-    this.sasquatch.setDepth(9).setCollideWorldBounds(true);
+    this.sasquatch.setDepth(9).setCollideWorldBounds(true).setScale(1.05);
     this.pickSasquatchWander();
     // Seed trail immediately so player never starts with empty trail
     for (let i = 0; i < 8; i++) {
@@ -150,43 +151,86 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildOutdoorWorld(): void {
-    const grass = this.add.rectangle(
-      WORLD.width / 2,
-      WORLD.height / 2,
-      WORLD.width,
-      WORLD.height,
-      0x1b3d24,
-    );
-    this.worldLayer.add(grass);
-
-    for (const road of ROADS) {
-      const r = this.add.rectangle(road.x + road.w / 2, road.y + road.h / 2, road.w, road.h, road.color);
-      this.worldLayer.add(r);
+    // Tiled grass background
+    for (let x = 0; x < WORLD.width; x += 64) {
+      for (let y = 0; y < WORLD.height; y += 64) {
+        const tile = this.add.image(x + 32, y + 32, 'tile_grass').setDepth(0);
+        this.worldLayer.add(tile);
+      }
     }
+
+    // Roads with asphalt tiles
+    for (const road of ROADS) {
+      for (let x = road.x; x < road.x + road.w; x += 64) {
+        for (let y = road.y; y < road.y + road.h; y += 64) {
+          const tile = this.add.image(x + 32, y + 32, 'tile_road').setDepth(1);
+          this.worldLayer.add(tile);
+        }
+      }
+      // curb outline
+      const curb = this.add
+        .rectangle(road.x + road.w / 2, road.y + road.h / 2, road.w + 4, road.h + 4)
+        .setStrokeStyle(2, 0xffee58, 0.25)
+        .setFillStyle(0x000000, 0)
+        .setDepth(1);
+      this.worldLayer.add(curb);
+    }
+
+    const buildingKey: Record<string, string> = {
+      security_hq: 'bldg_hq',
+      super_jail: 'bldg_jail',
+      city_plaza: 'bldg_plaza',
+      forest: 'bldg_forest_cabin',
+      vehicle_bay: 'bldg_plaza',
+    };
 
     for (const z of CITY_ZONES) {
-      const r = this.add
-        .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, z.color)
-        .setStrokeStyle(3, 0xffffff, 0.25);
-      this.worldLayer.add(r);
-      const t = this.add
-        .text(z.x + z.w / 2, z.y + 18, z.label, {
-          fontSize: '16px',
+      // ground pad under zone
+      const pad = this.add
+        .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, z.color, 0.35)
+        .setStrokeStyle(2, 0xffffff, 0.2)
+        .setDepth(2);
+      this.worldLayer.add(pad);
+
+      if (z.id !== 'forest' && z.id !== 'vehicle_bay') {
+        const key = buildingKey[z.id] || 'bldg_plaza';
+        const b = this.add
+          .image(z.x + z.w / 2, z.y + z.h / 2 - 10, key)
+          .setDepth(3)
+          .setScale(z.id === 'security_hq' || z.id === 'super_jail' ? 1.6 : 1.2);
+        this.worldLayer.add(b);
+      }
+      if (z.id === 'vehicle_bay') {
+        const bay = this.add
+          .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, 0x1b5e20, 0.5)
+          .setStrokeStyle(3, 0x69f0ae, 0.8)
+          .setDepth(2);
+        this.worldLayer.add(bay);
+      }
+
+      const label = this.add
+        .text(z.x + z.w / 2, z.y + 10, z.label, {
+          fontSize: '15px',
           color: '#ffffff',
-          backgroundColor: '#00000066',
-          padding: { x: 6, y: 3 },
+          backgroundColor: '#00000099',
+          padding: { x: 8, y: 4 },
         })
-        .setOrigin(0.5, 0);
-      this.worldLayer.add(t);
-      this.labels.push(t);
+        .setOrigin(0.5, 0)
+        .setDepth(6);
+      this.worldLayer.add(label);
+      this.labels.push(label);
     }
 
-    // Trees (placeholder circles) in forest
+    // Trees in forest
     const forest = CITY_ZONES.find((z) => z.id === 'forest')!;
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 55; i++) {
       const tx = forest.x + 40 + Math.random() * (forest.w - 80);
       const ty = forest.y + 40 + Math.random() * (forest.h - 80);
-      const tree = this.add.circle(tx, ty, 14 + Math.random() * 10, 0x0d3b1e, 0.9);
+      const tree = this.add
+        .image(tx, ty, 'tree')
+        .setDepth(4)
+        .setScale(0.9 + Math.random() * 0.5)
+        .setAngle(-6 + Math.random() * 12);
       this.worldLayer.add(tree);
     }
 
@@ -202,7 +246,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < citizenData.length; i++) {
       const cx = plaza.x + 60 + i * 90;
       const cy = plaza.y + 120 + (i % 2) * 40;
-      const body = this.add.circle(cx, cy, 12, 0xffcc80).setDepth(7);
+      const body = this.add.image(cx, cy, 'citizen').setDepth(7).setScale(1.1);
       const name = this.add
         .text(cx, cy + 16, citizenData[i].name, {
           fontSize: '10px',
@@ -217,6 +261,8 @@ export class GameScene extends Phaser.Scene {
       this.citizens.push({ x: cx, y: cy, name: citizenData[i].name, line: citizenData[i].line });
     }
 
+    const doorIcon = this.add.image(320, 455, 'door').setDepth(5).setScale(1.2);
+    this.worldLayer.add(doorIcon);
     this.hqDoorLabel = this.add
       .text(390, 430, '[E] Enter HQ → Underground Lair', {
         fontSize: '13px',

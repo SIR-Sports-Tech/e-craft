@@ -6,6 +6,12 @@
 - Citizen dialogue (Pike, Jun, Ada, Remy)
 # Changelog
 
+## 0.1.4 — 2026-09-05
+
+### Changed
+- Replaced bare colored blocks with **original drawn sprites**: officer, robot, sasquatch, patrol vehicle, buildings with roofs/windows, grass/road tiles, trees, trail icons, citizens
+
+
 ## 0.1.1 — 2026-09-05
 
 ### Added
