@@ -20,6 +20,7 @@ export class BootScene extends Phaser.Scene {
     this.makeTracker();
     this.makeTree();
     this.makeCitizen();
+    this.makePanther();
     this.makeBuilding('bldg_hq', 0x1a3d6d, 0x5dade2, 0x1abc9c, true);
     this.makeBuilding('bldg_jail', 0x6b2b2b, 0xf5b7b1, 0x922b21, true);
     this.makeBuilding('bldg_plaza', 0x4a5568, 0xf6c28b, 0x718096, false);
@@ -439,6 +440,98 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(22, 40, 5, 12);
     g.generateTexture('citizen', 40, 54);
     g.destroy();
+  }
+
+  private makePanther(): void {
+    // Sleek black panther — 4-frame run/pounce sheet
+    const fw = 72;
+    const fh = 48;
+    const frames = 4;
+    const sheet = this.make.graphics({ x: 0, y: 0 });
+
+    const drawFrame = (g: Phaser.GameObjects.Graphics, ox: number, frame: number) => {
+      const stretch = frame % 2 === 0 ? 0 : 4;
+      const leg = (frame % 2 === 0 ? -1 : 1) * 5;
+      const bob = frame % 2 === 0 ? 0 : -2;
+
+      // shadow
+      g.fillStyle(0x000000, 0.3);
+      g.fillEllipse(ox + 36, fh - 4, 40 + stretch, 8);
+
+      // body
+      g.fillStyle(0x111111, 1);
+      g.fillEllipse(ox + 34, 26 + bob, 44 + stretch, 20);
+      // shoulder / hip bulk
+      g.fillStyle(0x1a1a1a, 1);
+      g.fillEllipse(ox + 22, 24 + bob, 18, 16);
+      g.fillEllipse(ox + 48, 26 + bob, 16, 14);
+
+      // head
+      g.fillStyle(0x0d0d0d, 1);
+      g.fillCircle(ox + 58 + stretch * 0.3, 18 + bob, 12);
+      // ears
+      g.fillTriangle(ox + 52, 8 + bob, ox + 56, 16 + bob, ox + 48, 14 + bob);
+      g.fillTriangle(ox + 64, 8 + bob, ox + 68, 16 + bob, ox + 60, 14 + bob);
+      // yellow eyes
+      g.fillStyle(0xffeb3b, 1);
+      g.fillEllipse(ox + 56, 17 + bob, 5, 3.5);
+      g.fillEllipse(ox + 63, 17 + bob, 5, 3.5);
+      g.fillStyle(0x000000, 1);
+      g.fillRect(ox + 55, 16 + bob, 2, 3);
+      g.fillRect(ox + 62, 16 + bob, 2, 3);
+      // nose / mouth
+      g.fillStyle(0x333333, 1);
+      g.fillCircle(ox + 68, 20 + bob, 2);
+
+      // legs
+      g.fillStyle(0x0a0a0a, 1);
+      g.fillRoundedRect(ox + 18 + leg, 32 + bob, 7, 12, 2);
+      g.fillRoundedRect(ox + 28 - leg, 32 + bob, 7, 12, 2);
+      g.fillRoundedRect(ox + 40 + leg * 0.6, 33 + bob, 7, 11, 2);
+      g.fillRoundedRect(ox + 50 - leg * 0.6, 33 + bob, 7, 11, 2);
+      // paws
+      g.fillStyle(0x222222, 1);
+      g.fillEllipse(ox + 21 + leg, 44 + bob, 9, 4);
+      g.fillEllipse(ox + 31 - leg, 44 + bob, 9, 4);
+      g.fillEllipse(ox + 43 + leg * 0.6, 44 + bob, 9, 4);
+      g.fillEllipse(ox + 53 - leg * 0.6, 44 + bob, 9, 4);
+
+      // tail curve
+      g.lineStyle(4, 0x111111, 1);
+      g.beginPath();
+      g.moveTo(ox + 12, 24 + bob);
+      g.lineTo(ox + 4, 16 + bob - stretch * 0.5);
+      g.lineTo(ox + 2, 10 + bob);
+      g.strokePath();
+      g.fillStyle(0x111111, 1);
+      g.fillCircle(ox + 2, 9 + bob, 3);
+    };
+
+    for (let i = 0; i < frames; i++) drawFrame(sheet, i * fw, i);
+    sheet.generateTexture('panther_sheet_img', fw * frames, fh);
+    sheet.destroy();
+
+    const srcImg = this.textures.get('panther_sheet_img').getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    if (this.textures.exists('panther_sheet')) this.textures.remove('panther_sheet');
+    this.textures.addSpriteSheet('panther_sheet', srcImg as HTMLImageElement, {
+      frameWidth: fw,
+      frameHeight: fh,
+    });
+
+    if (this.anims.exists('panther-pounce')) this.anims.remove('panther-pounce');
+    if (this.anims.exists('panther-run')) this.anims.remove('panther-run');
+    this.anims.create({
+      key: 'panther-pounce',
+      frames: this.anims.generateFrameNumbers('panther_sheet', { start: 0, end: 1 }),
+      frameRate: 8,
+      repeat: 0,
+    });
+    this.anims.create({
+      key: 'panther-run',
+      frames: this.anims.generateFrameNumbers('panther_sheet', { start: 0, end: 3 }),
+      frameRate: 12,
+      repeat: -1,
+    });
   }
 
   private makeBuilding(

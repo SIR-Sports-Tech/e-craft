@@ -13,6 +13,7 @@ import { JobSystem } from '../systems/JobSystem';
 import { InventorySystem } from '../systems/InventorySystem';
 import { MysterySystem } from '../systems/MysterySystem';
 import { PoliceSystem } from '../systems/PoliceSystem';
+import { PantherSystem } from '../systems/PantherSystem';
 import { audio } from '../systems/AudioSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
@@ -88,6 +89,7 @@ export class GameScene extends Phaser.Scene {
   private construction!: ConstructionSystem;
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
   private dayNight!: DayNightSystem;
+  private panther!: PantherSystem;
   private jobs = new JobSystem();
   private inventory = new InventorySystem();
   private facing = 1;
@@ -199,6 +201,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(1.15);
     this.cameras.main.setRoundPixels(true);
     this.dayNight = new DayNightSystem(this, WORLD.width, WORLD.height);
+    this.panther = new PantherSystem(this);
     // Soft dust when moving (visual juice)
     const gfx = this.make.graphics({ x: 0, y: 0 });
     gfx.fillStyle(0xd7ccc8, 0.7);
@@ -273,6 +276,19 @@ export class GameScene extends Phaser.Scene {
         this.paused = false;
         this.mapOpen = false;
         this.doEnterHouse();
+      },
+      pantherJump: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        if (this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse) {
+          setDomStatus('Go outside for the panther!');
+          return;
+        }
+        this.panther.forceJump(this.player, (msg) => {
+          this.statusLine = msg;
+          setDomStatus(msg);
+          audio.talk();
+        });
       },
       runAcceptanceStep: (step: string) => this.runAcceptanceStep(step),
       runFullAcceptance: async () => {
@@ -888,6 +904,8 @@ export class GameScene extends Phaser.Scene {
       tracking: this.trail.isTracking(),
       playerAnim: this.player?.anims?.currentAnim?.key ?? null,
       onFoot: !this.flags.inVehicle && this.player?.texture?.key === 'player_sheet',
+      pantherActive: this.panther?.isActive?.() ?? false,
+      sunVisible: this.dayNight?.phase?.() !== 'night',
     };
   }
 
@@ -947,6 +965,14 @@ export class GameScene extends Phaser.Scene {
         this.updateCitizenSchedules();
       }
       this.dayNight.update(d);
+      const outdoors =
+        !this.flags.inLair && !this.flags.inJailBuilding && !this.flags.inHouse;
+      this.dayNight.setOutdoorVisible(outdoors);
+      this.panther.update(d, this.player, outdoors, (msg) => {
+        this.statusLine = msg;
+        setDomStatus(msg);
+        audio.talk();
+      });
       // Notify jobs when garage completes
       const garage = this.construction.getOrders().find((o) => o.id === 'robot_garage' && o.done);
       if (garage && !this.garageCredited) {
@@ -1100,6 +1126,19 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'exit_house':
         if (this.flags.inHouse) this.exitHouse();
+        break;
+      case 'panther':
+        if (this.flags.inLair) this.exitLair();
+        if (this.flags.inJailBuilding) this.exitJail();
+        if (this.flags.inHouse) this.exitHouse();
+        this.panther.forceJump(this.player, (msg) => {
+          this.statusLine = msg;
+          setDomStatus(msg);
+        });
+        break;
+      case 'sunrise':
+        this.dayNight.forceSunrise();
+        this.statusLine = 'Sun is rising!';
         break;
       case 'enter_vehicle':
         this.flags.robotActive = true;

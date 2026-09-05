@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.0 — 2026-09-05 — SUNRISE + BLACK PANTHER
+
+### Added
+- **Sun rises** in the sky and arcs sunrise → noon → sunset (moon at night)
+- Time label shows Sunrise / Day / Sunset / Night
+- Sleeping still jumps to morning — you wake to a risen sun
+- **Black panther** randomly leaps out outdoors, then races into the trees
+- **PANTHER!** button to trigger a jump-scare anytime outside
+
+
 ## 1.2.1 — 2026-09-05 — REAL PLAYER WALK CYCLE
 
 ### Fixed / Added

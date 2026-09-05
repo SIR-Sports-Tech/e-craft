@@ -39,6 +39,7 @@ type EcraftApi = {
   holdTracker?: () => void;
   sleep?: () => void;
   enterHouse?: () => void;
+  pantherJump?: () => void;
   unpause?: () => void;
   getState?: () => { flags?: Record<string, boolean>; prompt?: string; hour?: number; dayPhase?: string };
 };
@@ -133,6 +134,7 @@ export function installDomOverlay(): void {
     #ecraft-actions .trk { background: #00695c; color: #b9f6ca; font-size: 11px; }
     #ecraft-actions .home { background: #ad1457; color: #fff; font-size: 11px; }
     #ecraft-actions .sleep { background: #283593; color: #e8eaf6; font-size: 11px; }
+    #ecraft-actions .pan { background: #212121; color: #ffeb3b; font-size: 11px; }
 
     /* D-pad: RIGHT only — fixed square, never under left actions */
     #ecraft-pad {
@@ -195,6 +197,7 @@ export function installDomOverlay(): void {
       <button type="button" class="actv" id="btn-activate">ACTIVATE</button>
       <button type="button" class="home" id="btn-house">GO HOME</button>
       <button type="button" class="sleep" id="btn-sleep">SLEEP</button>
+      <button type="button" class="pan" id="btn-panther">PANTHER!</button>
       <button type="button" class="car" id="btn-car">PATROL CAR</button>
       <button type="button" class="race" id="btn-race">RACE CAR</button>
       <button type="button" class="rec" id="btn-recover">UNFREEZE / SAVE</button>
@@ -292,6 +295,7 @@ export function installDomOverlay(): void {
   bindAction('btn-activate', () => api()?.activate?.(), 'Activate');
   bindAction('btn-house', () => api()?.enterHouse?.(), 'Welcome home');
   bindAction('btn-sleep', () => api()?.sleep?.(), 'Sleeping…');
+  bindAction('btn-panther', () => api()?.pantherJump?.(), 'Panther!');
   bindAction('btn-car', () => api()?.enterCar?.(), 'Patrol Car');
   bindAction('btn-race', () => api()?.enterRaceCar?.(), 'Race Car');
   bindAction('btn-recover', () => api()?.recover?.(), 'Recovered');
