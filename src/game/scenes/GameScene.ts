@@ -69,6 +69,7 @@ export class GameScene extends Phaser.Scene {
   private lairNodes: Phaser.GameObjects.GameObject[] = [];
   private jailNodes: Phaser.GameObjects.GameObject[] = [];
   private objectiveMarker!: ObjectiveMarker;
+  private citizens: { x: number; y: number; name: string; line: string }[] = [];
 
   constructor() {
     super('Game');
@@ -189,13 +190,18 @@ export class GameScene extends Phaser.Scene {
     
     // Placeholder citizens (living-city seed — original shapes only)
     const plaza = CITY_ZONES.find((z) => z.id === 'city_plaza')!;
-    const citizenNames = ['Officer Pike', 'Builder Jun', 'Nurse Ada', 'Pilot Remy'];
-    for (let i = 0; i < citizenNames.length; i++) {
+    const citizenData = [
+      { name: 'Officer Pike', line: 'Stay safe out there, Chief!' },
+      { name: 'Builder Jun', line: 'Say the word and I will build a robot garage.' },
+      { name: 'Nurse Ada', line: 'The clinic is ready for any forest scrapes.' },
+      { name: 'Pilot Remy', line: 'Sky patrol reports weird footprints east.' },
+    ];
+    for (let i = 0; i < citizenData.length; i++) {
       const cx = plaza.x + 60 + i * 90;
       const cy = plaza.y + 120 + (i % 2) * 40;
       const body = this.add.circle(cx, cy, 12, 0xffcc80).setDepth(7);
       const name = this.add
-        .text(cx, cy + 16, citizenNames[i], {
+        .text(cx, cy + 16, citizenData[i].name, {
           fontSize: '10px',
           color: '#fff',
           backgroundColor: '#00000066',
@@ -205,6 +211,7 @@ export class GameScene extends Phaser.Scene {
         .setDepth(7);
       this.worldLayer.add(body);
       this.worldLayer.add(name);
+      this.citizens.push({ x: cx, y: cy, name: citizenData[i].name, line: citizenData[i].line });
     }
 
     this.hqDoorLabel = this.add
@@ -636,6 +643,9 @@ export class GameScene extends Phaser.Scene {
     ) {
       return '[E] Enter SUPER JAIL with Sasquatch';
     }
+    for (const c of this.citizens) {
+      if (this.near(c.x, c.y, 40)) return `[E] Talk to ${c.name}`;
+    }
     if (!this.flags.inVehicle && this.near(this.vehicle.x, this.vehicle.y, 60)) {
       if (this.flags.robotActive) return '[E] Enter security vehicle';
       return 'Activate robot first (in the lair)';
@@ -706,6 +716,13 @@ export class GameScene extends Phaser.Scene {
     ) {
       this.enterJail();
       return;
+    }
+
+    for (const c of this.citizens) {
+      if (this.near(c.x, c.y, 40)) {
+        this.statusLine = `${c.name}: "${c.line}"`;
+        return;
+      }
     }
 
     // Vehicle enter/exit
