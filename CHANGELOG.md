@@ -1,3 +1,9 @@
+
+## 0.1.3 — 2026-09-05
+
+### Added
+- Living-world seed: ask **Builder Jun** to build a **Robot Garage** behind HQ; it constructs over time and persists in-session.
+- Citizen dialogue (Pike, Jun, Ada, Remy)
 # Changelog
 
 ## 0.1.1 — 2026-09-05

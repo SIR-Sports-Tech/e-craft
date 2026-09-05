@@ -7,6 +7,7 @@ import {
 } from '../data/MissionState';
 import { TrailSystem } from '../systems/TrailSystem';
 import { ObjectiveMarker, objectiveFor } from '../systems/ObjectiveSystem';
+import { ConstructionSystem } from '../systems/ConstructionSystem';
 import {
   CITY_ZONES,
   JAIL_INTERIOR,
@@ -70,6 +71,7 @@ export class GameScene extends Phaser.Scene {
   private jailNodes: Phaser.GameObjects.GameObject[] = [];
   private objectiveMarker!: ObjectiveMarker;
   private citizens: { x: number; y: number; name: string; line: string }[] = [];
+  private construction!: ConstructionSystem;
 
   constructor() {
     super('Game');
@@ -90,6 +92,7 @@ export class GameScene extends Phaser.Scene {
 
     this.trail = new TrailSystem(this, this.trailLayer);
     this.objectiveMarker = new ObjectiveMarker(this);
+    this.construction = new ConstructionSystem(this, this.worldLayer);
 
     this.player = this.physics.add.sprite(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y, 'player');
     this.player.setCollideWorldBounds(true).setDepth(10);
@@ -354,6 +357,7 @@ export class GameScene extends Phaser.Scene {
       player: { x: this.player.x, y: this.player.y },
       world: { w: WORLD.width, h: WORLD.height },
       checklist,
+      builds: this.construction.getOrders().map((o) => ({ id: o.id, label: o.label, progress: o.progress, done: o.done })),
     };
   }
 
@@ -388,6 +392,7 @@ export class GameScene extends Phaser.Scene {
     this.consumeTouchActions();
     this.syncIndoorVisibility();
     this.updateObjectiveMarker();
+    this.construction.update(delta);
   }
 
   private updateObjectiveMarker(): void {
@@ -721,6 +726,14 @@ export class GameScene extends Phaser.Scene {
     for (const c of this.citizens) {
       if (this.near(c.x, c.y, 40)) {
         this.statusLine = `${c.name}: "${c.line}"`;
+        if (c.name === 'Builder Jun') {
+          const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
+          const order = this.construction.requestRobotGarage({
+            x: hq.x + hq.w / 2,
+            y: hq.y + hq.h + 70,
+          });
+          this.statusLine = `${c.name}: "On it! Building ${order.label} behind HQ…"`;
+        }
         return;
       }
     }
