@@ -6,20 +6,14 @@ const errs = [];
 page.on('pageerror', (e) => errs.push(String(e)));
 await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
 await page.waitForTimeout(2500);
-await page.waitForSelector('#btn-activate', { timeout: 10000 });
-await page.waitForFunction(() => !!window.__ecraft?.activate, null, { timeout: 10000 });
+await page.waitForSelector('#btn-robot', { timeout: 10000 });
+await page.waitForFunction(() => !!window.__ecraft?.activateRobot, null, { timeout: 10000 });
 
-// ACTIVATE twice (tracker + robot)
-await page.click('#btn-activate');
-await page.waitForTimeout(200);
-await page.click('#btn-activate');
-await page.waitForTimeout(200);
+// One ROBOT tap = tracker + robot outdoors
+await page.locator('#btn-robot').dispatchEvent('pointerdown');
+await page.waitForTimeout(350);
 let st = await page.evaluate(() => window.__ecraft.getState());
-const activated = st.flags.hasTracker && st.flags.robotActive;
-
-// Exit lair via E
-await page.click('#btn-e');
-await page.waitForTimeout(300);
+const activated = st.flags.hasTracker && st.flags.robotActive && !st.flags.inLair;
 
 // GET IN CAR
 await page.click('#btn-car');

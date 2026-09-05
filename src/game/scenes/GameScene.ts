@@ -259,6 +259,11 @@ export class GameScene extends Phaser.Scene {
         this.mapOpen = false;
         this.doActivate();
       },
+      activateRobot: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.doActivateRobot();
+      },
       enterCar: () => {
         this.paused = false;
         this.mapOpen = false;
@@ -2131,44 +2136,50 @@ export class GameScene extends Phaser.Scene {
   }
 
 
-  /** Activate tracker + robot partner (one tap can do both). */
-  private doActivate(): void {
-    if (!this.flags.inLair && (!this.flags.hasTracker || !this.flags.robotActive)) {
-      this.enterLair();
-    }
-
-    let didSomething = false;
+  /** Power up robot + tracker, then stand outside with robot following. */
+  private doActivateRobot(): void {
+    // Ensure gear
     if (!this.flags.hasTracker || !this.trackerHeld) {
       this.equipTracker(true);
-      this.setPhase(MissionPhase.HasTracker);
-      didSomething = true;
     }
-    if (!this.flags.robotActive) {
-      this.flags.robotActive = true;
-      this.robot.setTexture('robot_sheet', 0);
-      this.robot.setVisible(true);
-      this.robot.setPosition(this.player.x - 40, this.player.y);
-      this.robot.play('robot-idle', true);
-      this.setPhase(MissionPhase.RobotActive);
-      didSomething = true;
-    }
+    this.flags.robotActive = true;
+    this.robot.setTexture('robot_sheet', 0);
+    this.robot.play('robot-idle', true);
 
-    if (didSomething) {
-      audio.pickup();
-      this.statusLine = this.flags.inLair
-        ? 'Tracker + Robot ONLINE! Tap EXIT — robot follows you outside.'
-        : 'Tracker + Robot ONLINE! Robot is following you.';
-      if (!this.flags.inLair) this.syncRobotBesidePlayer();
-      setDomStatus(this.statusLine);
-      this.persistSave();
-      return;
-    }
+    // Always end outdoors so the player SEES the robot working
+    if (this.flags.inHouse) this.exitHouse();
+    if (this.flags.inJailBuilding) this.exitJail();
+    if (this.flags.inLair) this.exitLair();
+    // If still somehow indoors, force outdoor spawn
+    this.flags.inLair = false;
+    this.flags.inHouse = false;
+    this.flags.inJailBuilding = false;
+    this.indoorLayer.setVisible(false);
+    this.worldLayer.setVisible(true);
+    this.trailLayer.setVisible(true);
 
-    // Already online
-    if (!this.trackerHeld) this.equipTracker();
-    if (!this.flags.inLair) this.syncRobotBesidePlayer();
-    this.statusLine = 'Robot is with you! EXIT if indoors, then PATROL/RACE car.';
+    if (!this.flags.inVehicle) {
+      this.player.setPosition(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y);
+      this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+      this.vehicle.setVisible(true);
+      if (this.raceCar) this.raceCar.setVisible(true);
+    }
+    this.sasquatch.setVisible(!this.flags.sasquatchJailed);
+    this.syncRobotBesidePlayer();
+    this.robot.setVisible(true);
+    this.robot.setDepth(9);
+    this.robot.play('robot-walk', true);
+    this.setPhase(MissionPhase.CanDrive);
+    audio.success();
+    this.statusLine = '🤖 ROBOT ACTIVATED! It is following you right now.';
     setDomStatus(this.statusLine);
+    this.persistSave();
+  }
+
+  /** Activate tracker + robot partner (one tap can do both). */
+  private doActivate(): void {
+    // Prefer the clear “robot online outside” path so activation always feels real
+    this.doActivateRobot();
   }
 
   /** Leave any indoor space so car / outdoor actions can't stack broken flags. */

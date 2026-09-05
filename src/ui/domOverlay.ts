@@ -33,6 +33,7 @@ type EcraftApi = {
   interact?: () => void;
   capture?: () => void;
   activate?: () => void;
+  activateRobot?: () => void;
   enterCar?: () => void;
   enterRaceCar?: () => void;
   recover?: () => void;
@@ -153,6 +154,7 @@ export function installDomOverlay(): void {
     #ecraft-actions .cap { background: #b71c1c; font-size: 10px; }
     #ecraft-actions .car { background: #ef6c00; color: #111; }
     #ecraft-actions .actv { background: #6a1b9a; }
+    #ecraft-actions .bot { background: #00838f; color: #e0f7fa; font-size: 10px; }
     #ecraft-actions .race { background: #d50000; color: #fff; }
     #ecraft-actions .rec { background: #455a64; color: #fff; font-size: 10px; height: 34px; }
     #ecraft-actions .trk { background: #00695c; color: #b9f6ca; font-size: 10px; }
@@ -208,9 +210,10 @@ export function installDomOverlay(): void {
     <div id="ecraft-actions" aria-label="action buttons">
       <button type="button" class="act" id="btn-e">E</button>
       <button type="button" class="cap" id="btn-cap">CAPTURE</button>
-      <button type="button" class="trk wide" id="btn-tracker">HOLD TRACKER</button>
-      <button type="button" class="actv" id="btn-activate">ACTIVATE</button>
-      <button type="button" class="exit" id="btn-exit">EXIT</button>
+      <button type="button" class="trk" id="btn-tracker">TRACKER</button>
+      <button type="button" class="bot" id="btn-robot">ROBOT</button>
+      <button type="button" class="actv wide" id="btn-activate">ACTIVATE ROBOT</button>
+      <button type="button" class="exit wide" id="btn-exit">EXIT</button>
       <button type="button" class="home" id="btn-house">GO HOME</button>
       <button type="button" class="sleep" id="btn-sleep">SLEEP</button>
       <button type="button" class="car" id="btn-car">PATROL</button>
@@ -294,7 +297,8 @@ export function installDomOverlay(): void {
   bindAction('btn-e', 'interact', 'Interact');
   bindAction('btn-cap', 'capture', 'Capture');
   bindAction('btn-tracker', 'holdTracker', 'Holding Tracker');
-  bindAction('btn-activate', 'activate', 'Activate');
+  bindAction('btn-robot', 'activateRobot', 'Robot ON');
+  bindAction('btn-activate', 'activateRobot', 'Robot ON');
   bindAction('btn-exit', 'exitIndoor', 'Exited');
   bindAction('btn-house', 'enterHouse', 'Welcome home');
   bindAction('btn-sleep', 'sleep', 'Sleeping…');
@@ -315,7 +319,8 @@ export function installDomOverlay(): void {
         callApi('capture', 'Capture');
       }
       if (e.code === 'KeyC') callApi('enterCar', 'Patrol Car');
-      if (e.code === 'KeyF') callApi('activate', 'Activate');
+      if (e.code === 'KeyF') callApi('activateRobot', 'Robot ON');
+      if (e.code === 'KeyB') callApi('activateRobot', 'Robot ON');
       if (e.code === 'KeyT') callApi('holdTracker', 'Holding Tracker');
       if (e.code === 'KeyH') callApi('enterHouse', 'Welcome home');
       if (e.code === 'KeyZ') callApi('sleep', 'Sleeping…');

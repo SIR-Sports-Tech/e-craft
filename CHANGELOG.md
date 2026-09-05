@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.3 — 2026-09-05 — ACTIVATE ROBOT (CLEAR)
+
+### Fixed
+- New **ROBOT** / **ACTIVATE ROBOT** buttons
+- One tap activates tracker + robot and puts you **outside with robot following**
+- No more “activated but stuck in lair so it looks broken”
+
+
 ## 1.4.2 — 2026-09-05 — ROBOT PARTNER WORKS
 
 ### Fixed

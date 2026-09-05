@@ -8,12 +8,13 @@ page.on('pageerror', (e) => errs.push(String(e)));
 
 await page.goto(url, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2200);
-await page.waitForFunction(() => !!window.__ecraft?.exitIndoor);
+await page.waitForFunction(() => !!window.__ecraft?.exitIndoor && !!window.__ecraft?.activateRobot);
 
 const ids = [
   'btn-e',
   'btn-cap',
   'btn-tracker',
+  'btn-robot',
   'btn-activate',
   'btn-exit',
   'btn-house',
@@ -49,19 +50,11 @@ async function tap(id) {
 }
 
 // Fresh path proving each control
-await tap('btn-tracker');
-await page.waitForTimeout(200);
+await tap('btn-robot');
+await page.waitForTimeout(350);
 let st = await page.evaluate(() => window.__ecraft.getState());
-const trackerOk = st.flags.hasTracker && st.flags.trackerHeld && st.flags.inLair;
-
-await tap('btn-activate');
-await page.waitForTimeout(200);
-st = await page.evaluate(() => window.__ecraft.getState());
-const activateOk = st.flags.robotActive;
-
-await tap('btn-exit');
-await page.waitForTimeout(250);
-st = await page.evaluate(() => window.__ecraft.getState());
+const trackerOk = st.flags.hasTracker && st.flags.trackerHeld;
+const activateOk = st.flags.robotActive && !st.flags.inLair && st.robot?.visible === true;
 const exitOk = !st.flags.inLair && !st.flags.inHouse;
 
 await tap('btn-house');

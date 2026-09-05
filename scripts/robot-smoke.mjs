@@ -8,21 +8,23 @@ page.on('pageerror', (e) => errs.push(String(e)));
 
 await page.goto(url, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
-await page.waitForFunction(() => !!window.__ecraft?.activate);
+await page.waitForFunction(() => !!window.__ecraft?.activateRobot);
 
 async function tap(id) {
   await page.locator(`#${id}`).dispatchEvent('pointerdown');
   await page.waitForTimeout(150);
 }
 
-await tap('btn-activate'); // one tap = tracker + robot
-await page.waitForTimeout(200);
+// One ROBOT tap must activate AND put you outside with robot beside you
+await tap('btn-robot');
+await page.waitForTimeout(350);
 let st = await page.evaluate(() => window.__ecraft.getState());
-const activated = st.flags.robotActive === true && st.flags.hasTracker === true && st.robot?.active === true;
+const activated =
+  st.flags.robotActive === true &&
+  st.flags.hasTracker === true &&
+  st.flags.inLair === false &&
+  st.robot?.active === true;
 
-await tap('btn-exit');
-await page.waitForTimeout(400);
-st = await page.evaluate(() => window.__ecraft.getState());
 const beside =
   st.robot?.visible === true &&
   typeof st.robot.dist === 'number' &&
