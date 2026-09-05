@@ -25,7 +25,7 @@ export class BootScene extends Phaser.Scene {
     this.makeBuilding('bldg_forest_cabin', 0x3e2723, 0xa5d6a7, false);
     this.makeDoor();
     this.makeTrailIcons();
-    this.scene.start('Game');
+    this.scene.start('Title');
   }
 
   private g(): Phaser.GameObjects.Graphics {

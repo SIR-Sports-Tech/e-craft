@@ -6,6 +6,20 @@
 - Citizen dialogue (Pike, Jun, Ada, Remy)
 # Changelog
 
+## 0.2.0 — 2026-09-05 — TEST BUILD
+
+### Added
+- **Title screen** with New Game / Continue
+- **Autosave** (localStorage) every 8s + load on Continue
+- **Original SFX** (pickup / capture / success / talk)
+- Expanded city: Clinic, Sky Patrol Pad, Gadget Shop
+- Stronger lair lighting strips
+
+### For testers
+- Dev: http://127.0.0.1:5173/
+- Preview build: http://127.0.0.1:4173/
+
+
 ## 0.1.4 — 2026-09-05
 
 ### Changed

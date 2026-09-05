@@ -4,6 +4,10 @@ Original free-to-play, family-friendly living-world game prototype.
 
 **Stack:** Phaser 3 + TypeScript + Vite (browser)
 
+**Test builds:**
+- Dev (hot reload): `npm run dev` → http://127.0.0.1:5173/
+- Preview (production bundle): `npm run build && npm run preview -- --port 4173` → http://127.0.0.1:4173/
+
 ## Play
 
 ```bash

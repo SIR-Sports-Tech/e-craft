@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BootScene } from './game/scenes/BootScene';
+import { TitleScene } from './game/scenes/TitleScene';
 import { GameScene } from './game/scenes/GameScene';
 import { UIScene } from './game/scenes/UIScene';
 
@@ -20,7 +21,7 @@ const config: Phaser.Types.Core.GameConfig = {
       gravity: { x: 0, y: 0 },
     },
   },
-  scene: [BootScene, GameScene, UIScene],
+  scene: [BootScene, TitleScene, GameScene, UIScene],
   input: {
     activePointers: 3,
   },

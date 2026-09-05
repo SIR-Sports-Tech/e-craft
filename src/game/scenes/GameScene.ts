@@ -8,6 +8,8 @@ import {
 import { TrailSystem } from '../systems/TrailSystem';
 import { ObjectiveMarker, objectiveFor } from '../systems/ObjectiveSystem';
 import { ConstructionSystem } from '../systems/ConstructionSystem';
+import { audio } from '../systems/AudioSystem';
+import { loadGame, saveGame } from '../systems/SaveSystem';
 import {
   CITY_ZONES,
   JAIL_INTERIOR,
@@ -147,7 +149,69 @@ export class GameScene extends Phaser.Scene {
       getState: () => this.getHud(),
       advance: () => this.debugAdvance(),
       complete: () => this.debugCompleteMission(),
+      save: () => this.persistSave(),
     };
+
+    // Idle bob animation for living feel
+    this.tweens.add({
+      targets: this.player,
+      y: this.player.y - 2,
+      duration: 450,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        /* physics overrides y while moving; bob is subtle when idle only */
+      },
+    });
+
+    if (this.registry.get('loadSave')) {
+      this.applySave();
+    }
+    this.time.addEvent({ delay: 8000, loop: true, callback: () => this.persistSave() });
+  }
+
+  private persistSave(): void {
+    if (!this.player) return;
+    saveGame({
+      phase: this.phase,
+      flags: { ...this.flags },
+      player: { x: this.player.x, y: this.player.y },
+      builds: this.construction.getOrders().map((o) => ({
+        id: o.id,
+        progress: o.progress,
+        done: o.done,
+      })),
+    });
+  }
+
+  private applySave(): void {
+    const data = loadGame();
+    if (!data) return;
+    this.phase = data.phase;
+    this.flags = { ...data.flags };
+    this.player.setPosition(data.player.x, data.player.y);
+    if (this.flags.robotActive) {
+      this.robot.setVisible(true);
+      this.robot.setPosition(this.player.x - 36, this.player.y);
+    }
+    if (this.flags.inVehicle) {
+      this.vehicle.setVisible(false);
+      this.player.setTexture('vehicle');
+    }
+    if (this.flags.sasquatchJailed) {
+      this.sasquatch.setVisible(false);
+    }
+    for (const b of data.builds) {
+      if (b.id === 'robot_garage') {
+        const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
+        const order = this.construction.requestRobotGarage({ x: hq.x + hq.w / 2, y: hq.y + hq.h + 70 });
+        order.progress = b.progress;
+        order.done = b.done;
+      }
+    }
+    this.statusLine = 'Save loaded. Welcome back, Chief!';
+    audio.success();
   }
 
   private buildOutdoorWorld(): void {
@@ -180,6 +244,9 @@ export class GameScene extends Phaser.Scene {
       security_hq: 'bldg_hq',
       super_jail: 'bldg_jail',
       city_plaza: 'bldg_plaza',
+      clinic: 'bldg_plaza',
+      airfield: 'bldg_hq',
+      shop: 'bldg_forest_cabin',
       forest: 'bldg_forest_cabin',
       vehicle_bay: 'bldg_plaza',
     };
@@ -316,6 +383,15 @@ export class GameScene extends Phaser.Scene {
 
     this.lairNodes = [floor, title, tracker, trackerLbl, robotPad, robotLbl, exit];
     for (const n of this.lairNodes) this.indoorLayer.add(n);
+    for (let i = 0; i < 6; i++) {
+      const strip = this.add.rectangle(LAIR.x + 80 + i * 100, LAIR.y + LAIR.h / 2, 4, LAIR.h - 40, 0x4fc3f7, 0.15);
+      this.lairNodes.push(strip);
+      this.indoorLayer.add(strip);
+    }
+    const glow = this.add.circle(LAIR.trackerX, LAIR.trackerY, 40, 0xffeb3b, 0.12);
+    this.lairNodes.push(glow);
+    this.indoorLayer.add(glow);
+
   }
 
   private buildIndoorJail(): void {
@@ -718,6 +794,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.flags.hasTracker && this.near(LAIR.trackerX, LAIR.trackerY, 50)) {
         this.flags.hasTracker = true;
         this.setPhase(MissionPhase.HasTracker);
+        audio.pickup();
         this.statusLine = 'Sasquatch Tracker acquired!';
         return;
       }
@@ -726,6 +803,7 @@ export class GameScene extends Phaser.Scene {
         this.robot.setPosition(this.player.x - 30, this.player.y);
         this.robot.setVisible(true);
         this.setPhase(MissionPhase.RobotActive);
+        audio.pickup();
         this.statusLine = 'Robot online! Exit lair and take the security vehicle.';
         return;
       }
@@ -771,6 +849,7 @@ export class GameScene extends Phaser.Scene {
 
     for (const c of this.citizens) {
       if (this.near(c.x, c.y, 40)) {
+        audio.talk();
         this.statusLine = `${c.name}: "${c.line}"`;
         if (c.name === 'Builder Jun') {
           const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
@@ -858,6 +937,7 @@ export class GameScene extends Phaser.Scene {
     this.sasquatch.setVelocity(0);
     this.sasquatch.setTint(0x88ff88);
     this.setPhase(MissionPhase.Captured);
+    audio.capture();
     this.statusLine = 'Captured! Load Sasquatch into the security vehicle (E).';
     this.trail.clearFallback();
   }
@@ -963,6 +1043,7 @@ export class GameScene extends Phaser.Scene {
     if (this.flags.rewardClaimed) return;
     this.flags.rewardClaimed = true;
     this.setPhase(MissionPhase.Rewarded);
+    audio.success();
     this.statusLine = `MISSION COMPLETE! Reward: ${REWARD_TEXT}`;
     this.time.delayedCall(2500, () => {
       this.setPhase(MissionPhase.FreeExplore);

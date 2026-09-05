@@ -86,7 +86,7 @@ export class UIScene extends Phaser.Scene {
       .setDepth(100);
 
     this.add
-      .text(w - 12, 10, 'WASD move · E interact · Space capture · M map · Esc pause', {
+      .text(w - 12, 10, 'WASD · E · Space · M · Esc · Autosave on', {
         fontSize: '11px',
         color: '#b0bec5',
         backgroundColor: '#00000088',
