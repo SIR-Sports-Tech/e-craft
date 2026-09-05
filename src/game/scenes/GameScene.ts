@@ -672,9 +672,15 @@ export class GameScene extends Phaser.Scene {
 
     if (this.flags.inVehicle) {
       this.vehicle.setPosition(this.player.x, this.player.y);
-      this.player.setTexture('vehicle');
+      if (this.player.texture.key !== 'vehicle') {
+        this.player.setTexture('vehicle');
+        this.player.setScale(1.05);
+        const body = this.player.body as Phaser.Physics.Arcade.Body;
+        body.setSize(70, 36).setOffset(10, 12);
+      }
     } else if (this.player.texture.key !== 'player') {
       this.player.setTexture('player');
+      this.player.setScale(0.95);
     }
 
     if (this.flags.sasquatchInVehicle && this.flags.inVehicle) {
@@ -934,7 +940,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.trail.markNearbyDiscovered(this.player.x, this.player.y);
-    this.redrawTrailPath();
+    // dirt path handled inside TrailSystem
     const nearest = this.trail.nearestUndiscovered(this.player.x, this.player.y);
     if (nearest) {
       const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, nearest.x, nearest.y);
@@ -1014,11 +1020,15 @@ export class GameScene extends Phaser.Scene {
     for (const c of this.citizens) {
       if (this.near(c.x, c.y, 40)) return `[E] Talk to ${c.name}`;
     }
-    if (!this.flags.inVehicle && this.near(this.vehicle.x, this.vehicle.y, 60)) {
-      if (this.flags.robotActive) return '[E] Enter security vehicle';
-      return 'Activate robot first (in the lair)';
+    const bay = CITY_ZONES.find((z) => z.id === 'vehicle_bay');
+    const nearCar =
+      this.near(this.vehicle.x, this.vehicle.y, 120) ||
+      (!!bay && pointInRect(this.player.x, this.player.y, bay));
+    if (!this.flags.inVehicle && nearCar) {
+      if (this.flags.robotActive) return '[E] / CAR — Enter patrol vehicle';
+      return 'Activate robot first (underground lair)';
     }
-    if (this.flags.inVehicle) return '[E] Exit vehicle';
+    if (this.flags.inVehicle) return '[E] Exit vehicle · WASD to drive';
     if (
       this.flags.sasquatchCaptured &&
       !this.flags.sasquatchInVehicle &&
@@ -1123,32 +1133,25 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Vehicle enter/exit
-    if (!this.flags.inVehicle && this.near(this.vehicle.x, this.vehicle.y, 80)) {
-      if (!this.flags.robotActive) {
-        this.statusLine = 'Activate your robot partner first!';
+    // Vehicle enter/exit — generous radius + bay zone
+    {
+      const bay = CITY_ZONES.find((z) => z.id === 'vehicle_bay');
+      const nearCar =
+        this.near(this.vehicle.x, this.vehicle.y, 130) ||
+        (!!bay && pointInRect(this.player.x, this.player.y, {
+          x: bay.x - 20,
+          y: bay.y - 20,
+          w: bay.w + 40,
+          h: bay.h + 40,
+        }));
+      if (!this.flags.inVehicle && nearCar) {
+        if (!this.flags.robotActive) {
+          this.statusLine = 'Activate your robot partner first (underground lair)!';
+          return;
+        }
+        this.enterVehicle(true);
         return;
       }
-      this.flags.inVehicle = true;
-      this.player.setPosition(this.vehicle.x, this.vehicle.y);
-      this.vehicle.setVisible(false);
-      const sasqNear =
-        this.flags.sasquatchCaptured &&
-        Phaser.Math.Distance.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y) < 140;
-      if (sasqNear) {
-        this.flags.sasquatchInVehicle = true;
-        this.setPhase(MissionPhase.Transporting);
-        this.statusLine = 'Sasquatch loaded! Drive to SUPER JAIL (follow the yellow arrow).';
-      } else if (this.flags.sasquatchCaptured) {
-        this.statusLine = 'Sasquatch is following you — get closer to the vehicle, then press E again.';
-        this.flags.inVehicle = false;
-        this.vehicle.setVisible(true);
-        this.player.setTexture('player');
-      } else if (this.phase === MissionPhase.RobotActive || this.phase === MissionPhase.CanDrive) {
-        this.setPhase(MissionPhase.CanDrive);
-        this.statusLine = 'Vehicle engaged. Drive east to the forest (yellow arrow)!';
-      }
-      return;
     }
 
     // Load sasquatch while already driving
@@ -1169,12 +1172,40 @@ export class GameScene extends Phaser.Scene {
       this.vehicle.setPosition(this.player.x, this.player.y);
       this.vehicle.setVisible(true);
       this.player.setTexture('player');
+      this.player.setScale(0.95);
+      const body = this.player.body as Phaser.Physics.Arcade.Body;
+      body.setSize(28, 40).setOffset(10, 12);
       if (this.flags.sasquatchInVehicle) {
         this.sasquatch.setPosition(this.player.x + 40, this.player.y);
-        // Keep in vehicle inventory conceptually while transporting on foot near jail
       }
       this.statusLine = 'Exited vehicle.';
+      return;
     }
+  }
+
+
+  private enterVehicle(allowWithoutSasq = true): void {
+    this.flags.inVehicle = true;
+    this.player.setPosition(this.vehicle.x, this.vehicle.y);
+    this.vehicle.setVisible(false);
+    this.player.setTexture('vehicle');
+    this.player.setScale(1.05);
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    body.setSize(70, 36).setOffset(10, 12);
+    const sasqNear =
+      this.flags.sasquatchCaptured &&
+      Phaser.Math.Distance.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y) < 160;
+    if (sasqNear) {
+      this.flags.sasquatchInVehicle = true;
+      this.setPhase(MissionPhase.Transporting);
+      this.statusLine = 'Sasquatch loaded! Drive to SUPER JAIL.';
+    } else if (this.flags.sasquatchCaptured && !allowWithoutSasq) {
+      this.statusLine = 'Bring Sasquatch closer, then press E/CAR again.';
+    } else {
+      this.setPhase(MissionPhase.CanDrive);
+      this.statusLine = 'Driving! Use WASD / pad — go east to the forest.';
+    }
+    audio.drive();
   }
 
   private tryCapture(): void {

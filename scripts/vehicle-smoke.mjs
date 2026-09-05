@@ -1,0 +1,32 @@
+import { chromium } from 'playwright';
+const url = 'http://127.0.0.1:5173/?skiptitle=1';
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const errs = [];
+page.on('pageerror', (e) => errs.push(String(e)));
+await page.goto(url, { waitUntil: 'networkidle' });
+await page.waitForTimeout(2000);
+await page.locator('#app').click();
+await page.waitForFunction(() => !!window.__ecraft?.runAcceptanceStep, null, { timeout: 10000 });
+await page.evaluate(async () => {
+  const a = window.__ecraft;
+  a.runAcceptanceStep('enter_lair');
+  a.runAcceptanceStep('get_tracker');
+  a.runAcceptanceStep('activate_robot');
+  a.runAcceptanceStep('exit_lair');
+  a.runAcceptanceStep('enter_vehicle');
+});
+await page.waitForTimeout(300);
+const before = await page.evaluate(() => window.__ecraft.getState());
+// drive right with pad
+await page.locator('#ecraft-pad [data-dir="right"]').dispatchEvent('pointerdown');
+await page.waitForTimeout(600);
+await page.locator('#ecraft-pad [data-dir="right"]').dispatchEvent('pointerup');
+const after = await page.evaluate(() => window.__ecraft.getState());
+const moved = Math.abs(after.player.x - before.player.x) > 20;
+const driving = before.flags.inVehicle === true;
+const ok = errs.length === 0 && driving && moved;
+console.log(JSON.stringify({ errs, driving, beforeX: before.player.x, afterX: after.player.x, moved, ok }, null, 2));
+await page.screenshot({ path: 'docs/ecraft-vehicle-drive.png' });
+await browser.close();
+if (!ok) process.exit(1);

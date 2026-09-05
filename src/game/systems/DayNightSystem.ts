@@ -19,7 +19,7 @@ export class DayNightSystem {
         backgroundColor: '#00000099',
         padding: { x: 8, y: 4 },
       })
-      .setOrigin(1, 0)
+      .setOrigin(1, 0).setAlpha(0.7)
       .setScrollFactor(0)
       .setDepth(120);
   }

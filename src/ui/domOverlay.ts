@@ -1,5 +1,5 @@
 /**
- * Chrome-reliable DOM overlay: always-on keyboard capture + on-screen pad.
+ * Minimal Chrome/phone controls — no giant instruction boxes covering the game.
  */
 
 export type DomInputState = {
@@ -35,59 +35,59 @@ export function installDomOverlay(): void {
   const style = document.createElement('style');
   style.textContent = `
     #ecraft-dom-root {
-      position: fixed; inset: 0; pointer-events: none; z-index: 20;
+      position: fixed; inset: 0; pointer-events: none; z-index: 30;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
-    #ecraft-dom-root .panel {
+    #ecraft-toast {
       pointer-events: none;
-      position: absolute; left: 12px; top: 12px;
-      background: rgba(0,0,0,.72); color: #e8f5e9;
-      border: 1px solid rgba(79,195,247,.45); border-radius: 12px;
-      padding: 10px 14px; max-width: min(520px, 70vw);
-      backdrop-filter: blur(6px);
-      box-shadow: 0 8px 28px rgba(0,0,0,.35);
+      position: absolute; left: 50%; bottom: 118px; transform: translateX(-50%);
+      background: rgba(0,0,0,.55); color: #fffde7;
+      border-radius: 999px; padding: 8px 14px;
+      font-size: 13px; max-width: 90vw; text-align: center;
+      opacity: 0; transition: opacity .2s ease;
+      backdrop-filter: blur(4px);
     }
-    #ecraft-dom-root .panel h1 {
-      margin: 0 0 4px; font-size: 15px; color: #4fc3f7; letter-spacing: .04em;
-    }
-    #ecraft-dom-root .panel p { margin: 0; font-size: 13px; line-height: 1.35; color: #fff9c4; }
-    #ecraft-dom-root .hint { margin-top: 6px; font-size: 12px; color: #b0bec5; }
+    #ecraft-toast.show { opacity: 1; }
     #ecraft-pad {
       pointer-events: auto;
-      position: absolute; right: 16px; bottom: 16px;
-      display: grid; grid-template-columns: 56px 56px 56px; gap: 8px;
+      position: absolute; right: 12px; bottom: 12px;
+      display: grid; grid-template-columns: 58px 58px 58px; gap: 6px;
+      touch-action: none;
     }
-    #ecraft-pad button, #ecraft-actions button {
-      width: 56px; height: 56px; border-radius: 14px; border: 1px solid rgba(255,255,255,.25);
-      background: rgba(21,101,192,.85); color: #fff; font-weight: 700; font-size: 14px;
-      box-shadow: 0 4px 14px rgba(0,0,0,.35); cursor: pointer;
-    }
-    #ecraft-pad button:active, #ecraft-actions button:active { transform: scale(.96); background: #1b5e20; }
     #ecraft-actions {
       pointer-events: auto;
-      position: absolute; left: 16px; bottom: 16px;
-      display: flex; gap: 8px; flex-wrap: wrap; max-width: 420px;
+      position: absolute; left: 12px; bottom: 12px;
+      display: flex; flex-direction: column; gap: 8px;
+      touch-action: none;
     }
-    #ecraft-actions .cap { background: rgba(198,40,40,.9); }
-    #ecraft-actions .go { background: rgba(46,125,50,.9); width: auto; padding: 0 14px; }
-    #ecraft-actions .rad { background: rgba(0,151,167,.9); width: auto; padding: 0 12px; }
+    #ecraft-dom-root button {
+      width: 58px; height: 58px; border-radius: 16px;
+      border: 2px solid rgba(255,255,255,.35);
+      background: rgba(13,71,161,.88); color: #fff;
+      font-weight: 800; font-size: 13px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.4);
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      touch-action: none;
+    }
+    #ecraft-actions .go { background: rgba(27,94,32,.92); width: 86px; }
+    #ecraft-actions .cap { background: rgba(183,28,28,.92); width: 86px; }
+    #ecraft-actions .drive { background: rgba(255,143,0,.95); color: #111; width: 86px; font-size: 12px; }
+    #ecraft-pad button:active, #ecraft-actions button:active {
+      transform: scale(0.94);
+      filter: brightness(1.15);
+    }
   `;
   document.head.appendChild(style);
 
   const root = document.createElement('div');
   root.id = 'ecraft-dom-root';
   root.innerHTML = `
-    <div class="panel">
-      <h1>E-CRAFT v1.0 · Sasquatch Mission</h1>
-      <p id="ecraft-dom-status">Click the game, then use WASD or the pad to move.</p>
-      <div class="hint">WASD · E interact · Space capture · R robot tip · M map · Esc pause</div>
-      <div class="hint" id="ecraft-dom-inv" style="margin-top:4px;color:#b2dfdb"></div>
-      <div class="hint" id="ecraft-dom-job" style="margin-top:2px;color:#ffe082"></div>
-    </div>
+    <div id="ecraft-toast">Ready</div>
     <div id="ecraft-actions">
-      <button type="button" class="go" data-act="interact">E · Interact</button>
-      <button type="button" class="cap" data-act="capture">Space · Capture</button>
-      <button type="button" class="rad" data-act="radio">R · Robot Tip</button>
+      <button type="button" class="go" data-act="interact">E</button>
+      <button type="button" class="cap" data-act="capture">CAP</button>
+      <button type="button" class="drive" data-act="interact">CAR</button>
     </div>
     <div id="ecraft-pad" aria-label="movement pad">
       <span></span><button type="button" data-dir="up">▲</button><span></span>
@@ -101,10 +101,12 @@ export function installDomOverlay(): void {
   const bindHold = (btn: HTMLButtonElement, code: string) => {
     const down = (e: Event) => {
       e.preventDefault();
+      e.stopPropagation();
       pressed.add(code);
     };
     const up = (e: Event) => {
       e.preventDefault();
+      e.stopPropagation();
       pressed.delete(code);
     };
     btn.addEventListener('pointerdown', down);
@@ -114,40 +116,45 @@ export function installDomOverlay(): void {
   };
 
   root.querySelectorAll<HTMLButtonElement>('#ecraft-pad [data-dir]').forEach((btn) => {
-    const dir = btn.dataset.dir;
+    const dir = btn.dataset.dir!;
     const map: Record<string, string> = {
       up: 'ArrowUp',
       down: 'ArrowDown',
       left: 'ArrowLeft',
       right: 'ArrowRight',
     };
-    if (dir && map[dir]) bindHold(btn, map[dir]);
+    bindHold(btn, map[dir]);
   });
 
   root.querySelectorAll<HTMLButtonElement>('#ecraft-actions [data-act]').forEach((btn) => {
-    btn.addEventListener('pointerdown', (e) => {
+    const fire = (e: Event) => {
       e.preventDefault();
+      e.stopPropagation();
       const act = btn.dataset.act;
       if (act === 'interact') interactPulse = true;
       if (act === 'capture') capturePulse = true;
       if (act === 'radio') radioPulse = true;
-    });
+    };
+    btn.addEventListener('pointerdown', fire);
+    btn.addEventListener('click', fire);
   });
 
-  window.addEventListener('keydown', (e) => {
-    pressed.add(e.code);
-    if (e.code === 'KeyE') interactPulse = true;
-    if (e.code === 'Space') {
-      e.preventDefault();
-      capturePulse = true;
-    }
-    if (e.code === 'KeyM') mapPulse = true;
-    if (e.code === 'Escape') pausePulse = true;
-    if (e.code === 'KeyR') radioPulse = true;
-  });
-  window.addEventListener('keyup', (e) => {
-    pressed.delete(e.code);
-  });
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      pressed.add(e.code);
+      if (e.code === 'KeyE') interactPulse = true;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        capturePulse = true;
+      }
+      if (e.code === 'KeyM') mapPulse = true;
+      if (e.code === 'Escape') pausePulse = true;
+      if (e.code === 'KeyR') radioPulse = true;
+    },
+    { passive: false },
+  );
+  window.addEventListener('keyup', (e) => pressed.delete(e.code));
   window.addEventListener('blur', () => pressed.clear());
 }
 
@@ -170,14 +177,18 @@ export function pollDomInput(): DomInputState {
   return state;
 }
 
+let toastTimer: number | undefined;
 export function setDomStatus(text: string): void {
-  const el = document.getElementById('ecraft-dom-status');
-  if (el) el.textContent = text;
+  const el = document.getElementById('ecraft-toast');
+  if (!el) return;
+  // Keep toast short — no permanent walls of text
+  const short = text.length > 90 ? text.slice(0, 87) + '…' : text;
+  el.textContent = short;
+  el.classList.add('show');
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => el.classList.remove('show'), 2800);
 }
 
-export function setDomMeta(inv: string, job: string): void {
-  const i = document.getElementById('ecraft-dom-inv');
-  const j = document.getElementById('ecraft-dom-job');
-  if (i) i.textContent = inv;
-  if (j) j.textContent = job;
+export function setDomMeta(_inv: string, _job: string): void {
+  // Intentionally empty — inventory/job boxes were covering the game.
 }

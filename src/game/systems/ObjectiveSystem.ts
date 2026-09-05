@@ -77,13 +77,14 @@ export class ObjectiveMarker {
     const tri = scene.add.triangle(0, 0, 0, -20, 14, 12, -14, 12, 0xffee58);
     const ring = scene.add.circle(0, 0, 22, 0xffee58, 0.2).setStrokeStyle(2, 0xffee58, 0.8);
     const label = scene.add
-      .text(0, 28, '', {
-        fontSize: '12px',
+      .text(0, 26, '', {
+        fontSize: '10px',
         color: '#fffde7',
-        backgroundColor: '#000000aa',
-        padding: { x: 4, y: 2 },
+        backgroundColor: '#00000066',
+        padding: { x: 3, y: 1 },
       })
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5, 0)
+      .setAlpha(0.85);
     this.arrow.add([ring, tri, label]);
     (this.arrow as unknown as { label: Phaser.GameObjects.Text }).label = label;
   }
@@ -99,7 +100,7 @@ export class ObjectiveMarker {
     this.arrow.setRotation(angle + Math.PI / 2);
     const label = (this.arrow as unknown as { label: Phaser.GameObjects.Text }).label;
     label.setRotation(-(angle + Math.PI / 2));
-    label.setText(`${target.label} (${Math.round(dist)}m)`);
+    label.setText(dist < 160 ? target.label : '▸');
     this.arrow.setVisible(true);
   }
 }

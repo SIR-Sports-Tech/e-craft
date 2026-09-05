@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.1 — 2026-09-05 — UX HOTFIX
+
+### Fixed
+- Removed giant instruction / checklist / inventory boxes covering the screen
+- Controls: compact E / CAP / CAR + D-pad that actually work on phone/Chrome
+- Vehicle entry radius + bay zone; car now drives with pad/WASD
+- Sasquatch trail looks like real dirt prints/scuffs (not neon stickers)
+
+
 ## 1.0.0 — 2026-09-05 — FIRST PLAN COMPLETE
 
 ### Done

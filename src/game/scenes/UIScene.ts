@@ -35,63 +35,28 @@ export class UIScene extends Phaser.Scene {
     vig.fillRect(0, 0, w, 28);
     vig.fillRect(0, h - 28, w, 28);
 
-    this.phaseText = this.add
-      .text(12, 10, '', {
-        fontSize: '14px',
-        color: '#90caf9',
-        backgroundColor: '#000000aa',
-        padding: { x: 8, y: 4 },
-      })
-      .setScrollFactor(0)
-      .setDepth(100);
+    this.phaseText = this.add.text(0, 0, '').setVisible(false);
 
     this.hintText = this.add
-      .text(12, 40, '', {
-        fontSize: '15px',
-        color: '#fff9c4',
-        backgroundColor: '#000000cc',
-        padding: { x: 10, y: 6 },
-        wordWrap: { width: Math.min(720, w - 24) },
-      })
-      .setScrollFactor(0)
-      .setDepth(100);
-
-    this.statusText = this.add
-      .text(12, h - 70, '', {
-        fontSize: '14px',
-        color: '#e0f7fa',
-        backgroundColor: '#000000bb',
-        padding: { x: 10, y: 6 },
-        wordWrap: { width: Math.min(700, w - 24) },
-      })
-      .setScrollFactor(0)
-      .setDepth(100);
-
-    this.promptText = this.add
-      .text(w / 2, h - 110, '', {
-        fontSize: '18px',
-        color: '#ffe082',
-        backgroundColor: '#1b5e20cc',
-        padding: { x: 12, y: 8 },
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(100);
-
-    this.checklistText = this.add
-      .text(w - 12, 40, '', {
+      .text(12, 36, '', {
         fontSize: '12px',
-        color: '#cfd8dc',
-        backgroundColor: '#000000aa',
-        padding: { x: 8, y: 6 },
-        lineSpacing: 3,
+        color: '#fff9c4',
+        backgroundColor: '#00000066',
+        padding: { x: 6, y: 3 },
+        wordWrap: { width: Math.min(360, w - 24) },
       })
-      .setOrigin(1, 0)
       .setScrollFactor(0)
-      .setDepth(100);
+      .setDepth(100)
+      .setAlpha(0.85);
+
+    this.statusText = this.add.text(0, 0, '').setVisible(false);
+
+    this.promptText = this.add.text(0, 0, '').setVisible(false);
+
+    this.checklistText = this.add.text(0, 0, '').setVisible(false);
 
     this.add
-      .text(w - 12, 10, 'WASD · E · Space · M · Esc · Autosave on', {
+      .text(w - 12, 10, '', {
         fontSize: '11px',
         color: '#b0bec5',
         backgroundColor: '#00000088',
@@ -278,8 +243,7 @@ export class UIScene extends Phaser.Scene {
     this.phaseText.setText(`E-CRAFT v0.1 · ${hud.phase}`);
     this.hintText.setText(hud.hint);
     this.statusText.setText(hud.status);
-    this.promptText.setText(hud.prompt);
-    this.promptText.setVisible(!!hud.prompt);
+    // prompt via DOM toast only
     if (hud.checklist) {
       const police = (hud.policeLines || []).join('\n');
       this.checklistText.setText(
