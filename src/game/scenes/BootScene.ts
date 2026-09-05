@@ -80,45 +80,78 @@ export class BootScene extends Phaser.Scene {
 
   private makeRoad(): void {
     const s = 64;
+    // Realistic asphalt — dark gray with wear / grit / faint cracks
     const g = this.g();
-    // asphalt with subtle grit
-    g.fillStyle(0x37474f, 1);
+    g.fillStyle(0x2f3338, 1);
     g.fillRect(0, 0, s, s);
-    g.fillStyle(0x455a64, 1);
-    for (let i = 0; i < 18; i++) {
-      g.fillRect((i * 17) % s, (i * 23) % s, 2, 2);
+    g.fillStyle(0x3a3f45, 1);
+    for (let i = 0; i < 40; i++) {
+      g.fillRect((i * 19) % s, (i * 29) % s, 2 + (i % 2), 1 + (i % 2));
     }
-    g.fillStyle(0x263238, 1);
-    g.fillRect(0, 0, s, 4);
-    g.fillRect(0, s - 4, s, 4);
+    g.lineStyle(1, 0x1f2327, 0.35);
+    g.lineBetween(4, 20, 40, 28);
+    g.lineBetween(28, 48, 58, 44);
+    g.fillStyle(0x4a5058, 0.25);
+    g.fillRect(10, 8, 18, 3);
     g.generateTexture('tile_road', s, s);
     g.destroy();
 
-    // sidewalk concrete tile
+    // Sidewalk — concrete slabs + curb edge
     const sw = this.g();
-    sw.fillStyle(0x90a4ae, 1);
+    sw.fillStyle(0xa8b0b8, 1);
     sw.fillRect(0, 0, s, s);
-    sw.lineStyle(1, 0x78909c, 0.7);
+    sw.lineStyle(2, 0x8a939c, 0.9);
     sw.strokeRect(1, 1, s - 2, s - 2);
     sw.lineBetween(s / 2, 0, s / 2, s);
     sw.lineBetween(0, s / 2, s, s / 2);
-    sw.fillStyle(0xb0bec5, 0.35);
-    sw.fillRect(4, 4, 10, 8);
+    sw.fillStyle(0xc5ccd3, 0.45);
+    sw.fillRect(6, 6, 14, 10);
+    sw.fillStyle(0x6d757e, 1);
+    sw.fillRect(0, s - 6, s, 6); // curb lip
     sw.generateTexture('tile_sidewalk', s, s);
     sw.destroy();
 
-    // street lamp prop
+    // Tall street light with arm + warm lamp
     const lamp = this.g();
+    lamp.fillStyle(0x1a1a1a, 0.3);
+    lamp.fillEllipse(18, 92, 22, 8);
+    lamp.fillStyle(0x37474f, 1);
+    lamp.fillRect(15, 28, 7, 64); // pole
     lamp.fillStyle(0x263238, 1);
-    lamp.fillRect(14, 20, 6, 44);
+    lamp.fillRect(10, 86, 16, 6); // base
     lamp.fillStyle(0x455a64, 1);
-    lamp.fillRect(8, 14, 18, 8);
-    lamp.fillStyle(0xfff59d, 0.95);
-    lamp.fillCircle(17, 12, 8);
-    lamp.fillStyle(0xffe082, 0.35);
-    lamp.fillCircle(17, 12, 14);
-    lamp.generateTexture('street_lamp', 34, 64);
+    lamp.fillRect(16, 20, 28, 6); // arm
+    lamp.fillTriangle(42, 20, 50, 28, 42, 28);
+    lamp.fillStyle(0xfff59d, 1);
+    lamp.fillCircle(44, 34, 8);
+    lamp.fillStyle(0xffe082, 0.4);
+    lamp.fillCircle(44, 34, 14);
+    lamp.fillStyle(0xffffff, 0.7);
+    lamp.fillCircle(42, 32, 2);
+    lamp.generateTexture('street_lamp', 56, 96);
     lamp.destroy();
+
+    // Traffic signal housing (lights animated separately)
+    const sig = this.g();
+    sig.fillStyle(0x212121, 1);
+    sig.fillRect(10, 20, 8, 70); // pole
+    sig.fillStyle(0x111111, 1);
+    sig.fillRoundedRect(2, 2, 24, 56, 4); // head
+    sig.fillStyle(0x2a2a2a, 1);
+    sig.fillCircle(14, 14, 7);
+    sig.fillCircle(14, 30, 7);
+    sig.fillCircle(14, 46, 7);
+    // dim default lenses
+    sig.fillStyle(0x4e0000, 1);
+    sig.fillCircle(14, 14, 5);
+    sig.fillStyle(0x4e4200, 1);
+    sig.fillCircle(14, 30, 5);
+    sig.fillStyle(0x003d00, 1);
+    sig.fillCircle(14, 46, 5);
+    sig.fillStyle(0x37474f, 1);
+    sig.fillRect(6, 88, 16, 6);
+    sig.generateTexture('traffic_signal', 28, 96);
+    sig.destroy();
 
     // manhole
     const mh = this.g();

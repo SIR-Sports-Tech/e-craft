@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.0 — 2026-09-05 — REAL STREETS + TRAFFIC SIGNALS
+
+### Added / Improved
+- Darker worn asphalt + concrete sidewalks with curb lips
+- Double-yellow center lines + solid white edges
+- Better zebra crosswalks
+- Tall street lamps with warm glow pools (both sides of roads)
+- **Traffic signals** at intersections — red / yellow / green cycle
+- Clearer street-name signs
+
+
 ## 1.4.4 — 2026-09-05 — FULL SCREEN (NOT TINY)
 
 ### Fixed

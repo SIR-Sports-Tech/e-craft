@@ -88,6 +88,14 @@ export class GameScene extends Phaser.Scene {
   private houseNodes: Phaser.GameObjects.GameObject[] = [];
   private sleeping = false;
   private objectiveMarker!: ObjectiveMarker;
+  /** Animated traffic lights at intersections */
+  private trafficSignals: Array<{
+    red: Phaser.GameObjects.Arc;
+    yellow: Phaser.GameObjects.Arc;
+    green: Phaser.GameObjects.Arc;
+    offset: number;
+  }> = [];
+  private trafficTick = 0;
   private citizens: { x: number; y: number; name: string; line: string }[] = [];
   private construction!: ConstructionSystem;
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -712,11 +720,14 @@ export class GameScene extends Phaser.Scene {
     this.worldLayer.add(this.hqDoorLabel);
   }
 
-  /** Sidewalks, lane paint, crosswalks, lamps — few draw calls for phones. */
+  /** Realistic asphalt streets with sidewalks, lamps, and traffic signals. */
   private buildLifelikeStreets(): void {
-    const sidewalkW = 22;
+    this.trafficSignals = [];
+    const sidewalkW = 28;
+
     for (const road of ROADS) {
       const horiz = road.w >= road.h;
+      // Sidewalks both sides
       if (horiz) {
         const top = this.add
           .tileSprite(road.x + road.w / 2, road.y - sidewalkW / 2, road.w + sidewalkW * 2, sidewalkW, 'tile_sidewalk')
@@ -742,9 +753,10 @@ export class GameScene extends Phaser.Scene {
         .setDepth(1);
       this.worldLayer.add(asphalt);
 
+      // Dark curb outline
       const curb = this.add
-        .rectangle(road.x + road.w / 2, road.y + road.h / 2, road.w + 6, road.h + 6)
-        .setStrokeStyle(3, 0x90a4ae, 0.55)
+        .rectangle(road.x + road.w / 2, road.y + road.h / 2, road.w + 8, road.h + 8)
+        .setStrokeStyle(4, 0x6d757e, 0.7)
         .setFillStyle(0x000000, 0)
         .setDepth(1);
       this.worldLayer.add(curb);
@@ -752,75 +764,79 @@ export class GameScene extends Phaser.Scene {
 
     for (const ix of INTERSECTIONS) {
       const pad = this.add
-        .tileSprite(ix.x + ix.w / 2, ix.y + ix.h / 2, ix.w, ix.h, 'tile_road')
+        .tileSprite(ix.x + ix.w / 2, ix.y + ix.h / 2, ix.w + 12, ix.h + 12, 'tile_road')
         .setDepth(1);
       this.worldLayer.add(pad);
-      const ring = this.add
-        .rectangle(ix.x + ix.w / 2, ix.y + ix.h / 2, ix.w, ix.h)
-        .setStrokeStyle(2, 0xffee58, 0.2)
-        .setFillStyle(0x000000, 0)
-        .setDepth(1);
-      this.worldLayer.add(ring);
     }
 
+    // Lane paint
     const paint = this.add.graphics().setDepth(2);
     this.worldLayer.add(paint);
     for (const road of ROADS) {
       const horiz = road.w >= road.h;
       if (horiz) {
         const cy = road.y + road.h / 2;
-        paint.lineStyle(2, 0xffffff, 0.55);
-        paint.lineBetween(road.x + 8, road.y + 6, road.x + road.w - 8, road.y + 6);
-        paint.lineBetween(road.x + 8, road.y + road.h - 6, road.x + road.w - 8, road.y + road.h - 6);
-        paint.lineStyle(3, 0xffee58, 0.85);
-        for (let x = road.x + 20; x < road.x + road.w - 20; x += 48) {
-          paint.lineBetween(x, cy, Math.min(x + 22, road.x + road.w - 20), cy);
+        // solid white edge lines
+        paint.lineStyle(3, 0xffffff, 0.75);
+        paint.lineBetween(road.x + 10, road.y + 8, road.x + road.w - 10, road.y + 8);
+        paint.lineBetween(road.x + 10, road.y + road.h - 8, road.x + road.w - 10, road.y + road.h - 8);
+        // double yellow center
+        paint.lineStyle(2, 0xffd600, 0.95);
+        for (let x = road.x + 24; x < road.x + road.w - 24; x += 52) {
+          paint.lineBetween(x, cy - 3, Math.min(x + 26, road.x + road.w - 24), cy - 3);
+          paint.lineBetween(x, cy + 3, Math.min(x + 26, road.x + road.w - 24), cy + 3);
         }
       } else {
         const cx = road.x + road.w / 2;
-        paint.lineStyle(2, 0xffffff, 0.55);
-        paint.lineBetween(road.x + 6, road.y + 8, road.x + 6, road.y + road.h - 8);
-        paint.lineBetween(road.x + road.w - 6, road.y + 8, road.x + road.w - 6, road.y + road.h - 8);
-        paint.lineStyle(3, 0xffee58, 0.85);
-        for (let y = road.y + 20; y < road.y + road.h - 20; y += 48) {
-          paint.lineBetween(cx, y, cx, Math.min(y + 22, road.y + road.h - 20));
+        paint.lineStyle(3, 0xffffff, 0.75);
+        paint.lineBetween(road.x + 8, road.y + 10, road.x + 8, road.y + road.h - 10);
+        paint.lineBetween(road.x + road.w - 8, road.y + 10, road.x + road.w - 8, road.y + road.h - 10);
+        paint.lineStyle(2, 0xffd600, 0.95);
+        for (let y = road.y + 24; y < road.y + road.h - 24; y += 52) {
+          paint.lineBetween(cx - 3, y, cx - 3, Math.min(y + 26, road.y + road.h - 24));
+          paint.lineBetween(cx + 3, y, cx + 3, Math.min(y + 26, road.y + road.h - 24));
         }
       }
     }
 
+    // Crosswalks
     for (const cw of CROSSWALKS) {
-      paint.fillStyle(0xffffff, 0.85);
+      paint.fillStyle(0xffffff, 0.92);
       if (cw.horiz) {
-        for (let i = -3; i <= 3; i++) {
-          paint.fillRect(cw.x - 28, cw.y + i * 10 - 3, 56, 6);
-        }
+        for (let i = -4; i <= 4; i++) paint.fillRect(cw.x - 34, cw.y + i * 9 - 3, 68, 5);
+        paint.fillRect(cw.x - 48, cw.y - 42, 10, 84);
       } else {
-        for (let i = -3; i <= 3; i++) {
-          paint.fillRect(cw.x + i * 10 - 3, cw.y - 28, 6, 56);
-        }
+        for (let i = -4; i <= 4; i++) paint.fillRect(cw.x + i * 9 - 3, cw.y - 34, 5, 68);
+        paint.fillRect(cw.x - 42, cw.y - 48, 84, 10);
       }
-      paint.fillStyle(0xffffff, 0.7);
-      if (cw.horiz) paint.fillRect(cw.x - 40, cw.y - 36, 8, 72);
-      else paint.fillRect(cw.x - 36, cw.y - 40, 72, 8);
     }
 
-    const lampGap = 260;
+    // Street lights both sides + warm glow pools
+    const lampGap = 220;
     for (const road of ROADS) {
       const horiz = road.w >= road.h;
       if (horiz) {
-        for (let x = road.x + 40; x < road.x + road.w - 40; x += lampGap) {
-          const lamp = this.add.image(x, road.y - 18, 'street_lamp').setDepth(5).setScale(0.85);
-          this.worldLayer.add(lamp);
+        for (let x = road.x + 50; x < road.x + road.w - 50; x += lampGap) {
+          this.placeStreetLamp(x, road.y - 22, false);
+          if ((x / lampGap) % 2 < 1) this.placeStreetLamp(x + 110, road.y + road.h + 22, true);
         }
       } else {
-        for (let y = road.y + 40; y < road.y + road.h - 40; y += lampGap) {
-          const lamp = this.add.image(road.x - 18, y, 'street_lamp').setDepth(5).setScale(0.85);
-          this.worldLayer.add(lamp);
+        for (let y = road.y + 50; y < road.y + road.h - 50; y += lampGap) {
+          this.placeStreetLamp(road.x - 22, y, false);
+          if ((y / lampGap) % 2 < 1) this.placeStreetLamp(road.x + road.w + 22, y + 110, true);
         }
       }
     }
 
-    const holes = [
+    // Traffic signals at every intersection
+    let sigI = 0;
+    for (const ix of INTERSECTIONS) {
+      this.placeTrafficSignal(ix.x - 6, ix.y - 10, sigI++);
+      this.placeTrafficSignal(ix.x + ix.w + 6, ix.y + ix.h + 10, sigI++);
+    }
+
+    // Manholes
+    for (const h of [
       { x: 520, y: 760 },
       { x: 980, y: 760 },
       { x: 1600, y: 760 },
@@ -828,29 +844,64 @@ export class GameScene extends Phaser.Scene {
       { x: 1200, y: 1035 },
       { x: 1485, y: 700 },
       { x: 1940, y: 880 },
-    ];
-    for (const h of holes) {
-      const mh = this.add.image(h.x, h.y, 'manhole').setDepth(2).setAlpha(0.9);
+      { x: 400, y: 760 },
+      { x: 1800, y: 1035 },
+    ]) {
+      const mh = this.add.image(h.x, h.y, 'manhole').setDepth(2).setAlpha(0.92);
       this.worldLayer.add(mh);
     }
 
-    const names: Array<{ x: number; y: number; t: string }> = [
-      { x: 320, y: 700, t: 'MAIN ST' },
-      { x: 1520, y: 690, t: 'MARKET AVE' },
-      { x: 1980, y: 690, t: 'FOREST RD' },
-      { x: 320, y: 980, t: 'PARK RD' },
-    ];
-    for (const n of names) {
+    // Street name signs
+    for (const n of [
+      { x: 340, y: 688, t: 'MAIN STREET' },
+      { x: 1540, y: 678, t: 'MARKET AVE' },
+      { x: 2000, y: 678, t: 'FOREST RD' },
+      { x: 340, y: 968, t: 'PARK ROAD' },
+    ]) {
       const sign = this.add
         .text(n.x, n.y, n.t, {
-          fontSize: '11px',
+          fontSize: '12px',
           color: '#fffde7',
-          backgroundColor: '#1a237ecc',
-          padding: { x: 6, y: 3 },
+          backgroundColor: '#0d47a1ee',
+          padding: { x: 8, y: 4 },
         })
-        .setDepth(6)
-        .setAlpha(0.9);
+        .setDepth(6);
       this.worldLayer.add(sign);
+    }
+  }
+
+  private placeStreetLamp(x: number, y: number, flip: boolean): void {
+    const glow = this.add.circle(x + (flip ? -10 : 10), y + 8, 36, 0xffe082, 0.12).setDepth(4);
+    const lamp = this.add.image(x, y, 'street_lamp').setDepth(5).setScale(0.9).setFlipX(flip);
+    this.worldLayer.add(glow);
+    this.worldLayer.add(lamp);
+  }
+
+  private placeTrafficSignal(x: number, y: number, index: number): void {
+    const pole = this.add.image(x, y, 'traffic_signal').setDepth(6).setScale(0.95);
+    // Lens overlays (animated)
+    const red = this.add.circle(x, y - 34, 5, 0xff1744, 1).setDepth(7);
+    const yellow = this.add.circle(x, y - 18, 5, 0xffea00, 0.15).setDepth(7);
+    const green = this.add.circle(x, y - 2, 5, 0x00e676, 0.15).setDepth(7);
+    this.worldLayer.add(pole);
+    this.worldLayer.add(red);
+    this.worldLayer.add(yellow);
+    this.worldLayer.add(green);
+    this.trafficSignals.push({ red, yellow, green, offset: (index % 3) * 1800 });
+  }
+
+  private updateTrafficSignals(delta: number): void {
+    this.trafficTick += delta;
+    for (const s of this.trafficSignals) {
+      const t = (this.trafficTick + s.offset) % 6000;
+      // 0-3500 green, 3500-4200 yellow, 4200-6000 red
+      const mode = t < 3500 ? 'g' : t < 4200 ? 'y' : 'r';
+      s.red.setAlpha(mode === 'r' ? 1 : 0.12);
+      s.yellow.setAlpha(mode === 'y' ? 1 : 0.12);
+      s.green.setAlpha(mode === 'g' ? 1 : 0.12);
+      if (mode === 'r') s.red.setFillStyle(0xff1744, 1);
+      if (mode === 'y') s.yellow.setFillStyle(0xffea00, 1);
+      if (mode === 'g') s.green.setFillStyle(0x00e676, 1);
     }
   }
 
@@ -1266,6 +1317,8 @@ export class GameScene extends Phaser.Scene {
           ? Math.round(Phaser.Math.Distance.Between(this.robot.x, this.robot.y, this.player.x, this.player.y))
           : null,
       },
+      streetLights: true,
+      trafficSignals: this.trafficSignals.length,
     };
   }
 
@@ -1330,6 +1383,7 @@ export class GameScene extends Phaser.Scene {
       this.dayNight.setOutdoorVisible(outdoors);
       this.patrolCars.setOutdoorVisible(outdoors);
       this.patrolCars.update(d);
+      if (outdoors) this.updateTrafficSignals(d);
       this.panther.update(d, this.player, outdoors, (msg) => {
         this.statusLine = msg;
         setDomStatus(msg);
