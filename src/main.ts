@@ -9,11 +9,19 @@ const isPhone =
   /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
   (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
 
+/** Fill the real viewport — never letterbox a tiny 16:9 strip on phones. */
+function viewportSize(): { w: number; h: number } {
+  const w = Math.max(320, Math.floor(window.innerWidth || document.documentElement.clientWidth || 1280));
+  const h = Math.max(480, Math.floor(window.innerHeight || document.documentElement.clientHeight || 720));
+  return { w, h };
+}
+
+const start = viewportSize();
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'app',
   backgroundColor: '#0a1628',
-  // Cap FPS / skip frames on phones to avoid spiral-of-death freezes
   fps: {
     target: isPhone ? 40 : 60,
     min: 20,
@@ -25,10 +33,13 @@ const config: Phaser.Types.Core.GameConfig = {
     powerPreference: 'high-performance',
   },
   scale: {
-    mode: Phaser.Scale.FIT,
+    // RESIZE = canvas matches phone/desktop window (full screen)
+    mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: 1280,
-    height: 720,
+    width: start.w,
+    height: start.h,
+    expandParent: true,
+    autoRound: true,
   },
   physics: {
     default: 'arcade',
@@ -44,7 +55,28 @@ const config: Phaser.Types.Core.GameConfig = {
   },
 };
 
-// eslint-disable-next-line no-new
 installDomOverlay();
 const game = new Phaser.Game(config);
-(window as unknown as { __phaserGame: unknown }).__phaserGame = game;
+(window as unknown as { __phaserGame: Phaser.Game }).__phaserGame = game;
+
+function refreshFill(): void {
+  const { w, h } = viewportSize();
+  try {
+    game.scale.resize(w, h);
+  } catch {
+    /* ignore during boot */
+  }
+  const canvas = game.canvas;
+  if (canvas) {
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.margin = '0';
+    canvas.style.display = 'block';
+  }
+}
+
+window.addEventListener('resize', refreshFill);
+window.addEventListener('orientationchange', () => setTimeout(refreshFill, 80));
+game.events.once('ready', refreshFill);
+setTimeout(refreshFill, 50);
+setTimeout(refreshFill, 300);

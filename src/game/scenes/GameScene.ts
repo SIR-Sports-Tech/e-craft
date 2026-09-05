@@ -203,8 +203,14 @@ export class GameScene extends Phaser.Scene {
     }) as typeof this.keys;
 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
-    this.cameras.main.setZoom(1.15);
+    // Phone portrait: a bit more zoom so the world doesn't feel tiny
+    const portrait = this.scale.height > this.scale.width;
+    this.cameras.main.setZoom(portrait ? 1.35 : 1.15);
     this.cameras.main.setRoundPixels(true);
+    this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+      const tall = gameSize.height > gameSize.width;
+      this.cameras.main.setZoom(tall ? 1.35 : 1.15);
+    });
     this.dayNight = new DayNightSystem(this, WORLD.width, WORLD.height);
     this.panther = new PantherSystem(this);
     this.patrolCars = new PatrolCarsSystem(this);

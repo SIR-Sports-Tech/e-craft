@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.4 — 2026-09-05 — FULL SCREEN (NOT TINY)
+
+### Fixed
+- Phone was letterboxing a tiny 16:9 strip (~26% of screen)
+- Switch to **RESIZE** full-bleed canvas — game fills the whole phone/desktop
+- Portrait camera zoom bumped so characters read clearly
+
+
 ## 1.4.3 — 2026-09-05 — ACTIVATE ROBOT (CLEAR)
 
 ### Fixed
