@@ -14,6 +14,7 @@ import { InventorySystem } from '../systems/InventorySystem';
 import { MysterySystem } from '../systems/MysterySystem';
 import { PoliceSystem } from '../systems/PoliceSystem';
 import { PantherSystem } from '../systems/PantherSystem';
+import { PatrolCarsSystem } from '../systems/PatrolCarsSystem';
 import { audio } from '../systems/AudioSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
@@ -90,6 +91,7 @@ export class GameScene extends Phaser.Scene {
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
   private dayNight!: DayNightSystem;
   private panther!: PantherSystem;
+  private patrolCars!: PatrolCarsSystem;
   private jobs = new JobSystem();
   private inventory = new InventorySystem();
   private facing = 1;
@@ -202,6 +204,8 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setRoundPixels(true);
     this.dayNight = new DayNightSystem(this, WORLD.width, WORLD.height);
     this.panther = new PantherSystem(this);
+    this.patrolCars = new PatrolCarsSystem(this);
+    this.patrolCars.spawn();
     // Soft dust when moving (visual juice)
     const gfx = this.make.graphics({ x: 0, y: 0 });
     gfx.fillStyle(0xd7ccc8, 0.7);
@@ -906,6 +910,8 @@ export class GameScene extends Phaser.Scene {
       onFoot: !this.flags.inVehicle && this.player?.texture?.key === 'player_sheet',
       pantherActive: this.panther?.isActive?.() ?? false,
       sunVisible: this.dayNight?.phase?.() !== 'night',
+      policeCars: this.patrolCars?.count?.() ?? 0,
+      policeCarPositions: this.patrolCars?.snapshots?.() ?? [],
     };
   }
 
@@ -968,6 +974,8 @@ export class GameScene extends Phaser.Scene {
       const outdoors =
         !this.flags.inLair && !this.flags.inJailBuilding && !this.flags.inHouse;
       this.dayNight.setOutdoorVisible(outdoors);
+      this.patrolCars.setOutdoorVisible(outdoors);
+      this.patrolCars.update(d);
       this.panther.update(d, this.player, outdoors, (msg) => {
         this.statusLine = msg;
         setDomStatus(msg);

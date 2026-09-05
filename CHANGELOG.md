@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.1 — 2026-09-05 — POLICE CARS ON THE STREETS
+
+### Added
+- **3 city police cars** cruise road loops (Main / Park / Market / HQ Drive)
+- Black-and-white cruisers with flashing red/blue lights
+- Hide while indoors; keep driving forever outdoors
+
+
 ## 1.3.0 — 2026-09-05 — SUNRISE + BLACK PANTHER
 
 ### Added

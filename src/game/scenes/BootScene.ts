@@ -16,6 +16,7 @@ export class BootScene extends Phaser.Scene {
     this.makeRobot();
     this.makeSasquatch();
     this.makeVehicle();
+    this.makePoliceCar();
     this.makeRaceCar();
     this.makeTracker();
     this.makeTree();
@@ -358,6 +359,50 @@ export class BootScene extends Phaser.Scene {
     g.fillCircle(22, 48, 3);
     g.fillCircle(74, 48, 3);
     g.generateTexture('vehicle', 96, 60);
+    g.destroy();
+  }
+
+  private makePoliceCar(): void {
+    // Classic black-and-white city police cruiser (distinct from green security car)
+    const g = this.g();
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(48, 54, 70, 12);
+    // body white
+    g.fillStyle(0xf5f5f5, 1);
+    g.fillRoundedRect(6, 18, 84, 30, 10);
+    // black doors / hood band
+    g.fillStyle(0x212121, 1);
+    g.fillRect(28, 18, 40, 30);
+    // cabin
+    g.fillStyle(0x37474f, 1);
+    g.fillRoundedRect(34, 6, 34, 20, 5);
+    // glass
+    g.fillStyle(0x81d4fa, 1);
+    g.fillRoundedRect(38, 9, 12, 12, 2);
+    g.fillRoundedRect(54, 9, 12, 12, 2);
+    // lightbar
+    g.fillStyle(0xf44336, 1);
+    g.fillRect(40, 2, 10, 5);
+    g.fillStyle(0x2196f3, 1);
+    g.fillRect(52, 2, 10, 5);
+    // POLICE text block
+    g.fillStyle(0xffee58, 1);
+    g.fillRect(32, 28, 32, 10);
+    g.fillStyle(0x000000, 1);
+    g.fillRect(34, 30, 6, 6);
+    g.fillRect(42, 30, 6, 6);
+    g.fillRect(50, 30, 6, 6);
+    // wheels
+    g.fillStyle(0x111111, 1);
+    g.fillCircle(22, 48, 9);
+    g.fillCircle(74, 48, 9);
+    g.fillStyle(0xbdbdbd, 1);
+    g.fillCircle(22, 48, 3);
+    g.fillCircle(74, 48, 3);
+    // bumper
+    g.fillStyle(0x90a4ae, 1);
+    g.fillRect(88, 26, 6, 14);
+    g.generateTexture('police_car', 96, 60);
     g.destroy();
   }
 
