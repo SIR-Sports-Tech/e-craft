@@ -31,6 +31,25 @@ export class ConstructionSystem {
     return this.orders;
   }
 
+  requestHqWing(pos: { x: number; y: number }): BuildOrder {
+    const existing = this.orders.find((o) => o.id === 'hq_wing');
+    if (existing) return existing;
+    const order: BuildOrder = {
+      id: 'hq_wing',
+      label: 'Security HQ Wing',
+      x: pos.x,
+      y: pos.y,
+      w: 160,
+      h: 100,
+      progress: 0,
+      done: false,
+      requestedBy: 'player',
+    };
+    this.orders.push(order);
+    this.ensureVisual(order);
+    return order;
+  }
+
   requestRobotGarage(behindHQ: { x: number; y: number }): BuildOrder {
     const existing = this.orders.find((o) => o.id === 'robot_garage');
     if (existing) return existing;

@@ -12,6 +12,7 @@ import { DayNightSystem } from '../systems/DayNightSystem';
 import { JobSystem } from '../systems/JobSystem';
 import { InventorySystem } from '../systems/InventorySystem';
 import { MysterySystem } from '../systems/MysterySystem';
+import { PoliceSystem } from '../systems/PoliceSystem';
 import { audio } from '../systems/AudioSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
@@ -86,6 +87,7 @@ export class GameScene extends Phaser.Scene {
   private facing = 1;
   private garageCredited = false;
   private mysteries = new MysterySystem();
+  private police = new PoliceSystem();
 
   constructor() {
     super('Game');
@@ -267,6 +269,11 @@ export class GameScene extends Phaser.Scene {
       shop: 'bldg_forest_cabin',
       job_board: 'bldg_forest_cabin',
       park: 'bldg_plaza',
+      police_desk: 'bldg_hq',
+      school: 'bldg_plaza',
+      library: 'bldg_plaza',
+      market_row: 'bldg_shop',
+      docks: 'bldg_plaza',
       forest: 'bldg_forest_cabin',
       vehicle_bay: 'bldg_plaza',
     };
@@ -522,8 +529,10 @@ export class GameScene extends Phaser.Scene {
       player: { x: this.player.x, y: this.player.y },
       world: { w: WORLD.width, h: WORLD.height },
       checklist,
-      builds: this.construction.getOrders().map((o) => ({ id: o.id, label: o.label, progress: o.progress, done: o.done })),
       jobTitle: this.jobs.title(),
+      policeLines: this.police.boardLines(),
+      dayPhase: this.dayNight?.phase?.() ?? 'day',
+      builds: this.construction.getOrders().map((o) => ({ id: o.id, label: o.label, progress: o.progress, done: o.done })),
       jobBoard: this.jobs.boardLines(),
       inventory: this.inventory.summary(),
       hour: this.dayNight?.getHour?.() ?? 12,
@@ -562,6 +571,9 @@ export class GameScene extends Phaser.Scene {
     this.syncIndoorVisibility();
     this.updateObjectiveMarker();
     this.construction.update(delta);
+    const policeMsg = this.police.update(delta);
+    if (policeMsg) this.statusLine = policeMsg;
+    this.updateCitizenSchedules();
     this.dayNight.update(delta);
     // Notify jobs when garage completes
     const garage = this.construction.getOrders().find((o) => o.id === 'robot_garage' && o.done);
@@ -867,6 +879,13 @@ export class GameScene extends Phaser.Scene {
       return '[E] Enter underground gadget lair';
     }
     if (
+      this.flags.rewardClaimed &&
+      this.jobs.state.unlocked.includes('security_chief') &&
+      pointInRect(this.player.x, this.player.y, hq)
+    ) {
+      return '[E] Order HQ Security Wing upgrade';
+    }
+    if (
       this.flags.sasquatchCaptured &&
       !this.flags.sasquatchJailed &&
       pointInRect(this.player.x, this.player.y, jail)
@@ -945,6 +964,14 @@ export class GameScene extends Phaser.Scene {
       this.enterLair();
       return;
     }
+    if (
+      this.flags.rewardClaimed &&
+      this.jobs.state.unlocked.includes('security_chief') &&
+      pointInRect(this.player.x, this.player.y, hq)
+    ) {
+      this.tryHqUpgrade();
+      return;
+    }
 
     if (
       this.flags.sasquatchCaptured &&
@@ -957,7 +984,7 @@ export class GameScene extends Phaser.Scene {
 
     const jobBoardZ = CITY_ZONES.find((z) => z.id === 'job_board');
     if (jobBoardZ && pointInRect(this.player.x, this.player.y, jobBoardZ)) {
-      this.statusLine = this.jobs.boardLines().join(' | ');
+      this.statusLine = [...this.jobs.boardLines(), ...this.police.boardLines()].join(' | ');
       audio.interact();
       return;
     }
@@ -965,6 +992,10 @@ export class GameScene extends Phaser.Scene {
       if (this.near(c.x, c.y, 40)) {
         audio.talk();
         this.statusLine = `${c.name}: "${c.line}"`;
+        if (c.name === 'Officer Pike') {
+          this.statusLine = this.police.requestForestSweep();
+          return;
+        }
         if (c.name === 'Builder Jun') {
           const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
           const order = this.construction.requestRobotGarage({
@@ -1193,6 +1224,37 @@ export class GameScene extends Phaser.Scene {
     this.trailPath.moveTo(clues[0].x, clues[0].y);
     for (let i = 1; i < clues.length; i++) this.trailPath.lineTo(clues[i].x, clues[i].y);
     this.trailPath.strokePath();
+  }
+
+
+  private citizenHome: { name: string; x: number; y: number }[] = [];
+
+  private captureCitizenHomes(): void {
+    if (this.citizenHome.length) return;
+    this.citizenHome = this.citizens.map((c) => ({ name: c.name, x: c.x, y: c.y }));
+  }
+
+  private updateCitizenSchedules(): void {
+    this.captureCitizenHomes();
+    const phase = this.dayNight?.phase?.() ?? 'day';
+    for (const c of this.citizens) {
+      const home = this.citizenHome.find((h) => h.name === c.name);
+      if (!home) continue;
+      if (phase === 'night' || phase === 'dusk') {
+        c.x = home.x;
+        c.y = home.y;
+      }
+    }
+  }
+
+  tryHqUpgrade(): void {
+    if (!this.jobs.state.unlocked.includes('security_chief')) {
+      this.statusLine = 'Unlock Head of Security first (jail Sasquatch).';
+      return;
+    }
+    const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
+    const wing = this.construction.requestHqWing({ x: hq.x + hq.w + 50, y: hq.y + 60 });
+    this.statusLine = `HQ Upgrade ordered: ${wing.label} (${Math.floor(wing.progress * 100)}%)`;
   }
 
   private near(x: number, y: number, r: number): boolean {

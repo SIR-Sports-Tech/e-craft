@@ -48,6 +48,16 @@ Sasquatch **always** leaves a trail. If you drift away, a tracking marker / robo
 | Esc | Pause |
 | On-screen stick + buttons | Touch / tablet |
 
+## Play URL
+
+http://127.0.0.1:5173/  (add `?skiptitle=1` to skip title)
+
+## Living-world (v0.2.4)
+- Officer Pike → forest police patrol
+- Builder Jun → Robot Garage
+- After jailing Sasquatch: Head of Security → order HQ Wing at HQ (`E`)
+- New districts: Police Desk, School, Library, Market Row, Docks
+
 ## Living-world seed (v0.1.3)
 
 Talk to **Builder Jun** in the City Plaza (`E`). The game queues a **Robot Garage** behind Security HQ and builds it over time — early version of “the world remembers what you ask for.”

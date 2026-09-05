@@ -26,16 +26,22 @@ export class DayNightSystem {
 
   update(delta: number): void {
     this.t = (this.t + delta / this.dayLenMs) % 1;
-    // night around 0.0 and 1.0, noon at 0.5
     const night = Math.max(0, Math.cos(this.t * Math.PI * 2));
     const alpha = Phaser.Math.Clamp(night * 0.45, 0, 0.45);
     this.overlay.setAlpha(alpha);
-    const hour = Math.floor(this.t * 24);
-    const phase = hour < 5 || hour >= 20 ? 'Night' : hour < 11 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
-    this.label.setText(`🕒 ${phase} · ${hour.toString().padStart(2, '0')}:00`);
+    const hour = this.getHour();
+    this.label.setText(`🕒 ${this.phase()} · ${hour.toString().padStart(2, '0')}:00`);
   }
 
   getHour(): number {
     return Math.floor(this.t * 24);
+  }
+
+  phase(): 'night' | 'morning' | 'day' | 'dusk' {
+    const hour = this.getHour();
+    if (hour < 5 || hour >= 21) return 'night';
+    if (hour < 11) return 'morning';
+    if (hour < 17) return 'day';
+    return 'dusk';
   }
 }

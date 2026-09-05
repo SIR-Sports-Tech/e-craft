@@ -1,8 +1,8 @@
 /** Top-down world layout for E-CRAFT v0.1 (original placeholder geometry). */
 
 export const WORLD = {
-  width: 3600,
-  height: 2600,
+  width: 4200,
+  height: 2800,
 } as const;
 
 export interface RectZone {
@@ -104,12 +104,58 @@ export const CITY_ZONES: RectZone[] = [
     color: 0x2e7d32,
   },
   {
+    id: 'police_desk',
+    label: 'City Police Desk',
+    x: 900,
+    y: 520,
+    w: 180,
+    h: 140,
+    color: 0x1a237e,
+    interact: 'police',
+  },
+  {
+    id: 'school',
+    label: 'Friendship School',
+    x: 1480,
+    y: 820,
+    w: 220,
+    h: 160,
+    color: 0x5d4037,
+  },
+  {
+    id: 'library',
+    label: 'City Library',
+    x: 1480,
+    y: 1020,
+    w: 200,
+    h: 140,
+    color: 0x4e342e,
+  },
+  {
+    id: 'market_row',
+    label: 'Market Row',
+    x: 1100,
+    y: 1080,
+    w: 340,
+    h: 160,
+    color: 0x6d4c41,
+  },
+  {
+    id: 'docks',
+    label: 'River Docks',
+    x: 200,
+    y: 1100,
+    w: 400,
+    h: 180,
+    color: 0x37474f,
+  },
+  {
     id: 'forest',
     label: 'Forest / Wilderness',
-    x: 2100,
+    x: 2400,
     y: 200,
-    w: 1300,
-    h: 2000,
+    w: 1600,
+    h: 2200,
     color: 0x1a4a28,
   },
 ];
@@ -153,12 +199,14 @@ export const ROADS: RectZone[] = [
   { id: 'road_h1', label: 'Main Road', x: 100, y: 720, w: 2000, h: 80, color: 0x333340 },
   { id: 'road_v1', label: 'Forest Road', x: 1900, y: 200, w: 80, h: 1600, color: 0x333340 },
   { id: 'road_h2', label: 'HQ Drive', x: 200, y: 480, w: 80, h: 280, color: 0x333340 },
+  { id: 'road_h3', label: 'Park Road', x: 100, y: 1000, w: 2200, h: 70, color: 0x333340 },
+  { id: 'road_v2', label: 'Market Ave', x: 1450, y: 400, w: 70, h: 800, color: 0x333340 },
 ];
 
 export const SPAWN = {
   playerOutdoor: { x: 320, y: 620 },
   vehicle: { x: 300, y: 545 },
-  sasquatchForest: { x: 2700, y: 900 },
+  sasquatchForest: { x: 3000, y: 900 },
 };
 
 export function pointInRect(

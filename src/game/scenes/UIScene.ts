@@ -281,12 +281,14 @@ export class UIScene extends Phaser.Scene {
     this.promptText.setText(hud.prompt);
     this.promptText.setVisible(!!hud.prompt);
     if (hud.checklist) {
+      const police = (hud.policeLines || []).join('\n');
       this.checklistText.setText(
-        'MISSION\n' +
+        `E-CRAFT · ${hud.dayPhase || ''}\nJob: ${hud.jobTitle || ''}\n\nMISSION\n` +
           hud.checklist
             .map((c: { done: boolean; label: string }) => `${c.done ? '✓' : '○'} ${c.label}`)
             .join('\n') +
-          '\n\nF9 debug advance · F10 force complete',
+          (police ? `\n\nPOLICE\n${police}` : '') +
+          '\n\nF9 debug · F10 complete',
       );
     }
 

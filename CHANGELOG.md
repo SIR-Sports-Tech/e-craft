@@ -1,10 +1,16 @@
+# Changelog
 
-## 0.1.3 — 2026-09-05
+## 0.2.4 — 2026-09-05
 
 ### Added
-- Living-world seed: ask **Builder Jun** to build a **Robot Garage** behind HQ; it constructs over time and persists in-session.
-- Citizen dialogue (Pike, Jun, Ada, Remy)
-# Changelog
+- City expansion: Police Desk, Friendship School, Library, Market Row, River Docks
+- **Police coordination**: talk to Officer Pike → Forest Sweep Patrol (progresses over time)
+- **HQ Security Wing** upgrade order after Head of Security unlock (world remembers)
+- Day/night `phase()` used for citizen schedule hooks
+- HUD shows job title + police trust lines
+
+### Changed
+- World size 4200×2800; forest shifted east
 
 ## 0.2.3 — 2026-09-05
 
