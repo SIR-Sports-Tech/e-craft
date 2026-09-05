@@ -80,16 +80,55 @@ export class BootScene extends Phaser.Scene {
   private makeRoad(): void {
     const s = 64;
     const g = this.g();
-    g.fillStyle(0x455a64, 1);
-    g.fillRect(0, 0, s, s);
+    // asphalt with subtle grit
     g.fillStyle(0x37474f, 1);
-    g.fillRect(0, 0, s, 6);
-    g.fillRect(0, s - 6, s, 6);
-    g.fillStyle(0xffeb3b, 1);
-    g.fillRect(s / 2 - 3, 10, 6, 18);
-    g.fillRect(s / 2 - 3, 38, 6, 18);
+    g.fillRect(0, 0, s, s);
+    g.fillStyle(0x455a64, 1);
+    for (let i = 0; i < 18; i++) {
+      g.fillRect((i * 17) % s, (i * 23) % s, 2, 2);
+    }
+    g.fillStyle(0x263238, 1);
+    g.fillRect(0, 0, s, 4);
+    g.fillRect(0, s - 4, s, 4);
     g.generateTexture('tile_road', s, s);
     g.destroy();
+
+    // sidewalk concrete tile
+    const sw = this.g();
+    sw.fillStyle(0x90a4ae, 1);
+    sw.fillRect(0, 0, s, s);
+    sw.lineStyle(1, 0x78909c, 0.7);
+    sw.strokeRect(1, 1, s - 2, s - 2);
+    sw.lineBetween(s / 2, 0, s / 2, s);
+    sw.lineBetween(0, s / 2, s, s / 2);
+    sw.fillStyle(0xb0bec5, 0.35);
+    sw.fillRect(4, 4, 10, 8);
+    sw.generateTexture('tile_sidewalk', s, s);
+    sw.destroy();
+
+    // street lamp prop
+    const lamp = this.g();
+    lamp.fillStyle(0x263238, 1);
+    lamp.fillRect(14, 20, 6, 44);
+    lamp.fillStyle(0x455a64, 1);
+    lamp.fillRect(8, 14, 18, 8);
+    lamp.fillStyle(0xfff59d, 0.95);
+    lamp.fillCircle(17, 12, 8);
+    lamp.fillStyle(0xffe082, 0.35);
+    lamp.fillCircle(17, 12, 14);
+    lamp.generateTexture('street_lamp', 34, 64);
+    lamp.destroy();
+
+    // manhole
+    const mh = this.g();
+    mh.fillStyle(0x263238, 1);
+    mh.fillCircle(16, 16, 14);
+    mh.lineStyle(2, 0x546e7a, 1);
+    mh.strokeCircle(16, 16, 12);
+    mh.lineBetween(6, 16, 26, 16);
+    mh.lineBetween(16, 6, 16, 26);
+    mh.generateTexture('manhole', 32, 32);
+    mh.destroy();
   }
 
   private makePlayer(): void {

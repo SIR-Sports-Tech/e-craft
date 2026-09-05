@@ -238,6 +238,29 @@ export const ROADS: RectZone[] = [
   { id: 'road_v2', label: 'Market Ave', x: 1450, y: 400, w: 70, h: 800, color: 0x333340 },
 ];
 
+/** Intersection pads (filled asphalt squares where roads meet) */
+export const INTERSECTIONS: Array<{ x: number; y: number; w: number; h: number; name: string }> = [
+  { x: 200, y: 720, w: 100, h: 100, name: 'HQ & Main' },
+  { x: 1420, y: 700, w: 120, h: 120, name: 'Market & Main' },
+  { x: 1870, y: 700, w: 130, h: 120, name: 'Forest & Main' },
+  { x: 200, y: 980, w: 100, h: 110, name: 'HQ & Park' },
+  { x: 1420, y: 970, w: 120, h: 120, name: 'Market & Park' },
+  { x: 1870, y: 970, w: 130, h: 120, name: 'Forest & Park' },
+];
+
+/** Crosswalk stripes drawn across road at these centers */
+export const CROSSWALKS: Array<{ x: number; y: number; horiz: boolean }> = [
+  { x: 250, y: 760, horiz: true },
+  { x: 1485, y: 760, horiz: true },
+  { x: 1940, y: 760, horiz: true },
+  { x: 250, y: 1035, horiz: true },
+  { x: 1485, y: 1035, horiz: true },
+  { x: 1940, y: 1035, horiz: true },
+  { x: 1485, y: 560, horiz: false },
+  { x: 1940, y: 560, horiz: false },
+  { x: 240, y: 600, horiz: false },
+];
+
 export const SPAWN = {
   playerOutdoor: { x: 320, y: 620 },
   vehicle: { x: 300, y: 545 },

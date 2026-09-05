@@ -20,7 +20,9 @@ import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
 import {
   CITY_ZONES,
+  CROSSWALKS,
   HOUSE_INTERIOR,
+  INTERSECTIONS,
   JAIL_INTERIOR,
   LAIR,
   ROADS,
@@ -535,19 +537,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(0);
     this.worldLayer.add(grass);
 
-    // Roads as few rectangles + dashed line (not hundreds of tiles)
-    for (const road of ROADS) {
-      const asphalt = this.add
-        .rectangle(road.x + road.w / 2, road.y + road.h / 2, road.w, road.h, 0x455a64, 1)
-        .setDepth(1);
-      this.worldLayer.add(asphalt);
-      const curb = this.add
-        .rectangle(road.x + road.w / 2, road.y + road.h / 2, road.w + 4, road.h + 4)
-        .setStrokeStyle(2, 0xffee58, 0.25)
-        .setFillStyle(0x000000, 0)
-        .setDepth(1);
-      this.worldLayer.add(curb);
-    }
+    this.buildLifelikeStreets();
 
     const buildingKey: Record<string, string> = {
       security_hq: 'bldg_hq',
@@ -687,6 +677,148 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     this.worldLayer.add(this.hqDoorLabel);
+  }
+
+  /** Sidewalks, lane paint, crosswalks, lamps — few draw calls for phones. */
+  private buildLifelikeStreets(): void {
+    const sidewalkW = 22;
+    for (const road of ROADS) {
+      const horiz = road.w >= road.h;
+      if (horiz) {
+        const top = this.add
+          .tileSprite(road.x + road.w / 2, road.y - sidewalkW / 2, road.w + sidewalkW * 2, sidewalkW, 'tile_sidewalk')
+          .setDepth(1);
+        const bot = this.add
+          .tileSprite(road.x + road.w / 2, road.y + road.h + sidewalkW / 2, road.w + sidewalkW * 2, sidewalkW, 'tile_sidewalk')
+          .setDepth(1);
+        this.worldLayer.add(top);
+        this.worldLayer.add(bot);
+      } else {
+        const left = this.add
+          .tileSprite(road.x - sidewalkW / 2, road.y + road.h / 2, sidewalkW, road.h + sidewalkW * 2, 'tile_sidewalk')
+          .setDepth(1);
+        const right = this.add
+          .tileSprite(road.x + road.w + sidewalkW / 2, road.y + road.h / 2, sidewalkW, road.h + sidewalkW * 2, 'tile_sidewalk')
+          .setDepth(1);
+        this.worldLayer.add(left);
+        this.worldLayer.add(right);
+      }
+
+      const asphalt = this.add
+        .tileSprite(road.x + road.w / 2, road.y + road.h / 2, road.w, road.h, 'tile_road')
+        .setDepth(1);
+      this.worldLayer.add(asphalt);
+
+      const curb = this.add
+        .rectangle(road.x + road.w / 2, road.y + road.h / 2, road.w + 6, road.h + 6)
+        .setStrokeStyle(3, 0x90a4ae, 0.55)
+        .setFillStyle(0x000000, 0)
+        .setDepth(1);
+      this.worldLayer.add(curb);
+    }
+
+    for (const ix of INTERSECTIONS) {
+      const pad = this.add
+        .tileSprite(ix.x + ix.w / 2, ix.y + ix.h / 2, ix.w, ix.h, 'tile_road')
+        .setDepth(1);
+      this.worldLayer.add(pad);
+      const ring = this.add
+        .rectangle(ix.x + ix.w / 2, ix.y + ix.h / 2, ix.w, ix.h)
+        .setStrokeStyle(2, 0xffee58, 0.2)
+        .setFillStyle(0x000000, 0)
+        .setDepth(1);
+      this.worldLayer.add(ring);
+    }
+
+    const paint = this.add.graphics().setDepth(2);
+    this.worldLayer.add(paint);
+    for (const road of ROADS) {
+      const horiz = road.w >= road.h;
+      if (horiz) {
+        const cy = road.y + road.h / 2;
+        paint.lineStyle(2, 0xffffff, 0.55);
+        paint.lineBetween(road.x + 8, road.y + 6, road.x + road.w - 8, road.y + 6);
+        paint.lineBetween(road.x + 8, road.y + road.h - 6, road.x + road.w - 8, road.y + road.h - 6);
+        paint.lineStyle(3, 0xffee58, 0.85);
+        for (let x = road.x + 20; x < road.x + road.w - 20; x += 48) {
+          paint.lineBetween(x, cy, Math.min(x + 22, road.x + road.w - 20), cy);
+        }
+      } else {
+        const cx = road.x + road.w / 2;
+        paint.lineStyle(2, 0xffffff, 0.55);
+        paint.lineBetween(road.x + 6, road.y + 8, road.x + 6, road.y + road.h - 8);
+        paint.lineBetween(road.x + road.w - 6, road.y + 8, road.x + road.w - 6, road.y + road.h - 8);
+        paint.lineStyle(3, 0xffee58, 0.85);
+        for (let y = road.y + 20; y < road.y + road.h - 20; y += 48) {
+          paint.lineBetween(cx, y, cx, Math.min(y + 22, road.y + road.h - 20));
+        }
+      }
+    }
+
+    for (const cw of CROSSWALKS) {
+      paint.fillStyle(0xffffff, 0.85);
+      if (cw.horiz) {
+        for (let i = -3; i <= 3; i++) {
+          paint.fillRect(cw.x - 28, cw.y + i * 10 - 3, 56, 6);
+        }
+      } else {
+        for (let i = -3; i <= 3; i++) {
+          paint.fillRect(cw.x + i * 10 - 3, cw.y - 28, 6, 56);
+        }
+      }
+      paint.fillStyle(0xffffff, 0.7);
+      if (cw.horiz) paint.fillRect(cw.x - 40, cw.y - 36, 8, 72);
+      else paint.fillRect(cw.x - 36, cw.y - 40, 72, 8);
+    }
+
+    const lampGap = 260;
+    for (const road of ROADS) {
+      const horiz = road.w >= road.h;
+      if (horiz) {
+        for (let x = road.x + 40; x < road.x + road.w - 40; x += lampGap) {
+          const lamp = this.add.image(x, road.y - 18, 'street_lamp').setDepth(5).setScale(0.85);
+          this.worldLayer.add(lamp);
+        }
+      } else {
+        for (let y = road.y + 40; y < road.y + road.h - 40; y += lampGap) {
+          const lamp = this.add.image(road.x - 18, y, 'street_lamp').setDepth(5).setScale(0.85);
+          this.worldLayer.add(lamp);
+        }
+      }
+    }
+
+    const holes = [
+      { x: 520, y: 760 },
+      { x: 980, y: 760 },
+      { x: 1600, y: 760 },
+      { x: 700, y: 1035 },
+      { x: 1200, y: 1035 },
+      { x: 1485, y: 700 },
+      { x: 1940, y: 880 },
+    ];
+    for (const h of holes) {
+      const mh = this.add.image(h.x, h.y, 'manhole').setDepth(2).setAlpha(0.9);
+      this.worldLayer.add(mh);
+    }
+
+    const names: Array<{ x: number; y: number; t: string }> = [
+      { x: 320, y: 700, t: 'MAIN ST' },
+      { x: 1520, y: 690, t: 'MARKET AVE' },
+      { x: 1980, y: 690, t: 'FOREST RD' },
+      { x: 320, y: 980, t: 'PARK RD' },
+    ];
+    for (const n of names) {
+      const sign = this.add
+        .text(n.x, n.y, n.t, {
+          fontSize: '11px',
+          color: '#fffde7',
+          backgroundColor: '#1a237ecc',
+          padding: { x: 6, y: 3 },
+        })
+        .setDepth(6)
+        .setAlpha(0.9);
+      this.worldLayer.add(sign);
+    }
   }
 
   private buildIndoorLair(): void {

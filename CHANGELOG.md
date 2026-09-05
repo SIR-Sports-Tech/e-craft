@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.2 — 2026-09-05 — LIFELIKE STREETS
+
+### Added
+- Concrete **sidewalks** along every road
+- Asphalt grit + white edge lines + yellow dashed center lanes
+- **Crosswalks** + stop lines at major corners
+- Intersection pads where roads meet
+- Street lamps, manholes, street-name signs (MAIN / PARK / MARKET / FOREST)
+
+
 ## 1.3.1 — 2026-09-05 — POLICE CARS ON THE STREETS
 
 ### Added
