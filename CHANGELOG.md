@@ -6,6 +6,22 @@
 - Citizen dialogue (Pike, Jun, Ada, Remy)
 # Changelog
 
+## 0.2.2 — 2026-09-05 — CHROME BETTER BUILD
+
+### Added
+- **Chrome-proof DOM controls**: on-screen D-pad + E/Capture buttons always available
+- Window-level keyboard capture (works even if canvas focus is weird)
+- Mission status HUD panel over the game
+- Footstep dust particles + smoother camera
+
+### Fixed
+- Desktop control reliability in Google Chrome
+
+### Test
+- http://127.0.0.1:5173/?skiptitle=1
+- http://127.0.0.1:4173/?skiptitle=1
+
+
 ## 0.2.1 — 2026-09-05 — CONTROLS + ART FIX
 
 ### Fixed

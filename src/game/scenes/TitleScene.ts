@@ -41,7 +41,7 @@ export class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     this.add
-      .text(w / 2, 165, 'v0.2 Test Build · Family-friendly living world', {
+      .text(w / 2, 165, 'v0.2.2 Chrome Test Build · Family-friendly living world', {
         fontSize: '14px',
         color: '#90a4ae',
       })
@@ -78,7 +78,7 @@ export class TitleScene extends Phaser.Scene {
     }
 
     this.add
-      .text(w / 2, h - 56, 'Click NEW GAME  ·  or press Enter / Space', {
+      .text(w / 2, h - 56, 'CLICK NEW GAME  ·  or press ENTER / SPACE', {
         fontSize: '16px',
         color: '#ffe082',
       })

@@ -29,6 +29,11 @@ export class UIScene extends Phaser.Scene {
   create(): void {
     const w = this.scale.width;
     const h = this.scale.height;
+    // subtle vignette for polish
+    const vig = this.add.graphics().setScrollFactor(0).setDepth(90).setAlpha(0.35);
+    vig.fillStyle(0x000000, 1);
+    vig.fillRect(0, 0, w, 28);
+    vig.fillRect(0, h - 28, w, 28);
 
     this.phaseText = this.add
       .text(12, 10, '', {

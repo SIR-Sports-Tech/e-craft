@@ -10,6 +10,7 @@ import { ObjectiveMarker, objectiveFor } from '../systems/ObjectiveSystem';
 import { ConstructionSystem } from '../systems/ConstructionSystem';
 import { audio } from '../systems/AudioSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
+import { pollDomInput, setDomStatus } from '../../ui/domOverlay';
 import {
   CITY_ZONES,
   JAIL_INTERIOR,
@@ -74,6 +75,7 @@ export class GameScene extends Phaser.Scene {
   private objectiveMarker!: ObjectiveMarker;
   private citizens: { x: number; y: number; name: string; line: string }[] = [];
   private construction!: ConstructionSystem;
+  private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
 
   constructor() {
     super('Game');
@@ -140,8 +142,24 @@ export class GameScene extends Phaser.Scene {
       F10: Phaser.Input.Keyboard.KeyCodes.F10,
     }) as typeof this.keys;
 
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
-    this.cameras.main.setZoom(1.2);
+    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    this.cameras.main.setZoom(1.15);
+    this.cameras.main.setRoundPixels(true);
+    // Soft dust when moving (visual juice)
+    const gfx = this.make.graphics({ x: 0, y: 0 });
+    gfx.fillStyle(0xd7ccc8, 0.7);
+    gfx.fillCircle(3, 3, 3);
+    gfx.generateTexture('dust', 6, 6);
+    gfx.destroy();
+    this.dust = this.add.particles(0, 0, 'dust', {
+      speed: { min: 10, max: 30 },
+      angle: { min: 200, max: 340 },
+      scale: { start: 0.8, end: 0 },
+      lifespan: 280,
+      frequency: 80,
+      alpha: { start: 0.45, end: 0 },
+      emitting: false,
+    }).setDepth(6);
 
     this.scene.launch('UI', { game: this });
     this.setPhase(MissionPhase.AtSecurityHQ);
@@ -503,6 +521,8 @@ export class GameScene extends Phaser.Scene {
     this.syncIndoorVisibility();
     this.updateObjectiveMarker();
     this.construction.update(delta);
+    const hudLine = this.interactPrompt || this.statusLine || PHASE_HINTS[this.phase];
+    setDomStatus(hudLine);
   }
 
   private updateObjectiveMarker(): void {
@@ -515,7 +535,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleMovement(): void {
-    const speed = this.flags.inVehicle ? 320 : 200;
+    const speed = this.flags.inVehicle ? 340 : 220;
     let vx = 0;
     let vy = 0;
     const left = this.cursors.left?.isDown || this.keys.A?.isDown;
@@ -526,17 +546,30 @@ export class GameScene extends Phaser.Scene {
     if (right) vx += 1;
     if (up) vy -= 1;
     if (down) vy += 1;
-    // Touch stick only if meaningful deflection (avoid drift)
+    // Chrome-proof DOM keyboard / on-screen pad
+    const dom = pollDomInput();
+    vx += dom.x;
+    vy += dom.y;
+    if (dom.interact) this.tryInteract();
+    if (dom.capture) this.tryCapture();
+    if (dom.map) this.mapOpen = !this.mapOpen;
+    if (dom.pause) this.paused = !this.paused;
+    // Phaser touch stick (mobile)
     if (Math.abs(this.touchVec.x) > 0.15 || Math.abs(this.touchVec.y) > 0.15) {
       vx += this.touchVec.x;
       vy += this.touchVec.y;
     }
     if (vx === 0 && vy === 0) {
       this.player.setVelocity(0, 0);
+      if (this.dust) this.dust.emitting = false;
       return;
     }
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * speed, (vy / len) * speed);
+    if (this.dust) {
+      this.dust.setPosition(this.player.x, this.player.y + 18);
+      this.dust.emitting = !this.flags.inVehicle;
+    }
 
     if (this.flags.inVehicle) {
       this.vehicle.setPosition(this.player.x, this.player.y);

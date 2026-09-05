@@ -7,25 +7,27 @@ page.on('pageerror', (e) => pageErrors.push(String(e)));
 await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
 await page.waitForTimeout(2000);
 await page.locator('#app').click();
-await page.waitForTimeout(300);
-// Move with WASD briefly
-for (const k of ['KeyD','KeyD','KeyD','KeyW','KeyW']) {
+// Prefer DOM pad if present
+const hasPad = await page.locator('#ecraft-pad').count();
+if (hasPad) {
+  await page.locator('#ecraft-pad [data-dir="right"]').dispatchEvent('pointerdown');
+  await page.waitForTimeout(400);
+  await page.locator('#ecraft-pad [data-dir="right"]').dispatchEvent('pointerup');
+}
+for (const k of ['KeyD','KeyD','KeyW']) {
   await page.keyboard.down(k);
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(100);
   await page.keyboard.up(k);
 }
-const moved = await page.evaluate(() => {
-  const s = window.__ecraft?.getState?.();
-  return s ? { x: s.player.x, y: s.player.y, phase: s.phase } : null;
-});
+const moved = await page.evaluate(() => window.__ecraft?.getState?.()?.player ?? null);
 await page.evaluate(() => window.__ecraft?.complete?.());
-await page.waitForTimeout(1200);
+await page.waitForTimeout(1000);
 const after = await page.evaluate(() => {
   const s = window.__ecraft?.getState?.();
-  return s ? { phase: s.phase, jailed: s.flags.sasquatchJailed, reward: s.flags.rewardClaimed } : null;
+  return s ? { phase: s.phase, reward: s.flags.rewardClaimed, jailed: s.flags.sasquatchJailed } : null;
 });
 const ok = pageErrors.length === 0 && !!moved && after?.reward === true;
-console.log(JSON.stringify({ pageErrors, moved, after, ok }, null, 2));
-await page.screenshot({ path: 'docs/ecraft-v021-play.png' });
+console.log(JSON.stringify({ pageErrors, hasPad, moved, after, ok }, null, 2));
+await page.screenshot({ path: 'docs/ecraft-v022-chrome.png' });
 await browser.close();
 if (!ok) process.exit(1);

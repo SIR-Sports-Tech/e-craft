@@ -1,3 +1,4 @@
+import { installDomOverlay } from './ui/domOverlay';
 import Phaser from 'phaser';
 import { BootScene } from './game/scenes/BootScene';
 import { TitleScene } from './game/scenes/TitleScene';
@@ -28,4 +29,6 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 // eslint-disable-next-line no-new
-new Phaser.Game(config);
+installDomOverlay();
+const game = new Phaser.Game(config);
+(window as unknown as { __phaserGame: unknown }).__phaserGame = game;
