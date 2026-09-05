@@ -36,6 +36,7 @@ type EcraftApi = {
   enterCar?: () => void;
   enterRaceCar?: () => void;
   recover?: () => void;
+  holdTracker?: () => void;
   unpause?: () => void;
   getState?: () => { flags?: Record<string, boolean>; prompt?: string };
 };
@@ -118,16 +119,18 @@ export function installDomOverlay(): void {
     #ecraft-actions .actv { background: #6a1b9a; grid-column: 1 / -1; }
     #ecraft-actions .race { background: #d50000; color: #fff; grid-column: 1 / -1; }
     #ecraft-actions .rec { background: #455a64; color: #fff; grid-column: 1 / -1; font-size: 11px; }
+    #ecraft-actions .trk { background: #00695c; color: #b9f6ca; grid-column: 1 / -1; font-size: 12px; }
   `;
   document.head.appendChild(style);
 
   const root = document.createElement('div');
   root.id = 'ecraft-dom-root';
   root.innerHTML = `
-    <div id="ecraft-toast">Tap ACTIVATE / E near objects · CAR to drive</div>
+    <div id="ecraft-toast">HOLD TRACKER lights the gold trail</div>
     <div id="ecraft-actions">
       <button type="button" class="act" id="btn-e">E</button>
       <button type="button" class="cap" id="btn-cap">CAPTURE</button>
+      <button type="button" class="trk" id="btn-tracker">HOLD TRACKER</button>
       <button type="button" class="actv" id="btn-activate">ACTIVATE</button>
       <button type="button" class="car" id="btn-car">PATROL CAR</button>
       <button type="button" class="race" id="btn-race">RACE CAR</button>
@@ -187,9 +190,14 @@ export function installDomOverlay(): void {
   const bindAction = (id: string, fn: () => void, label: string) => {
     const btn = document.getElementById(id);
     if (!btn) return;
+    let last = 0;
     const fire = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
+      // Debounce: pointerdown + click both fire on phones — was toggling tracker off
+      const now = Date.now();
+      if (now - last < 280) return;
+      last = now;
       api()?.unpause?.();
       flash(btn);
       try {
@@ -206,6 +214,7 @@ export function installDomOverlay(): void {
 
   bindAction('btn-e', () => api()?.interact?.(), 'Interact');
   bindAction('btn-cap', () => api()?.capture?.(), 'Capture');
+  bindAction('btn-tracker', () => api()?.holdTracker?.(), 'Holding Tracker');
   bindAction('btn-activate', () => api()?.activate?.(), 'Activate');
   bindAction('btn-car', () => api()?.enterCar?.(), 'Patrol Car');
   bindAction('btn-race', () => api()?.enterRaceCar?.(), 'Race Car');
@@ -224,6 +233,7 @@ export function installDomOverlay(): void {
       }
       if (e.code === 'KeyC') api()?.enterCar?.();
       if (e.code === 'KeyF') api()?.activate?.();
+      if (e.code === 'KeyT') api()?.holdTracker?.();
     },
     { passive: false },
   );

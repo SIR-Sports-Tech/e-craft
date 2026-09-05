@@ -95,6 +95,13 @@ export class GameScene extends Phaser.Scene {
   private lastHudWrite = 0;
   private citizenTick = 0;
   private onVisSave?: () => void;
+  /** Visible gadget in the player's hand when holding the tracker. */
+  private heldTracker?: Phaser.GameObjects.Image;
+  private trackerScanGfx?: Phaser.GameObjects.Graphics;
+  private trackerArrow?: Phaser.GameObjects.Container;
+  private trackerPedestal?: Phaser.GameObjects.Image;
+  private trackerHeld = false;
+  private trackerScanTick = 0;
 
   constructor() {
     super('Game');
@@ -153,11 +160,15 @@ export class GameScene extends Phaser.Scene {
     this.sasquatch.setDepth(9).setCollideWorldBounds(true).setScale(0.95); // same size as player
     this.sasquatch.play('sasquatch-idle');
     this.pickSasquatchWander();
-    // Seed trail immediately so player never starts with empty trail
-    for (let i = 0; i < 8; i++) {
+    // Seed a clear trail from forest entrance → Sasquatch (so tracking works on arrival)
+    const forest = CITY_ZONES.find((z) => z.id === 'forest')!;
+    const trailStartX = forest.x + 80;
+    const trailStartY = SPAWN.sasquatchForest.y;
+    for (let i = 0; i < 18; i++) {
+      const t = i / 17;
       this.trail.maybeDrop(
-        SPAWN.sasquatchForest.x - i * 70,
-        SPAWN.sasquatchForest.y + (i % 2) * 30,
+        Phaser.Math.Linear(trailStartX, SPAWN.sasquatchForest.x, t),
+        Phaser.Math.Linear(trailStartY, SPAWN.sasquatchForest.y, t) + (i % 2) * 24,
         true,
       );
     }
@@ -242,6 +253,11 @@ export class GameScene extends Phaser.Scene {
         this.mapOpen = false;
         this.doEnterCar('race_car');
       },
+      holdTracker: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.toggleHoldTracker();
+      },
       runAcceptanceStep: (step: string) => this.runAcceptanceStep(step),
       runFullAcceptance: async () => {
         const steps = [
@@ -258,6 +274,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.registry.get('loadSave')) {
       this.applySave();
+      if (this.flags.hasTracker) this.equipTracker(true);
       setDomStatus('Continued from last save — progress kept!');
     }
     this.time.addEvent({ delay: 2000, loop: true, callback: () => this.persistSave() });
@@ -296,8 +313,129 @@ export class GameScene extends Phaser.Scene {
         /* ignore */
       }
     }
+    // Re-light trail if still holding tracker after trim
+    if (this.trackerHeld) this.trail.setTracking(true);
     this.persistSave();
     setDomStatus(msg);
+  }
+
+  /** Pick up / hold the Sasquatch Tracker in hand and light the trail. */
+  private equipTracker(silent = false): void {
+    this.flags.hasTracker = true;
+    this.trackerHeld = true;
+    this.inventory.add('tracker');
+    this.trail.setTracking(true);
+    if (this.trackerPedestal) this.trackerPedestal.setVisible(false);
+
+    if (!this.heldTracker) {
+      this.heldTracker = this.add.image(0, 0, 'tracker').setDepth(14).setScale(0.7);
+    }
+    this.heldTracker.setVisible(!this.flags.inVehicle && !this.flags.inLair && !this.flags.inJailBuilding);
+
+    if (!this.trackerScanGfx) {
+      this.trackerScanGfx = this.add.graphics().setDepth(13);
+    }
+    if (!this.trackerArrow) {
+      const c = this.add.container(0, 0).setDepth(15);
+      const shaft = this.add.triangle(0, 0, 0, -28, -10, 8, 10, 8, 0x00e676).setStrokeStyle(2, 0xffffff, 0.9);
+      const tip = this.add
+        .text(0, 18, 'HOLD', {
+          fontSize: '10px',
+          color: '#b9f6ca',
+          backgroundColor: '#000000cc',
+          padding: { x: 3, y: 1 },
+        })
+        .setOrigin(0.5, 0);
+      c.add([shaft, tip]);
+      this.trackerArrow = c;
+    }
+    this.trackerArrow.setVisible(true);
+
+    if (!silent) {
+      this.statusLine = 'HOLDING Sasquatch Tracker! Follow the glowing gold trail.';
+      setDomStatus(this.statusLine);
+    }
+  }
+
+  /** Phone button: always HOLD the tracker (never accidental double-tap holster). */
+  private toggleHoldTracker(): void {
+    if (!this.flags.inLair && !this.flags.hasTracker) this.enterLair();
+    if (!this.flags.hasTracker || !this.trackerHeld) {
+      this.equipTracker();
+      if (this.phase === MissionPhase.AtSecurityHQ || this.phase === MissionPhase.InUndergroundLair) {
+        this.setPhase(MissionPhase.HasTracker);
+      }
+      audio.pickup();
+      return;
+    }
+    // Already holding — reinforce + re-light trail (idempotent for double pointer/click)
+    this.equipTracker();
+    this.statusLine = 'Still HOLDING Tracker — gold trail ON. Follow the arrow!';
+    setDomStatus(this.statusLine);
+  }
+
+  private updateHeldTracker(delta: number): void {
+    if (!this.trackerHeld || !this.flags.hasTracker) {
+      if (this.heldTracker) this.heldTracker.setVisible(false);
+      if (this.trackerArrow) this.trackerArrow.setVisible(false);
+      if (this.trackerScanGfx) this.trackerScanGfx.clear();
+      return;
+    }
+    if (this.flags.inLair || this.flags.inJailBuilding) {
+      if (this.heldTracker) this.heldTracker.setVisible(false);
+      if (this.trackerArrow) this.trackerArrow.setVisible(false);
+      if (this.trackerScanGfx) this.trackerScanGfx.clear();
+      return;
+    }
+
+    const handX = this.player.x + this.facing * (this.flags.inVehicle ? 0 : 22);
+    const handY = this.player.y + (this.flags.inVehicle ? -8 : 6);
+    if (this.heldTracker) {
+      this.heldTracker.setVisible(!this.flags.inVehicle);
+      this.heldTracker.setPosition(handX, handY);
+      this.heldTracker.setFlipX(this.facing < 0);
+    }
+
+    // Point at trail head (newest clue) or Sasquatch if close trail is done
+    const latest = this.trail.latestClue();
+    const nearTrail = this.trail.nearestUndiscovered(this.player.x, this.player.y);
+    let tx = this.sasquatch.x;
+    let ty = this.sasquatch.y;
+    if (nearTrail && !this.flags.sasquatchCaptured) {
+      tx = nearTrail.x;
+      ty = nearTrail.y;
+    } else if (latest && !this.flags.sasquatchCaptured) {
+      tx = latest.x;
+      ty = latest.y;
+    }
+    const ang = Phaser.Math.Angle.Between(this.player.x, this.player.y, tx, ty);
+    const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, tx, ty);
+
+    if (this.trackerArrow) {
+      this.trackerArrow.setVisible(true);
+      this.trackerArrow.setPosition(
+        this.player.x + Math.cos(ang) * 48,
+        this.player.y + Math.sin(ang) * 48,
+      );
+      this.trackerArrow.setRotation(ang + Math.PI / 2);
+    }
+
+    // Pulse scan ring
+    this.trackerScanTick += delta;
+    if (this.trackerScanGfx) {
+      this.trackerScanGfx.clear();
+      const pulse = 40 + (this.trackerScanTick % 700) / 700 * 50;
+      const strength = Phaser.Math.Clamp(1 - dist / 1400, 0.2, 1);
+      this.trackerScanGfx.lineStyle(3, 0x69f0ae, 0.35 + strength * 0.5);
+      this.trackerScanGfx.strokeCircle(this.player.x, this.player.y, pulse);
+      this.trackerScanGfx.lineStyle(2, 0xffeb3b, 0.55);
+      this.trackerScanGfx.lineBetween(
+        this.player.x,
+        this.player.y,
+        this.player.x + Math.cos(ang) * Math.min(120, dist),
+        this.player.y + Math.sin(ang) * Math.min(120, dist),
+      );
+    }
   }
 
   private persistSave(): void {
@@ -521,11 +659,14 @@ export class GameScene extends Phaser.Scene {
         padding: { x: 8, y: 4 },
       })
       .setOrigin(0.5, 0);
-    const tracker = this.add.image(LAIR.trackerX, LAIR.trackerY, 'tracker');
+    const tracker = this.add.image(LAIR.trackerX, LAIR.trackerY, 'tracker').setScale(1.35);
+    this.trackerPedestal = tracker;
     const trackerLbl = this.add
-      .text(LAIR.trackerX, LAIR.trackerY + 24, 'Sasquatch Tracker [E]', {
-        fontSize: '12px',
+      .text(LAIR.trackerX, LAIR.trackerY + 28, 'HOLD Tracker [E]', {
+        fontSize: '13px',
         color: '#fff59d',
+        backgroundColor: '#00000099',
+        padding: { x: 4, y: 2 },
       })
       .setOrigin(0.5, 0);
     const robotPad = this.add.circle(LAIR.robotX, LAIR.robotY, 28, 0x1565c0, 0.5);
@@ -637,7 +778,7 @@ export class GameScene extends Phaser.Scene {
       prompt: this.interactPrompt,
       paused: this.paused,
       mapOpen: this.mapOpen,
-      flags: { ...this.flags },
+      flags: { ...this.flags, trackerHeld: this.trackerHeld },
       reward: this.flags.rewardClaimed ? REWARD_TEXT : null,
       player: { x: this.player.x, y: this.player.y },
       world: { w: WORLD.width, h: WORLD.height },
@@ -649,6 +790,8 @@ export class GameScene extends Phaser.Scene {
       jobBoard: this.jobs.boardLines(),
       inventory: this.inventory.summary(),
       hour: this.dayNight?.getHour?.() ?? 12,
+      trailClues: this.trail.getClues().length,
+      tracking: this.trail.isTracking(),
     };
   }
 
@@ -694,6 +837,7 @@ export class GameScene extends Phaser.Scene {
       this.updateRobotFollow();
       this.updateSasquatch(d);
       this.updateTrailHelp(d);
+      this.updateHeldTracker(d);
       this.updateInteractPrompt();
       this.consumeTouchActions();
       this.syncIndoorVisibility();
@@ -834,15 +978,14 @@ export class GameScene extends Phaser.Scene {
       case 'get_tracker':
         if (!this.flags.inLair) this.enterLair();
         this.player.setPosition(LAIR.trackerX, LAIR.trackerY);
-        this.flags.hasTracker = true;
-        this.inventory.add('tracker');
+        this.equipTracker(true);
         this.setPhase(MissionPhase.HasTracker);
-        this.statusLine = 'Sasquatch Tracker acquired!';
+        this.statusLine = 'Holding Sasquatch Tracker!';
         break;
       case 'activate_robot':
         if (!this.flags.inLair) this.enterLair();
         this.player.setPosition(LAIR.robotX, LAIR.robotY);
-        this.flags.hasTracker = true;
+        this.equipTracker(true);
         this.flags.robotActive = true;
         this.robot.setVisible(true);
         this.setPhase(MissionPhase.RobotActive);
@@ -917,10 +1060,10 @@ export class GameScene extends Phaser.Scene {
 
   /** QA: advance critical flags toward next gate */
   private debugAdvance(): void {
-    if (!this.flags.hasTracker) {
-      this.flags.hasTracker = true;
+    if (!this.flags.hasTracker || !this.trackerHeld) {
+      this.equipTracker(true);
       this.setPhase(MissionPhase.HasTracker);
-      this.statusLine = '[DEBUG] Tracker granted';
+      this.statusLine = '[DEBUG] Tracker held';
       return;
     }
     if (!this.flags.robotActive) {
@@ -955,7 +1098,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private debugCompleteMission(): void {
-    this.flags.hasTracker = true;
+    this.equipTracker(true);
     this.flags.robotActive = true;
     this.flags.sasquatchCaptured = true;
     this.flags.sasquatchInVehicle = true;
@@ -1072,23 +1215,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateTrailHelp(delta: number): void {
-    if (!this.flags.hasTracker || this.flags.sasquatchCaptured || this.flags.inLair) {
+    if (!this.flags.hasTracker || !this.trackerHeld || this.flags.sasquatchCaptured || this.flags.inLair) {
       this.trail.clearFallback();
       return;
     }
     this.trail.markNearbyDiscovered(this.player.x, this.player.y);
-    // dirt path handled inside TrailSystem
     const nearest = this.trail.nearestUndiscovered(this.player.x, this.player.y);
     if (nearest) {
       const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, nearest.x, nearest.y);
-      if (d > 320) this.lostTrailTimer += delta;
+      if (d > 280) this.lostTrailTimer += delta;
       else this.lostTrailTimer = 0;
     }
-    const robotHelps = this.flags.robotActive && this.lostTrailTimer > 1800;
+    const robotHelps = this.flags.robotActive && this.lostTrailTimer > 1400;
     const msg = this.trail.updateFallbackHelp(this.player.x, this.player.y, robotHelps);
-    if (msg && robotHelps) this.statusLine = msg;
+    // Keep tracker readouts on screen so the track feels alive
+    if (msg) this.statusLine = msg;
 
-    // Advance to tracking once player reaches forest with tracker
     const forest = CITY_ZONES.find((z) => z.id === 'forest')!;
     if (
       this.flags.hasTracker &&
@@ -1097,7 +1239,7 @@ export class GameScene extends Phaser.Scene {
       (this.phase === MissionPhase.CanDrive || this.phase === MissionPhase.RobotActive)
     ) {
       this.setPhase(MissionPhase.Tracking);
-      this.statusLine = 'Trail found — follow footprints, fur, mud, branches…';
+      this.statusLine = 'GOLD TRAIL LIVE — hold Tracker and follow footprints!';
     }
   }
 
@@ -1107,8 +1249,11 @@ export class GameScene extends Phaser.Scene {
 
   private describeInteract(): string | null {
     if (this.flags.inLair) {
-      if (!this.flags.hasTracker && this.near(LAIR.trackerX, LAIR.trackerY, 50)) {
-        return '[E] Pick up Sasquatch Tracker';
+      if (!this.flags.hasTracker && this.near(LAIR.trackerX, LAIR.trackerY, 80)) {
+        return '[E] HOLD Sasquatch Tracker';
+      }
+      if (this.flags.hasTracker && !this.trackerHeld && this.near(LAIR.trackerX, LAIR.trackerY, 80)) {
+        return '[E] Hold Tracker again';
       }
       if (this.flags.hasTracker && !this.flags.robotActive && this.near(LAIR.robotX, LAIR.robotY, 55)) {
         return '[E] Activate robot partner';
@@ -1179,12 +1324,10 @@ export class GameScene extends Phaser.Scene {
 
   private tryInteract(): void {
     if (this.flags.inLair) {
-      if (!this.flags.hasTracker && this.near(LAIR.trackerX, LAIR.trackerY, 50)) {
-        this.flags.hasTracker = true;
+      if ((!this.flags.hasTracker || !this.trackerHeld) && this.near(LAIR.trackerX, LAIR.trackerY, 80)) {
+        this.equipTracker();
         this.setPhase(MissionPhase.HasTracker);
-        this.inventory.add('tracker');
         audio.pickup();
-        this.statusLine = 'Sasquatch Tracker acquired!';
         return;
       }
       if (this.flags.hasTracker && !this.flags.robotActive && this.near(LAIR.robotX, LAIR.robotY, 55)) {
@@ -1373,12 +1516,11 @@ export class GameScene extends Phaser.Scene {
   private doActivate(): void {
     if (!this.flags.hasTracker || !this.flags.robotActive) {
       if (!this.flags.inLair) this.enterLair();
-      if (!this.flags.hasTracker) {
-        this.flags.hasTracker = true;
-        this.inventory.add('tracker');
+      if (!this.flags.hasTracker || !this.trackerHeld) {
+        this.equipTracker();
         this.setPhase(MissionPhase.HasTracker);
-        this.statusLine = 'Tracker ON. Tap ACTIVATE again for robot!';
         audio.pickup();
+        this.statusLine = 'HOLDING Tracker! Tap ACTIVATE again for robot.';
         setDomStatus(this.statusLine);
         return;
       }
@@ -1386,12 +1528,14 @@ export class GameScene extends Phaser.Scene {
       this.robot.setVisible(true);
       this.robot.setPosition(this.player.x - 30, this.player.y);
       this.setPhase(MissionPhase.RobotActive);
-      this.statusLine = 'Robot ONLINE! Exit lair, then tap GET IN CAR.';
+      this.statusLine = 'Robot ONLINE! Exit lair, HOLD TRACKER, then CAR → forest trail.';
       audio.pickup();
       setDomStatus(this.statusLine);
       return;
     }
-    this.statusLine = 'Already activated. Exit lair (E) then GET IN CAR.';
+    // Already have both — ensure tracker is held so trail works
+    if (!this.trackerHeld) this.equipTracker();
+    this.statusLine = 'Tracker + Robot ready. Exit lair (E) then GET IN CAR.';
     setDomStatus(this.statusLine);
     this.tryInteract();
   }
@@ -1586,11 +1730,13 @@ export class GameScene extends Phaser.Scene {
     if (this.flags.robotActive) this.robot.setVisible(true);
     this.player.setPosition(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    if (this.flags.hasTracker) this.equipTracker(true);
     if (this.flags.robotActive) {
       this.setPhase(MissionPhase.CanDrive);
-      this.statusLine = 'Back outside. Enter the security vehicle.';
+      this.statusLine = 'Back outside. HOLD TRACKER on — take the car to the forest trail!';
     } else if (this.flags.hasTracker) {
       this.setPhase(MissionPhase.HasTracker);
+      this.statusLine = 'Holding Tracker. Activate robot next.';
     } else {
       this.setPhase(MissionPhase.AtSecurityHQ);
     }

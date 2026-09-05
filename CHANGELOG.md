@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.0 — 2026-09-05 — HOLD TRACKER + WORKING TRAIL
+
+### Fixed / Added
+- **HOLD TRACKER** button (and keyboard `T`) — you physically hold the gadget
+- Tracker in-hand sprite + green scan arrow + pulse radar
+- Trail stays **dim until you hold the tracker**, then lights a **bright gold path**
+- Bigger glowing footprints / fur / mud / branch clues with labels
+- Seeded forest entrance → Sasquatch trail so tracking works on arrival
+- Tracker distance readout: “Tracker: Footprint — 240m”
+- Pedestal disappears when you pick it up; auto-hold on ACTIVATE / E
+
+### Play
+1. Tap **ACTIVATE** (or HOLD TRACKER) in lair
+2. Exit → car → forest
+3. Keep **HOLD TRACKER** on — follow the gold trail + green arrow
+
+
 ## 1.0.9 — 2026-09-05 — NO MORE START-OVER
 
 ### Fixed
