@@ -58,7 +58,7 @@ const activateOk = st.flags.robotActive && !st.flags.inLair && st.robot?.visible
 const exitOk = !st.flags.inLair && !st.flags.inHouse;
 
 await tap('btn-house');
-await page.waitForTimeout(250);
+await page.waitForTimeout(1400); // wait for door open animation
 st = await page.evaluate(() => window.__ecraft.getState());
 const houseOk = st.flags.inHouse === true && st.flags.inLair === false && st.flags.inVehicle === false;
 

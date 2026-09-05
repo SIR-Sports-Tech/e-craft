@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.1 — 2026-09-05 — OPENING DOORS + CLASSIC SASQUATCH
+
+### Added
+- Building doors **swing open** when entering HQ / House / Jail
+- Door frames + open/closed door art
+- Sasquatch remade to classic Bigfoot silhouette with **glowing red eyes**
+- **Mouth opens and closes** while idle and walking
+
+
 ## 1.5.0 — 2026-09-05 — REAL STREETS + TRAFFIC SIGNALS
 
 ### Added / Improved

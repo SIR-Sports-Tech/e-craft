@@ -16,8 +16,8 @@ const before = await page.evaluate(() => {
 });
 
 // Force evening-ish via sleep path: enter house + sleep
-await page.click('#btn-house');
-await page.waitForTimeout(400);
+await page.locator('#btn-house').dispatchEvent('pointerdown');
+await page.waitForTimeout(1400); // door swing then enter
 let st = await page.evaluate(() => window.__ecraft.getState());
 if (!st.flags.inHouse) throw new Error('GO HOME did not enter house');
 

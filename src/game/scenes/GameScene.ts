@@ -96,6 +96,8 @@ export class GameScene extends Phaser.Scene {
     offset: number;
   }> = [];
   private trafficTick = 0;
+  private outdoorDoors: Partial<Record<'hq' | 'house' | 'jail', Phaser.GameObjects.Image>> = {};
+  private doorBusy = false;
   private citizens: { x: number; y: number; name: string; line: string }[] = [];
   private construction!: ConstructionSystem;
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -178,8 +180,10 @@ export class GameScene extends Phaser.Scene {
       'sasquatch_sheet',
       0,
     );
-    this.sasquatch.setDepth(9).setCollideWorldBounds(true).setScale(0.95); // same size as player
-    this.sasquatch.play('sasquatch-idle');
+    // Classic Bigfoot proportions (taller sheet) — still near player scale
+    this.sasquatch.setDepth(9).setCollideWorldBounds(true).setScale(0.92);
+    this.sasquatch.body!.setSize(36, 56).setOffset(18, 22);
+    this.sasquatch.play('sasquatch-idle'); // idle includes mouth moving
     this.pickSasquatchWander();
     // Seed a clear trail from forest entrance → Sasquatch (so tracking works on arrival)
     const forest = CITY_ZONES.find((z) => z.id === 'forest')!;
@@ -707,17 +711,125 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    const doorIcon = this.add.image(320, 455, 'door').setDepth(5).setScale(1.2);
-    this.worldLayer.add(doorIcon);
+    // HQ door
+    const hqFrame = this.add.image(320, 448, 'door_frame').setDepth(4).setScale(1.15);
+    const hqDoor = this.add.image(320, 455, 'door').setDepth(5).setScale(1.15);
+    this.outdoorDoors.hq = hqDoor;
+    this.worldLayer.add(hqFrame);
+    this.worldLayer.add(hqDoor);
     this.hqDoorLabel = this.add
-      .text(390, 430, '[E] Enter HQ → Underground Lair', {
+      .text(320, 410, '[E] HQ Door → Lair', {
         fontSize: '13px',
         color: '#ffe082',
         backgroundColor: '#00000099',
         padding: { x: 6, y: 3 },
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(6);
     this.worldLayer.add(this.hqDoorLabel);
+
+    // House door
+    const house = CITY_ZONES.find((z) => z.id === 'player_house')!;
+    const houseFrame = this.add
+      .image(SPAWN.houseDoor.x, SPAWN.houseDoor.y - 8, 'door_frame')
+      .setDepth(4)
+      .setScale(1.2);
+    const houseDoor = this.add.image(SPAWN.houseDoor.x, SPAWN.houseDoor.y, 'door').setDepth(5).setScale(1.2);
+    this.outdoorDoors.house = houseDoor;
+    this.worldLayer.add(houseFrame);
+    this.worldLayer.add(houseDoor);
+    const houseLbl = this.add
+      .text(SPAWN.houseDoor.x, SPAWN.houseDoor.y - 48, '[E] Front Door', {
+        fontSize: '12px',
+        color: '#ffe082',
+        backgroundColor: '#00000099',
+        padding: { x: 5, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setDepth(6);
+    this.worldLayer.add(houseLbl);
+    void house;
+
+    // Jail door
+    const jail = CITY_ZONES.find((z) => z.id === 'super_jail')!;
+    const jailDoorX = jail.x + jail.w / 2;
+    const jailDoorY = jail.y + jail.h - 8;
+    const jailFrame = this.add.image(jailDoorX, jailDoorY - 8, 'door_frame').setDepth(4).setScale(1.15);
+    const jailDoor = this.add.image(jailDoorX, jailDoorY, 'door').setDepth(5).setScale(1.15);
+    this.outdoorDoors.jail = jailDoor;
+    this.worldLayer.add(jailFrame);
+    this.worldLayer.add(jailDoor);
+    const jailLbl = this.add
+      .text(jailDoorX, jailDoorY - 48, '[E] Jail Door', {
+        fontSize: '12px',
+        color: '#ffcdd2',
+        backgroundColor: '#00000099',
+        padding: { x: 5, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setDepth(6);
+    this.worldLayer.add(jailLbl);
+  }
+
+  /** Swing the outdoor door open, then enter the building. */
+  private openDoorThen(kind: 'hq' | 'house' | 'jail', enter: () => void): void {
+    if (this.doorBusy) return;
+    // Already inside that building — just run enter logic
+    if (
+      (kind === 'hq' && this.flags.inLair) ||
+      (kind === 'house' && this.flags.inHouse) ||
+      (kind === 'jail' && this.flags.inJailBuilding)
+    ) {
+      enter();
+      return;
+    }
+
+    const door = this.outdoorDoors[kind];
+    if (!door) {
+      enter();
+      return;
+    }
+
+    this.doorBusy = true;
+    this.paused = false;
+    this.mapOpen = false;
+    this.statusLine = 'Door opening…';
+    setDomStatus(this.statusLine);
+    audio.interact();
+
+    const ox = door.x;
+    const oy = door.y;
+    const sc = door.scaleX;
+    // Hinge on the left edge so it swings open
+    door.setOrigin(0.05, 0.5);
+    door.setPosition(ox - door.displayWidth * 0.45, oy);
+
+    this.time.delayedCall(240, () => {
+      if (door.active) door.setTexture('door_open');
+    });
+    this.tweens.add({
+      targets: door,
+      angle: -88,
+      duration: 520,
+      ease: 'Cubic.easeOut',
+      onComplete: () => {
+        door.setTexture('door_open');
+        this.time.delayedCall(160, () => {
+          enter();
+          // Reset door while player is indoors (world hidden)
+          this.time.delayedCall(250, () => {
+            if (door.active) {
+              door.setTexture('door');
+              door.setAngle(0);
+              door.setOrigin(0.5, 0.5);
+              door.setPosition(ox, oy);
+              door.setScale(sc);
+            }
+            this.doorBusy = false;
+          });
+        });
+      },
+    });
   }
 
   /** Realistic asphalt streets with sidewalks, lamps, and traffic signals. */
@@ -1519,17 +1631,17 @@ export class GameScene extends Phaser.Scene {
     switch (step) {
       case 'enter_lair':
         this.player.setPosition(390, 400);
-        this.enterLair();
+        this.enterLair(true);
         break;
       case 'get_tracker':
-        if (!this.flags.inLair) this.enterLair();
+        if (!this.flags.inLair) this.enterLair(true);
         this.player.setPosition(LAIR.trackerX, LAIR.trackerY);
         this.equipTracker(true);
         this.setPhase(MissionPhase.HasTracker);
         this.statusLine = 'Holding Sasquatch Tracker!';
         break;
       case 'activate_robot':
-        if (!this.flags.inLair) this.enterLair();
+        if (!this.flags.inLair) this.enterLair(true);
         this.player.setPosition(LAIR.robotX, LAIR.robotY);
         this.equipTracker(true);
         this.flags.robotActive = true;
@@ -1544,7 +1656,7 @@ export class GameScene extends Phaser.Scene {
         this.exitLair();
         break;
       case 'enter_house':
-        this.doEnterHouse();
+        this.enterHouse(true);
         break;
       case 'sleep':
         this.doSleep();
@@ -1612,11 +1724,11 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'enter_jail':
         this.flags.sasquatchCaptured = true;
-        this.enterJail();
+        this.enterJail(true);
         break;
       case 'lock_cell':
         this.flags.sasquatchCaptured = true;
-        if (!this.flags.inJailBuilding) this.enterJail();
+        if (!this.flags.inJailBuilding) this.enterJail(true);
         this.player.setPosition(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY);
         this.jailSasquatch();
         break;
@@ -2420,7 +2532,11 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
-  private enterLair(): void {
+  private enterLair(skipDoorAnim = false): void {
+    if (!skipDoorAnim && !this.flags.inLair) {
+      this.openDoorThen('hq', () => this.enterLair(true));
+      return;
+    }
     this.flags.inLair = true;
     this.flags.inHouse = false;
     this.flags.inJailBuilding = false;
@@ -2436,7 +2552,8 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.stopFollow();
     this.cameras.main.centerOn(LAIR.x + LAIR.w / 2, LAIR.y + LAIR.h / 2);
     this.setPhase(MissionPhase.InUndergroundLair);
-    this.statusLine = 'Secret gadget lair. Grab the tracker!';
+    this.statusLine = 'Door opened — secret gadget lair. Grab the tracker!';
+    setDomStatus(this.statusLine);
   }
 
   private exitLair(): void {
@@ -2469,7 +2586,11 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private enterJail(): void {
+  private enterJail(skipDoorAnim = false): void {
+    if (!skipDoorAnim && !this.flags.inJailBuilding) {
+      this.openDoorThen('jail', () => this.enterJail(true));
+      return;
+    }
     this.flags.inJailBuilding = true;
     this.flags.inHouse = false;
     this.flags.inLair = false;
@@ -2488,7 +2609,8 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.stopFollow();
     this.cameras.main.centerOn(JAIL_INTERIOR.x + JAIL_INTERIOR.w / 2, JAIL_INTERIOR.y + JAIL_INTERIOR.h / 2);
     this.setPhase(MissionPhase.AtSuperJail);
-    this.statusLine = 'Inside SUPER JAIL. Lock Sasquatch in the cell!';
+    this.statusLine = 'Door opened — SUPER JAIL. Lock Sasquatch in the cell!';
+    setDomStatus(this.statusLine);
   }
 
   private doEnterHouse(): void {
@@ -2502,7 +2624,11 @@ export class GameScene extends Phaser.Scene {
     this.enterHouse();
   }
 
-  private enterHouse(): void {
+  private enterHouse(skipDoorAnim = false): void {
+    if (!skipDoorAnim && !this.flags.inHouse) {
+      this.openDoorThen('house', () => this.enterHouse(true));
+      return;
+    }
     this.flags.inHouse = true;
     this.flags.inLair = false;
     this.flags.inJailBuilding = false;
@@ -2520,9 +2646,8 @@ export class GameScene extends Phaser.Scene {
     this.player.setPosition(HOUSE_INTERIOR.exitX + 100, HOUSE_INTERIOR.exitY + 100);
     this.cameras.main.stopFollow();
     this.cameras.main.centerOn(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2, HOUSE_INTERIOR.y + HOUSE_INTERIOR.h / 2);
-    this.statusLine = 'Welcome home! Walk to the bed and SLEEP.';
+    this.statusLine = 'Door opened — welcome home! Walk to the bed and SLEEP.';
     setDomStatus(this.statusLine);
-    audio.interact();
   }
 
   private exitHouse(): void {
@@ -2552,7 +2677,8 @@ export class GameScene extends Phaser.Scene {
   /** Enter house if needed, then sleep until morning. */
   private doSleep(): void {
     if (this.sleeping) return;
-    if (!this.flags.inHouse) this.doEnterHouse();
+    // Skip door anim so sleep is instant once you're heading to bed
+    if (!this.flags.inHouse) this.enterHouse(true);
     // Snap to bed for clarity
     this.player.setPosition(HOUSE_INTERIOR.bedX - 20, HOUSE_INTERIOR.bedY + 10);
     this.sleeping = true;

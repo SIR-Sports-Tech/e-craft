@@ -352,71 +352,101 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makeSasquatch(): void {
-    // Player-sized (64x64) walk sheet — 4 frames — cute/classic bigfoot + RED eyes
-    const fw = 64;
-    const fh = 64;
-    const frames = 4;
+    /**
+     * Classic Bigfoot silhouette (matches user reference):
+     * tall conical head, dark brown fur, long arms, GLOWING RED eyes,
+     * mouth opens/closes across frames.
+     */
+    const fw = 72;
+    const fh = 88;
+    const frames = 6;
     const sheet = this.make.graphics({ x: 0, y: 0 });
 
     const drawFrame = (g: Phaser.GameObjects.Graphics, ox: number, frame: number) => {
-      const stride = (frame % 2 === 0 ? -1 : 1) * (3 + (frame % 2));
-      const bob = frame % 2 === 0 ? 0 : -2;
-      const arm = (frame - 1.5) * 3;
+      const stride = Math.sin((frame / frames) * Math.PI * 2) * 5;
+      const stride2 = Math.sin((frame / frames) * Math.PI * 2 + Math.PI) * 5;
+      const bob = Math.abs(Math.sin((frame / frames) * Math.PI * 2)) * -2;
+      const armSwing = Math.sin((frame / frames) * Math.PI * 2) * 4;
+      const mouthOpen = frame % 2 === 1; // alternating mouth
 
-      // shadow
-      g.fillStyle(0x000000, 0.28);
-      g.fillEllipse(ox + 32, fh - 4, 28, 8);
+      // ground shadow
+      g.fillStyle(0x000000, 0.35);
+      g.fillEllipse(ox + 36, fh - 3, 34, 9);
 
-      // legs
-      g.fillStyle(0x5d4037, 1);
-      g.fillRoundedRect(ox + 20 + stride, 40 + bob, 9, 18, 3);
-      g.fillRoundedRect(ox + 35 - stride, 40 + bob, 9, 18, 3);
-      // feet
-      g.fillStyle(0x4e342e, 1);
-      g.fillEllipse(ox + 24 + stride, 58 + bob, 12, 7);
-      g.fillEllipse(ox + 40 - stride, 58 + bob, 12, 7);
+      // LEGS — dark shaggy
+      g.fillStyle(0x2a1a12, 1);
+      g.fillRoundedRect(ox + 22 + stride * 0.4, 52 + bob, 11, 26, 3);
+      g.fillRoundedRect(ox + 40 + stride2 * 0.4, 52 + bob, 11, 26, 3);
+      // feet / toes
+      g.fillStyle(0x1a100a, 1);
+      g.fillEllipse(ox + 26 + stride, 80 + bob, 14, 8);
+      g.fillEllipse(ox + 46 + stride2, 80 + bob, 14, 8);
 
-      // body (furry)
-      g.fillStyle(0x6d4c41, 1);
-      g.fillRoundedRect(ox + 16, 24 + bob, 32, 24, 8);
-      // belly
-      g.fillStyle(0x8d6e63, 1);
-      g.fillEllipse(ox + 32, 36 + bob, 16, 14);
+      // TORSO — classic barrel chest silhouette
+      g.fillStyle(0x3b2418, 1);
+      g.fillRoundedRect(ox + 18, 30 + bob, 36, 30, 10);
+      // fur tufts
+      g.fillStyle(0x4a2f20, 1);
+      g.fillEllipse(ox + 36, 40 + bob, 28, 22);
+      g.fillStyle(0x2a1a12, 0.55);
+      g.fillEllipse(ox + 36, 44 + bob, 16, 12);
 
-      // arms
-      g.fillStyle(0x5d4037, 1);
-      g.fillRoundedRect(ox + 6 - arm, 26 + bob, 12, 20, 4);
-      g.fillRoundedRect(ox + 46 + arm, 26 + bob, 12, 20, 4);
+      // LONG ARMS hanging ape-style
+      g.fillStyle(0x2a1a12, 1);
+      g.fillRoundedRect(ox + 4 - armSwing, 28 + bob, 14, 34, 5);
+      g.fillRoundedRect(ox + 54 + armSwing, 28 + bob, 14, 34, 5);
       // hands
-      g.fillStyle(0x4e342e, 1);
-      g.fillCircle(ox + 12 - arm, 46 + bob, 5);
-      g.fillCircle(ox + 52 + arm, 46 + bob, 5);
+      g.fillStyle(0x1a100a, 1);
+      g.fillCircle(ox + 10 - armSwing, 64 + bob, 7);
+      g.fillCircle(ox + 62 + armSwing, 64 + bob, 7);
 
-      // head
-      g.fillStyle(0x6d4c41, 1);
-      g.fillCircle(ox + 32, 16 + bob, 14);
-      // face
-      g.fillStyle(0xa1887f, 1);
-      g.fillEllipse(ox + 32, 18 + bob, 14, 12);
-      // RED EYES (requested)
+      // HEAD — conical / dome like the reference
+      g.fillStyle(0x3b2418, 1);
+      g.fillEllipse(ox + 36, 18 + bob, 28, 30); // tall head
+      g.fillCircle(ox + 36, 10 + bob, 14); // crown
+      // face plate (slightly lighter muzzle)
+      g.fillStyle(0x5c3b28, 1);
+      g.fillEllipse(ox + 36, 22 + bob, 16, 14);
+
+      // Heavy brow ridge
+      g.fillStyle(0x1a100a, 1);
+      g.fillEllipse(ox + 36, 14 + bob, 22, 8);
+
+      // GLOWING RED EYES (reference look)
+      g.fillStyle(0xff1744, 0.35);
+      g.fillCircle(ox + 28, 16 + bob, 9);
+      g.fillCircle(ox + 44, 16 + bob, 9);
       g.fillStyle(0xff1744, 1);
-      g.fillCircle(ox + 27, 15 + bob, 4);
-      g.fillCircle(ox + 37, 15 + bob, 4);
+      g.fillCircle(ox + 28, 16 + bob, 5);
+      g.fillCircle(ox + 44, 16 + bob, 5);
       g.fillStyle(0xff8a80, 1);
-      g.fillCircle(ox + 27, 15 + bob, 1.6);
-      g.fillCircle(ox + 37, 15 + bob, 1.6);
-      // glow
-      g.fillStyle(0xff1744, 0.22);
-      g.fillCircle(ox + 27, 15 + bob, 7);
-      g.fillCircle(ox + 37, 15 + bob, 7);
-      // brow
-      g.fillStyle(0x4e342e, 1);
-      g.fillRect(ox + 22, 10 + bob, 20, 3);
-      // smile (slightly friendlier but still wild)
-      g.lineStyle(2, 0x3e2723, 1);
-      g.beginPath();
-      g.arc(ox + 32, 22 + bob, 5, 0.15 * Math.PI, 0.85 * Math.PI, false);
-      g.strokePath();
+      g.fillCircle(ox + 27, 15 + bob, 2);
+      g.fillCircle(ox + 43, 15 + bob, 2);
+      g.fillStyle(0xffffff, 0.9);
+      g.fillCircle(ox + 26.5, 14.5 + bob, 1);
+
+      // NOSE
+      g.fillStyle(0x1a100a, 1);
+      g.fillEllipse(ox + 36, 22 + bob, 6, 4);
+
+      // MOUTH — opens / closes (requested)
+      if (mouthOpen) {
+        g.fillStyle(0x0d0503, 1);
+        g.fillEllipse(ox + 36, 28 + bob, 10, 7);
+        // teeth
+        g.fillStyle(0xffecb3, 1);
+        g.fillRect(ox + 31, 25 + bob, 3, 3);
+        g.fillRect(ox + 36, 25 + bob, 3, 3);
+        g.fillRect(ox + 41, 25 + bob, 2, 3);
+        // tongue
+        g.fillStyle(0xc62828, 1);
+        g.fillEllipse(ox + 36, 30 + bob, 5, 3);
+      } else {
+        g.lineStyle(3, 0x0d0503, 1);
+        g.beginPath();
+        g.arc(ox + 36, 26 + bob, 6, 0.15 * Math.PI, 0.85 * Math.PI, false);
+        g.strokePath();
+      }
     };
 
     for (let i = 0; i < frames; i++) drawFrame(sheet, i * fw, i);
@@ -432,22 +462,32 @@ export class BootScene extends Phaser.Scene {
 
     const one = this.make.graphics({ x: 0, y: 0 });
     drawFrame(one, 0, 0);
+    if (this.textures.exists('sasquatch')) this.textures.remove('sasquatch');
     one.generateTexture('sasquatch', fw, fh);
     one.destroy();
 
     if (this.anims.exists('sasquatch-walk')) this.anims.remove('sasquatch-walk');
     if (this.anims.exists('sasquatch-idle')) this.anims.remove('sasquatch-idle');
+    if (this.anims.exists('sasquatch-talk')) this.anims.remove('sasquatch-talk');
     if (this.anims.exists('sasquatch-down')) this.anims.remove('sasquatch-down');
+
     this.anims.create({
       key: 'sasquatch-walk',
-      frames: this.anims.generateFrameNumbers('sasquatch_sheet', { start: 0, end: 3 }),
-      frameRate: 8,
+      frames: this.anims.generateFrameNumbers('sasquatch_sheet', { start: 0, end: frames - 1 }),
+      frameRate: 9,
+      repeat: -1,
+    });
+    // Idle = mouth talking / moving while standing
+    this.anims.create({
+      key: 'sasquatch-idle',
+      frames: this.anims.generateFrameNumbers('sasquatch_sheet', { frames: [0, 1, 0, 1, 0, 1] }),
+      frameRate: 4,
       repeat: -1,
     });
     this.anims.create({
-      key: 'sasquatch-idle',
-      frames: [{ key: 'sasquatch_sheet', frame: 0 }],
-      frameRate: 1,
+      key: 'sasquatch-talk',
+      frames: this.anims.generateFrameNumbers('sasquatch_sheet', { frames: [0, 1, 2, 1] }),
+      frameRate: 5,
       repeat: -1,
     });
   }
@@ -754,15 +794,46 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makeDoor(): void {
+    // Closed door
     const g = this.g();
-    g.fillStyle(0x5d4037, 1);
-    g.fillRoundedRect(0, 0, 40, 56, 4);
-    g.fillStyle(0x3e2723, 1);
-    g.fillRoundedRect(4, 4, 32, 48, 3);
+    g.fillStyle(0x4e342e, 1);
+    g.fillRoundedRect(0, 0, 44, 64, 3);
+    g.fillStyle(0x6d4c41, 1);
+    g.fillRoundedRect(4, 4, 36, 56, 2);
+    g.lineStyle(2, 0x3e2723, 0.8);
+    g.strokeRoundedRect(4, 4, 36, 56, 2);
+    g.lineBetween(22, 4, 22, 60);
     g.fillStyle(0xffe082, 1);
-    g.fillCircle(30, 28, 3);
-    g.generateTexture('door', 40, 56);
+    g.fillCircle(34, 34, 3.5);
+    g.fillStyle(0x5d4037, 1);
+    g.fillRect(8, 10, 10, 14);
+    g.fillRect(26, 10, 10, 14);
+    g.generateTexture('door', 44, 64);
     g.destroy();
+
+    // Open door (swung — shows interior gap)
+    const o = this.g();
+    o.fillStyle(0x3e2723, 1);
+    o.fillRect(0, 0, 14, 64); // door edge / thickness
+    o.fillStyle(0x6d4c41, 1);
+    o.fillRoundedRect(6, 2, 10, 60, 2);
+    o.fillStyle(0xffe082, 1);
+    o.fillCircle(12, 34, 2);
+    o.fillStyle(0x152018, 0.5);
+    o.fillRect(16, 4, 28, 56); // dark opening
+    o.generateTexture('door_open', 44, 64);
+    o.destroy();
+
+    // Door frame / doorway
+    const f = this.g();
+    f.fillStyle(0x5d4037, 1);
+    f.fillRect(0, 0, 56, 8); // lintel
+    f.fillRect(0, 0, 8, 72);
+    f.fillRect(48, 0, 8, 72);
+    f.fillStyle(0x3e2723, 1);
+    f.fillRect(8, 8, 40, 64);
+    f.generateTexture('door_frame', 56, 72);
+    f.destroy();
   }
 
   private makeBed(): void {
