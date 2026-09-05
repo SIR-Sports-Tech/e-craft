@@ -186,6 +186,27 @@ export class GameScene extends Phaser.Scene {
       this.worldLayer.add(tree);
     }
 
+    
+    // Placeholder citizens (living-city seed — original shapes only)
+    const plaza = CITY_ZONES.find((z) => z.id === 'city_plaza')!;
+    const citizenNames = ['Officer Pike', 'Builder Jun', 'Nurse Ada', 'Pilot Remy'];
+    for (let i = 0; i < citizenNames.length; i++) {
+      const cx = plaza.x + 60 + i * 90;
+      const cy = plaza.y + 120 + (i % 2) * 40;
+      const body = this.add.circle(cx, cy, 12, 0xffcc80).setDepth(7);
+      const name = this.add
+        .text(cx, cy + 16, citizenNames[i], {
+          fontSize: '10px',
+          color: '#fff',
+          backgroundColor: '#00000066',
+          padding: { x: 3, y: 1 },
+        })
+        .setOrigin(0.5, 0)
+        .setDepth(7);
+      this.worldLayer.add(body);
+      this.worldLayer.add(name);
+    }
+
     this.hqDoorLabel = this.add
       .text(390, 430, '[E] Enter HQ → Underground Lair', {
         fontSize: '13px',
@@ -451,6 +472,7 @@ export class GameScene extends Phaser.Scene {
     this.flags.sasquatchCaptured = true;
     this.flags.sasquatchInVehicle = true;
     this.jailSasquatch();
+    this.grantReward();
     this.statusLine = '[DEBUG] Mission force-complete';
   }
 
