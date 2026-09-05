@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.5 — 2026-09-05 — CAPTURE KNOCKDOWN
+
+### Fixed / Added
+- CAPTURE button knocks Sasquatch **down** (fall tween, red flash, stun stars, DOWN!)
+- Much larger capture range for phone play
+- Clear toast if too far / missing tracker
+
+
 ## 1.0.4 — 2026-09-05 — SCARY WALKING SASQUATCH
 
 ### Added

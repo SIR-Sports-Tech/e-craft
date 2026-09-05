@@ -85,7 +85,7 @@ export function installDomOverlay(): void {
       pointer-events: auto;
       position: absolute; left: 10px; bottom: 10px;
       display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-      width: 150px;
+      width: 168px;
       touch-action: none;
     }
     #ecraft-dom-root button {
@@ -98,7 +98,7 @@ export function installDomOverlay(): void {
       touch-action: none;
     }
     #ecraft-actions .act { background: #1b5e20; }
-    #ecraft-actions .cap { background: #b71c1c; }
+    #ecraft-actions .cap { background: #b71c1c; font-size: 12px; }
     #ecraft-actions .car { background: #ef6c00; color: #111; grid-column: 1 / -1; }
     #ecraft-actions .actv { background: #6a1b9a; grid-column: 1 / -1; }
   `;
@@ -110,7 +110,7 @@ export function installDomOverlay(): void {
     <div id="ecraft-toast">Tap ACTIVATE / E near objects · CAR to drive</div>
     <div id="ecraft-actions">
       <button type="button" class="act" id="btn-e">E</button>
-      <button type="button" class="cap" id="btn-cap">CAP</button>
+      <button type="button" class="cap" id="btn-cap">CAPTURE</button>
       <button type="button" class="actv" id="btn-activate">ACTIVATE</button>
       <button type="button" class="car" id="btn-car">GET IN CAR / DRIVE</button>
     </div>

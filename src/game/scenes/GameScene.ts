@@ -1293,27 +1293,111 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tryCapture(): void {
-    if (this.flags.sasquatchCaptured || this.flags.sasquatchJailed) return;
-    if (!this.flags.hasTracker) {
-      this.statusLine = 'You need the Sasquatch Tracker first!';
+    if (this.flags.sasquatchCaptured || this.flags.sasquatchJailed) {
+      setDomStatus('Already captured — load into the CAR!');
       return;
     }
+    if (!this.flags.hasTracker) {
+      this.statusLine = 'Need Tracker first — tap ACTIVATE!';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    // Exit car briefly if needed so capture feels close-range on foot/vehicle
     const d = Phaser.Math.Distance.Between(
       this.player.x,
       this.player.y,
       this.sasquatch.x,
       this.sasquatch.y,
     );
-    if (d > 80) {
-      this.statusLine = 'Get closer to Sasquatch to capture (Space).';
+    // Big hitbox — scary sasquatch is large; phone aiming is hard
+    const range = this.flags.inVehicle ? 220 : 190;
+    if (d > range) {
+      this.statusLine = `Too far (${Math.round(d)}) — get closer then hit CAP!`;
+      setDomStatus(this.statusLine);
+      audio.beep?.(180, 0.08, 'square', 0.03);
+      // soft fail beep via audio system
+      try { audio.talk(); } catch { /* ignore */ }
       return;
     }
+    this.knockDownSasquatch();
+  }
+
+  /** Capture success: Sasquatch collapses to the ground. */
+  private knockDownSasquatch(): void {
     this.flags.sasquatchCaptured = true;
-    this.sasquatch.setVelocity(0);
-    this.sasquatch.setTint(0x88ff88);
+    this.sasquatch.setVelocity(0, 0);
+    const body = this.sasquatch.body as Phaser.Physics.Arcade.Body | undefined;
+    if (body) body.enable = false;
+
+    // Stop walk, fall over
+    try {
+      this.sasquatch.anims.stop();
+      this.sasquatch.setFrame(0);
+    } catch { /* ignore */ }
+
+    const fallAngle = this.sasquatch.flipX ? -90 : 90;
+    this.tweens.killTweensOf(this.sasquatch);
+    this.tweens.add({
+      targets: this.sasquatch,
+      angle: fallAngle,
+      y: this.sasquatch.y + 18,
+      duration: 380,
+      ease: 'Bounce.easeOut',
+    });
+    // Red hit flash then stunned look
+    this.sasquatch.setTint(0xff1744);
+    this.time.delayedCall(200, () => this.sasquatch.setTint(0xb0bec5));
+
+    // Impact ring
+    const ring = this.add.circle(this.sasquatch.x, this.sasquatch.y, 10, 0xff1744, 0.35).setDepth(20);
+    this.tweens.add({
+      targets: ring,
+      scale: 4,
+      alpha: 0,
+      duration: 450,
+      onComplete: () => ring.destroy(),
+    });
+    // Stars / stun marks
+    for (let i = 0; i < 5; i++) {
+      const star = this.add
+        .star(this.sasquatch.x, this.sasquatch.y - 20, 5, 3, 7, 0xffe082, 1)
+        .setDepth(21);
+      this.tweens.add({
+        targets: star,
+        x: this.sasquatch.x + Phaser.Math.Between(-40, 40),
+        y: this.sasquatch.y - Phaser.Math.Between(40, 80),
+        alpha: 0,
+        angle: 180,
+        duration: 600,
+        delay: i * 40,
+        onComplete: () => star.destroy(),
+      });
+    }
+
+    // Floor label
+    const down = this.add
+      .text(this.sasquatch.x, this.sasquatch.y + 50, 'DOWN!', {
+        fontSize: '18px',
+        color: '#ff8a80',
+        fontStyle: 'bold',
+        stroke: '#000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(22);
+    this.tweens.add({
+      targets: down,
+      y: down.y - 30,
+      alpha: 0,
+      duration: 900,
+      onComplete: () => down.destroy(),
+    });
+
+    this.setPhase(MissionPhase.FoundSasquatch);
     this.setPhase(MissionPhase.Captured);
     audio.capture();
-    this.statusLine = 'Captured! Load Sasquatch into the security vehicle (E).';
+    this.statusLine = 'Sasquatch DOWN! Tap GET IN CAR to load him.';
+    setDomStatus(this.statusLine);
     this.trail.clearFallback();
   }
 
