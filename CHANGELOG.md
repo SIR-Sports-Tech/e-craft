@@ -1,6 +1,22 @@
 # Changelog
 
+## 0.1.1 — 2026-09-05
+
+### Added
+- Yellow **objective arrow** always points to the next mission step
+- On-screen **mission checklist** (HQ → jail → reward)
+- Captured Sasquatch **follows** the player to the vehicle
+- Easier vehicle load radius + mid-drive load
+- QA keys: **F9** advance / **F10** force-complete mission
+- Playwright browser smoke script
+
+### Fixed
+- Sticky capture → transport handoff
+- Jail vs lair indoor visibility switching
+
 ## 0.1.0 — 2026-09-05
+
+
 
 ### Added
 - Phaser 3 + TypeScript + Vite project scaffold

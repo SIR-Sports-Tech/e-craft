@@ -6,6 +6,7 @@ import {
   REWARD_TEXT,
 } from '../data/MissionState';
 import { TrailSystem } from '../systems/TrailSystem';
+import { ObjectiveMarker, objectiveFor } from '../systems/ObjectiveSystem';
 import {
   CITY_ZONES,
   JAIL_INTERIOR,
@@ -67,6 +68,7 @@ export class GameScene extends Phaser.Scene {
   private hqDoorLabel?: Phaser.GameObjects.Text;
   private lairNodes: Phaser.GameObjects.GameObject[] = [];
   private jailNodes: Phaser.GameObjects.GameObject[] = [];
+  private objectiveMarker!: ObjectiveMarker;
 
   constructor() {
     super('Game');
@@ -86,6 +88,7 @@ export class GameScene extends Phaser.Scene {
     this.buildIndoorJail();
 
     this.trail = new TrailSystem(this, this.trailLayer);
+    this.objectiveMarker = new ObjectiveMarker(this);
 
     this.player = this.physics.add.sprite(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y, 'player');
     this.player.setCollideWorldBounds(true).setDepth(10);
@@ -125,6 +128,8 @@ export class GameScene extends Phaser.Scene {
       M: Phaser.Input.Keyboard.KeyCodes.M,
       SPACE: Phaser.Input.Keyboard.KeyCodes.SPACE,
       ESC: Phaser.Input.Keyboard.KeyCodes.ESC,
+      F9: Phaser.Input.Keyboard.KeyCodes.F9,
+      F10: Phaser.Input.Keyboard.KeyCodes.F10,
     }) as typeof this.keys;
 
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
@@ -133,6 +138,11 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch('UI', { game: this });
     this.setPhase(MissionPhase.AtSecurityHQ);
     this.statusLine = 'Welcome to E-CRAFT Security Division. Find Sasquatch!';
+    (window as unknown as { __ecraft: unknown }).__ecraft = {
+      getState: () => this.getHud(),
+      advance: () => this.debugAdvance(),
+      complete: () => this.debugCompleteMission(),
+    };
   }
 
   private buildOutdoorWorld(): void {
@@ -283,6 +293,27 @@ export class GameScene extends Phaser.Scene {
 
   // —— Public API for UIScene ——
   getHud() {
+    const advanced = [
+      MissionPhase.Tracking,
+      MissionPhase.FoundSasquatch,
+      MissionPhase.Captured,
+      MissionPhase.Transporting,
+      MissionPhase.AtSuperJail,
+      MissionPhase.Jailed,
+      MissionPhase.Rewarded,
+      MissionPhase.FreeExplore,
+    ].includes(this.phase);
+    const checklist = [
+      { id: 'lair', label: 'Enter underground lair', done: this.flags.hasTracker || this.flags.inLair || this.phase !== MissionPhase.AtSecurityHQ },
+      { id: 'tracker', label: 'Get Sasquatch Tracker', done: this.flags.hasTracker },
+      { id: 'robot', label: 'Activate robot', done: this.flags.robotActive },
+      { id: 'vehicle', label: 'Drive security vehicle', done: this.flags.robotActive && (this.flags.inVehicle || this.flags.sasquatchCaptured || advanced) },
+      { id: 'trail', label: 'Follow Sasquatch trail', done: this.flags.sasquatchCaptured || this.phase === MissionPhase.FoundSasquatch || this.phase === MissionPhase.Tracking },
+      { id: 'capture', label: 'Capture Sasquatch', done: this.flags.sasquatchCaptured },
+      { id: 'transport', label: 'Transport in vehicle', done: this.flags.sasquatchInVehicle || this.flags.sasquatchJailed },
+      { id: 'jail', label: 'Lock in SUPER JAIL', done: this.flags.sasquatchJailed },
+      { id: 'reward', label: 'Claim reward', done: this.flags.rewardClaimed },
+    ];
     return {
       phase: this.phase,
       hint: PHASE_HINTS[this.phase],
@@ -294,6 +325,7 @@ export class GameScene extends Phaser.Scene {
       reward: this.flags.rewardClaimed ? REWARD_TEXT : null,
       player: { x: this.player.x, y: this.player.y },
       world: { w: WORLD.width, h: WORLD.height },
+      checklist,
     };
   }
 
@@ -327,6 +359,16 @@ export class GameScene extends Phaser.Scene {
     this.updateInteractPrompt();
     this.consumeTouchActions();
     this.syncIndoorVisibility();
+    this.updateObjectiveMarker();
+  }
+
+  private updateObjectiveMarker(): void {
+    const target = objectiveFor(this.phase, this.flags, {
+      sasquatch: { x: this.sasquatch.x, y: this.sasquatch.y },
+      vehicle: { x: this.vehicle.x, y: this.vehicle.y },
+      player: { x: this.player.x, y: this.player.y },
+    });
+    this.objectiveMarker.update(this.player.x, this.player.y, target);
   }
 
   private handleMovement(): void {
@@ -361,6 +403,55 @@ export class GameScene extends Phaser.Scene {
     if (just(this.keys.SPACE)) this.tryCapture();
     if (just(this.keys.M)) this.mapOpen = !this.mapOpen;
     if (just(this.keys.ESC)) this.paused = !this.paused;
+    if (just((this.keys as any).F9)) this.debugAdvance();
+    if (just((this.keys as any).F10)) this.debugCompleteMission();
+  }
+
+  /** QA: advance critical flags toward next gate */
+  private debugAdvance(): void {
+    if (!this.flags.hasTracker) {
+      this.flags.hasTracker = true;
+      this.setPhase(MissionPhase.HasTracker);
+      this.statusLine = '[DEBUG] Tracker granted';
+      return;
+    }
+    if (!this.flags.robotActive) {
+      this.flags.robotActive = true;
+      this.robot.setVisible(true);
+      this.setPhase(MissionPhase.RobotActive);
+      this.statusLine = '[DEBUG] Robot online';
+      return;
+    }
+    if (!this.flags.sasquatchCaptured) {
+      this.flags.sasquatchCaptured = true;
+      this.sasquatch.setTint(0x88ff88);
+      this.setPhase(MissionPhase.Captured);
+      this.statusLine = '[DEBUG] Sasquatch captured';
+      return;
+    }
+    if (!this.flags.sasquatchInVehicle) {
+      this.flags.sasquatchInVehicle = true;
+      this.flags.inVehicle = true;
+      this.vehicle.setVisible(false);
+      this.setPhase(MissionPhase.Transporting);
+      this.statusLine = '[DEBUG] Loaded in vehicle';
+      return;
+    }
+    if (!this.flags.sasquatchJailed) {
+      this.jailSasquatch();
+      this.statusLine = '[DEBUG] Jailed';
+      return;
+    }
+    this.grantReward();
+  }
+
+  private debugCompleteMission(): void {
+    this.flags.hasTracker = true;
+    this.flags.robotActive = true;
+    this.flags.sasquatchCaptured = true;
+    this.flags.sasquatchInVehicle = true;
+    this.jailSasquatch();
+    this.statusLine = '[DEBUG] Mission force-complete';
   }
 
   private consumeTouchActions(): void {
@@ -391,10 +482,18 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.flags.sasquatchCaptured) {
-      this.sasquatch.setVelocity(0);
-      if (!this.flags.sasquatchInVehicle) {
-        // Stay where captured until loaded
+      if (this.flags.sasquatchInVehicle && this.flags.inVehicle) {
+        this.sasquatch.setPosition(this.player.x - 28, this.player.y);
+        this.sasquatch.setVelocity(0);
+        return;
       }
+      if (this.flags.sasquatchInVehicle && !this.flags.inVehicle) {
+        // On foot with "loaded" cargo — keep beside player for jail walk-in
+        this.physics.moveTo(this.sasquatch, this.player.x + 36, this.player.y + 8, 160);
+        return;
+      }
+      // Follow player to the vehicle
+      this.physics.moveTo(this.sasquatch, this.player.x + 40, this.player.y + 10, 140);
       return;
     }
 
@@ -449,6 +548,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.trail.markNearbyDiscovered(this.player.x, this.player.y);
+    this.redrawTrailPath();
     const nearest = this.trail.nearestUndiscovered(this.player.x, this.player.y);
     if (nearest) {
       const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, nearest.x, nearest.y);
@@ -587,7 +687,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Vehicle enter/exit
-    if (!this.flags.inVehicle && this.near(this.vehicle.x, this.vehicle.y, 60)) {
+    if (!this.flags.inVehicle && this.near(this.vehicle.x, this.vehicle.y, 80)) {
       if (!this.flags.robotActive) {
         this.statusLine = 'Activate your robot partner first!';
         return;
@@ -595,16 +695,35 @@ export class GameScene extends Phaser.Scene {
       this.flags.inVehicle = true;
       this.player.setPosition(this.vehicle.x, this.vehicle.y);
       this.vehicle.setVisible(false);
-      if (this.flags.sasquatchCaptured && this.near(this.sasquatch.x, this.sasquatch.y, 90)) {
+      const sasqNear =
+        this.flags.sasquatchCaptured &&
+        Phaser.Math.Distance.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y) < 140;
+      if (sasqNear) {
         this.flags.sasquatchInVehicle = true;
         this.setPhase(MissionPhase.Transporting);
-        this.statusLine = 'Sasquatch loaded! Drive to SUPER JAIL.';
+        this.statusLine = 'Sasquatch loaded! Drive to SUPER JAIL (follow the yellow arrow).';
+      } else if (this.flags.sasquatchCaptured) {
+        this.statusLine = 'Sasquatch is following you — get closer to the vehicle, then press E again.';
+        this.flags.inVehicle = false;
+        this.vehicle.setVisible(true);
+        this.player.setTexture('player');
       } else if (this.phase === MissionPhase.RobotActive || this.phase === MissionPhase.CanDrive) {
         this.setPhase(MissionPhase.CanDrive);
-        this.statusLine = 'Vehicle engaged. Drive east to the forest!';
-      } else if (this.flags.sasquatchCaptured) {
-        this.statusLine = 'Bring the vehicle closer to Sasquatch to load.';
+        this.statusLine = 'Vehicle engaged. Drive east to the forest (yellow arrow)!';
       }
+      return;
+    }
+
+    // Load sasquatch while already driving
+    if (
+      this.flags.inVehicle &&
+      this.flags.sasquatchCaptured &&
+      !this.flags.sasquatchInVehicle &&
+      Phaser.Math.Distance.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y) < 120
+    ) {
+      this.flags.sasquatchInVehicle = true;
+      this.setPhase(MissionPhase.Transporting);
+      this.statusLine = 'Sasquatch loaded mid-drive! Head to SUPER JAIL.';
       return;
     }
 
@@ -763,6 +882,22 @@ export class GameScene extends Phaser.Scene {
 
   private setPhase(phase: MissionPhase): void {
     this.phase = phase;
+  }
+
+  private trailPath?: Phaser.GameObjects.Graphics;
+  private redrawTrailPath(): void {
+    if (!this.trailPath) {
+      this.trailPath = this.add.graphics().setDepth(4);
+      this.trailLayer.add(this.trailPath);
+    }
+    this.trailPath.clear();
+    const clues = this.trail.getClues();
+    if (clues.length < 2) return;
+    this.trailPath.lineStyle(2, 0xffe082, 0.35);
+    this.trailPath.beginPath();
+    this.trailPath.moveTo(clues[0].x, clues[0].y);
+    for (let i = 1; i < clues.length; i++) this.trailPath.lineTo(clues[i].x, clues[i].y);
+    this.trailPath.strokePath();
   }
 
   private near(x: number, y: number, r: number): boolean {

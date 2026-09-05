@@ -16,6 +16,7 @@ export class UIScene extends Phaser.Scene {
   private stickKnob!: Phaser.GameObjects.Arc;
   private stickPointerId: number | null = null;
   private rewardedShown = false;
+  private checklistText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('UI');
@@ -72,6 +73,18 @@ export class UIScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(100);
 
+    this.checklistText = this.add
+      .text(w - 12, 40, '', {
+        fontSize: '12px',
+        color: '#cfd8dc',
+        backgroundColor: '#000000aa',
+        padding: { x: 8, y: 6 },
+        lineSpacing: 3,
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0)
+      .setDepth(100);
+
     this.add
       .text(w - 12, 10, 'WASD move · E interact · Space capture · M map · Esc pause', {
         fontSize: '11px',
@@ -91,6 +104,7 @@ export class UIScene extends Phaser.Scene {
     this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
       this.statusText.setY(gameSize.height - 70);
       this.promptText.setPosition(gameSize.width / 2, gameSize.height - 110);
+      this.checklistText.setX(gameSize.width - 12);
       this.layoutTouch(gameSize.width, gameSize.height);
     });
   }
@@ -256,6 +270,15 @@ export class UIScene extends Phaser.Scene {
     this.statusText.setText(hud.status);
     this.promptText.setText(hud.prompt);
     this.promptText.setVisible(!!hud.prompt);
+    if (hud.checklist) {
+      this.checklistText.setText(
+        'MISSION\n' +
+          hud.checklist
+            .map((c: { done: boolean; label: string }) => `${c.done ? '✓' : '○'} ${c.label}`)
+            .join('\n') +
+          '\n\nF9 debug advance · F10 force complete',
+      );
+    }
 
     this.pauseOverlay.setVisible(hud.paused);
     this.mapOverlay.setVisible(hud.mapOpen);

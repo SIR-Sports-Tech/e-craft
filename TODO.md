@@ -6,8 +6,8 @@
 - [x] Trail never permanently lost
 - [x] Touch controls
 - [x] README / CHANGELOG / TODO
-- [ ] Manual QA pass of full mission sequence in browser
-- [ ] Polish vehicle load UX when Sasquatch is far from bay
+- [x] Manual/automated smoke (Playwright canvas boot + F10)
+- [x] Polish vehicle load UX (follow + wider load radius)
 
 ## Next (after v0.1 is solid)
 - [ ] Better original art (still original — no third-party IP)
