@@ -32,6 +32,8 @@ export class GameScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private robot!: Phaser.Physics.Arcade.Sprite;
   private vehicle!: Phaser.Physics.Arcade.Sprite;
+  private raceCar!: Phaser.Physics.Arcade.Sprite;
+  private activeCarKey: 'vehicle' | 'race_car' = 'vehicle';
   private sasquatch!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keys!: {
@@ -123,6 +125,19 @@ export class GameScene extends Phaser.Scene {
     this.vehicle = this.physics.add.sprite(SPAWN.vehicle.x, SPAWN.vehicle.y, 'vehicle');
     this.vehicle.setImmovable(true).setDepth(8).setScale(1.05);
     this.vehicle.body!.enable = false;
+    this.raceCar = this.physics.add.sprite(SPAWN.raceCar.x, SPAWN.raceCar.y, 'race_car');
+    this.raceCar.setImmovable(true).setDepth(8).setScale(1.05);
+    this.raceCar.body!.enable = false;
+    const raceLbl = this.add
+      .text(SPAWN.raceCar.x, SPAWN.raceCar.y - 36, 'RACE CAR', {
+        fontSize: '12px',
+        color: '#ff8a80',
+        backgroundColor: '#00000088',
+        padding: { x: 4, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setDepth(8);
+    this.worldLayer.add(raceLbl);
 
     this.sasquatch = this.physics.add.sprite(
       SPAWN.sasquatchForest.x,
@@ -208,7 +223,12 @@ export class GameScene extends Phaser.Scene {
       enterCar: () => {
         this.paused = false;
         this.mapOpen = false;
-        this.doEnterCar();
+        this.doEnterCar('vehicle');
+      },
+      enterRaceCar: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.doEnterCar('race_car');
       },
       runAcceptanceStep: (step: string) => this.runAcceptanceStep(step),
       runFullAcceptance: async () => {
@@ -256,6 +276,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.flags.inVehicle) {
       this.vehicle.setVisible(false);
+    if (this.raceCar) this.raceCar.setVisible(false);
       this.player.setTexture('vehicle');
     }
     if (this.flags.sasquatchJailed) {
@@ -315,6 +336,7 @@ export class GameScene extends Phaser.Scene {
       docks: 'bldg_plaza',
       forest: 'bldg_forest_cabin',
       vehicle_bay: 'bldg_plaza',
+      race_bay: 'bldg_plaza',
     };
 
     for (const z of CITY_ZONES) {
@@ -337,6 +359,13 @@ export class GameScene extends Phaser.Scene {
         const bay = this.add
           .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, 0x1b5e20, 0.5)
           .setStrokeStyle(3, 0x69f0ae, 0.8)
+          .setDepth(2);
+        this.worldLayer.add(bay);
+      }
+      if (z.id === 'race_bay') {
+        const bay = this.add
+          .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, 0x7f0000, 0.45)
+          .setStrokeStyle(3, 0xff5252, 0.85)
           .setDepth(2);
         this.worldLayer.add(bay);
       }
@@ -637,7 +666,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleMovement(): void {
-    const speed = this.flags.inVehicle ? 560 : 240;
+    const speed = this.flags.inVehicle ? (this.activeCarKey === 'race_car' ? 720 : 560) : 240;
     let vx = 0;
     let vy = 0;
     const left = this.cursors.left?.isDown || this.keys.A?.isDown;
@@ -679,9 +708,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.flags.inVehicle) {
-      this.vehicle.setPosition(this.player.x, this.player.y);
-      if (this.player.texture.key !== 'vehicle') {
-        this.player.setTexture('vehicle');
+      const car = this.activeCarKey === 'race_car' ? this.raceCar : this.vehicle;
+      car.setPosition(this.player.x, this.player.y);
+      if (this.player.texture.key !== this.activeCarKey) {
+        this.player.setTexture(this.activeCarKey);
         this.player.setScale(1.05);
         const body = this.player.body as Phaser.Physics.Arcade.Body;
         body.setSize(70, 36).setOffset(10, 12);
@@ -750,6 +780,7 @@ export class GameScene extends Phaser.Scene {
         this.player.setPosition(this.vehicle.x, this.vehicle.y);
         this.flags.inVehicle = true;
         this.vehicle.setVisible(false);
+    if (this.raceCar) this.raceCar.setVisible(false);
         this.player.setTexture('vehicle');
         this.setPhase(MissionPhase.CanDrive);
         this.statusLine = 'Vehicle engaged.';
@@ -757,6 +788,7 @@ export class GameScene extends Phaser.Scene {
       case 'go_forest':
         this.flags.inVehicle = true;
         this.vehicle.setVisible(false);
+    if (this.raceCar) this.raceCar.setVisible(false);
         this.player.setTexture('vehicle');
         this.player.setPosition(forest.x + 180, forest.y + 400);
         this.setPhase(MissionPhase.Tracking);
@@ -776,6 +808,7 @@ export class GameScene extends Phaser.Scene {
         this.flags.inVehicle = true;
         this.flags.sasquatchInVehicle = true;
         this.vehicle.setVisible(false);
+    if (this.raceCar) this.raceCar.setVisible(false);
         this.player.setTexture('vehicle');
         this.setPhase(MissionPhase.Transporting);
         this.statusLine = 'Sasquatch loaded!';
@@ -832,6 +865,7 @@ export class GameScene extends Phaser.Scene {
       this.flags.sasquatchInVehicle = true;
       this.flags.inVehicle = true;
       this.vehicle.setVisible(false);
+    if (this.raceCar) this.raceCar.setVisible(false);
       this.setPhase(MissionPhase.Transporting);
       this.statusLine = '[DEBUG] Loaded in vehicle';
       return;
@@ -1196,8 +1230,9 @@ export class GameScene extends Phaser.Scene {
 
     if (this.flags.inVehicle) {
       this.flags.inVehicle = false;
-      this.vehicle.setPosition(this.player.x, this.player.y);
-      this.vehicle.setVisible(true);
+      const car = this.activeCarKey === 'race_car' ? this.raceCar : this.vehicle;
+      car.setPosition(this.player.x, this.player.y);
+      car.setVisible(true);
       this.player.setTexture('player');
       this.player.setScale(0.95);
       const body = this.player.body as Phaser.Physics.Arcade.Body;
@@ -1211,14 +1246,18 @@ export class GameScene extends Phaser.Scene {
   }
 
 
-  private enterVehicle(allowWithoutSasq = true): void {
+  private enterVehicle(allowWithoutSasq = true, kind: 'vehicle' | 'race_car' = 'vehicle'): void {
     this.flags.inVehicle = true;
-    this.player.setPosition(this.vehicle.x, this.vehicle.y);
-    this.vehicle.setVisible(false);
-    this.player.setTexture('vehicle');
+    this.activeCarKey = kind;
+    const car = kind === 'race_car' ? this.raceCar : this.vehicle;
+    const other = kind === 'race_car' ? this.vehicle : this.raceCar;
+    this.player.setPosition(car.x, car.y);
+    car.setVisible(false);
+    other.setVisible(true);
+    this.player.setTexture(kind);
     this.player.setScale(1.05);
     this.player.setDrag(0);
-    this.player.setMaxVelocity(700);
+    this.player.setMaxVelocity(kind === 'race_car' ? 900 : 700);
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     body.enable = true;
     body.setAllowGravity(false);
@@ -1281,7 +1320,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** One-tap car: requires robot, snaps to vehicle and drives. */
-  private doEnterCar(): void {
+  private doEnterCar(kind: 'vehicle' | 'race_car' = 'vehicle'): void {
     if (!this.flags.robotActive) {
       this.statusLine = 'Activate robot first (tap ACTIVATE twice)!';
       setDomStatus(this.statusLine);
@@ -1289,9 +1328,17 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.flags.inLair) this.exitLair();
     if (this.flags.inJailBuilding) this.exitJail();
-    // Always re-seat into car so DRIVE works even if state was weird
-    this.player.setPosition(this.vehicle.x, this.vehicle.y);
-    // If Sasquatch is already DOWN anywhere, pull him in
+
+    const car = kind === 'race_car' ? this.raceCar : this.vehicle;
+    this.activeCarKey = kind;
+    // Park the other car visibly if switching
+    if (kind === 'race_car') {
+      this.vehicle.setVisible(true);
+    } else {
+      this.raceCar.setVisible(true);
+    }
+
+    this.player.setPosition(car.x, car.y);
     if (this.flags.sasquatchCaptured) {
       this.sasquatch.setPosition(this.player.x - 28, this.player.y);
       this.sasquatch.setAngle(0);
@@ -1300,11 +1347,12 @@ export class GameScene extends Phaser.Scene {
       if (b) b.enable = true;
       this.flags.sasquatchInVehicle = true;
     }
-    this.enterVehicle(true);
-    this.player.setVelocity(480, 0);
-    this.statusLine = this.flags.sasquatchInVehicle
-      ? 'Sasquatch in car — DRIVE to SUPER JAIL!'
-      : 'DRIVING — hold D-pad to steer';
+    this.enterVehicle(true, kind);
+    const kick = kind === 'race_car' ? 620 : 480;
+    this.player.setVelocity(kick, 0);
+    this.statusLine = kind === 'race_car'
+      ? (this.flags.sasquatchInVehicle ? 'RACE CAR + Sasquatch — GO!' : 'RACE CAR — hold D-pad!')
+      : (this.flags.sasquatchInVehicle ? 'Patrol car + Sasquatch — DRIVE!' : 'PATROL CAR — hold D-pad!');
     setDomStatus(this.statusLine);
   }
 
@@ -1434,6 +1482,7 @@ export class GameScene extends Phaser.Scene {
     this.worldLayer.setVisible(false);
     this.trailLayer.setVisible(false);
     this.vehicle.setVisible(false);
+    if (this.raceCar) this.raceCar.setVisible(false);
     this.sasquatch.setVisible(false);
     this.robot.setVisible(false);
     this.player.setPosition(LAIR.exitX + 80, LAIR.exitY + 80);
@@ -1448,7 +1497,13 @@ export class GameScene extends Phaser.Scene {
     this.indoorLayer.setVisible(false);
     this.worldLayer.setVisible(true);
     this.trailLayer.setVisible(true);
-    this.vehicle.setVisible(!this.flags.inVehicle);
+    this.vehicle.setVisible(!this.flags.inVehicle || this.activeCarKey !== 'vehicle');
+    if (this.raceCar) this.raceCar.setVisible(!this.flags.inVehicle || this.activeCarKey !== 'race_car');
+    // if not in a vehicle, both parked cars should show
+    if (!this.flags.inVehicle) {
+      this.vehicle.setVisible(true);
+      if (this.raceCar) this.raceCar.setVisible(true);
+    }
     this.sasquatch.setVisible(!this.flags.sasquatchJailed);
     if (this.flags.robotActive) this.robot.setVisible(true);
     this.player.setPosition(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y);
@@ -1473,6 +1528,7 @@ export class GameScene extends Phaser.Scene {
     this.worldLayer.setVisible(false);
     this.trailLayer.setVisible(false);
     this.vehicle.setVisible(false);
+    if (this.raceCar) this.raceCar.setVisible(false);
     this.sasquatch.setVisible(false);
     this.robot.setVisible(false);
     this.player.setPosition(JAIL_INTERIOR.exitX + 100, JAIL_INTERIOR.exitY + 100);
@@ -1488,7 +1544,10 @@ export class GameScene extends Phaser.Scene {
     this.cellMarker?.setVisible(this.flags.sasquatchJailed);
     this.worldLayer.setVisible(true);
     this.trailLayer.setVisible(true);
-    this.vehicle.setVisible(!this.flags.inVehicle);
+    if (!this.flags.inVehicle) {
+      this.vehicle.setVisible(true);
+      if (this.raceCar) this.raceCar.setVisible(true);
+    }
     if (this.flags.robotActive) this.robot.setVisible(true);
     this.player.setPosition(800, 420);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);

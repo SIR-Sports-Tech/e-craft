@@ -16,6 +16,7 @@ export class BootScene extends Phaser.Scene {
     this.makeRobot();
     this.makeSasquatch();
     this.makeVehicle();
+    this.makeRaceCar();
     this.makeTracker();
     this.makeTree();
     this.makeCitizen();
@@ -257,6 +258,39 @@ export class BootScene extends Phaser.Scene {
     g.fillCircle(22, 48, 3);
     g.fillCircle(74, 48, 3);
     g.generateTexture('vehicle', 96, 60);
+    g.destroy();
+  }
+
+  private makeRaceCar(): void {
+    const g = this.g();
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(48, 50, 70, 10);
+    // sleek low body
+    g.fillStyle(0xd50000, 1);
+    g.fillRoundedRect(6, 22, 84, 22, 8);
+    // cockpit
+    g.fillStyle(0x212121, 1);
+    g.fillRoundedRect(38, 10, 28, 16, 4);
+    g.fillStyle(0x80d8ff, 1);
+    g.fillRoundedRect(42, 12, 20, 10, 2);
+    // spoiler
+    g.fillStyle(0xb71c1c, 1);
+    g.fillRect(8, 14, 18, 5);
+    g.fillRect(12, 8, 4, 8);
+    // stripe
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(34, 24, 8, 18);
+    // wheels
+    g.fillStyle(0x111111, 1);
+    g.fillCircle(24, 44, 8);
+    g.fillCircle(72, 44, 8);
+    g.fillStyle(0xbdbdbd, 1);
+    g.fillCircle(24, 44, 3);
+    g.fillCircle(72, 44, 3);
+    // nose
+    g.fillStyle(0xff1744, 1);
+    g.fillTriangle(90, 33, 98, 33, 90, 40);
+    g.generateTexture('race_car', 100, 56);
     g.destroy();
   }
 

@@ -49,6 +49,16 @@ export const CITY_ZONES: RectZone[] = [
     interact: 'vehicle',
   },
   {
+    id: 'race_bay',
+    label: 'Race Car',
+    x: 420,
+    y: 500,
+    w: 160,
+    h: 90,
+    color: 0x7a1e1e,
+    interact: 'race',
+  },
+  {
     id: 'city_plaza',
     label: 'City Plaza',
     x: 1100,
@@ -206,6 +216,7 @@ export const ROADS: RectZone[] = [
 export const SPAWN = {
   playerOutdoor: { x: 320, y: 620 },
   vehicle: { x: 300, y: 545 },
+  raceCar: { x: 480, y: 545 },
   sasquatchForest: { x: 3000, y: 900 },
 };
 

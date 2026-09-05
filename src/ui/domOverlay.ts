@@ -34,6 +34,7 @@ type EcraftApi = {
   capture?: () => void;
   activate?: () => void;
   enterCar?: () => void;
+  enterRaceCar?: () => void;
   unpause?: () => void;
   getState?: () => { flags?: Record<string, boolean>; prompt?: string };
 };
@@ -114,6 +115,7 @@ export function installDomOverlay(): void {
     #ecraft-actions .cap { background: #b71c1c; font-size: 12px; }
     #ecraft-actions .car { background: #ef6c00; color: #111; grid-column: 1 / -1; }
     #ecraft-actions .actv { background: #6a1b9a; grid-column: 1 / -1; }
+    #ecraft-actions .race { background: #d50000; color: #fff; grid-column: 1 / -1; }
   `;
   document.head.appendChild(style);
 
@@ -125,7 +127,8 @@ export function installDomOverlay(): void {
       <button type="button" class="act" id="btn-e">E</button>
       <button type="button" class="cap" id="btn-cap">CAPTURE</button>
       <button type="button" class="actv" id="btn-activate">ACTIVATE</button>
-      <button type="button" class="car" id="btn-car">GET IN CAR / DRIVE</button>
+      <button type="button" class="car" id="btn-car">PATROL CAR</button>
+      <button type="button" class="race" id="btn-race">RACE CAR</button>
     </div>
     <div id="ecraft-pad" aria-label="movement pad">
       <span></span><button type="button" data-dir="up">▲</button><span></span>
@@ -201,7 +204,8 @@ export function installDomOverlay(): void {
   bindAction('btn-e', () => api()?.interact?.(), 'Interact');
   bindAction('btn-cap', () => api()?.capture?.(), 'Capture');
   bindAction('btn-activate', () => api()?.activate?.(), 'Activate');
-  bindAction('btn-car', () => api()?.enterCar?.(), 'Car');
+  bindAction('btn-car', () => api()?.enterCar?.(), 'Patrol Car');
+  bindAction('btn-race', () => api()?.enterRaceCar?.(), 'Race Car');
 
   window.addEventListener(
     'keydown',

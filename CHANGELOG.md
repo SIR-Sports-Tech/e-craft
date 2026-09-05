@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.7 — 2026-09-05 — RACE CAR + BOTH CARS DRIVE
+
+### Added
+- **RACE CAR** (red) next to patrol bay — tap **RACE CAR** button
+- **PATROL CAR** button for security vehicle
+- Race car is faster than patrol
+
+### Tested
+- BOTH CARS DRIVE PASSED (patrol ~448px / race ~600px in 0.8s hold)
+
+
 ## 1.0.5 — 2026-09-05 — CAPTURE KNOCKDOWN
 
 ### Fixed / Added
