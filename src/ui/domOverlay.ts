@@ -282,7 +282,7 @@ export function installDomOverlay(): void {
       e.preventDefault();
       e.stopPropagation();
       const now = Date.now();
-      if (now - last < 220) return;
+      if (now - last < 140) return;
       last = now;
       flash(btn);
       callApi(fnName, label);

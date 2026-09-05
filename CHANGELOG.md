@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.2 — 2026-09-05 — ROBOT PARTNER WORKS
+
+### Fixed
+- Robot no longer stranded at lair coords after EXIT
+- Snaps beside you on exit house/lair/jail; warps if left behind
+- Faster follow on foot + rides with you in the car
+- Walk/idle animation so you can see it moving
+- **One ACTIVATE** turns on Tracker + Robot together
+
+
 ## 1.4.1 — 2026-09-05 — ALL BUTTONS WORK
 
 ### Fixed

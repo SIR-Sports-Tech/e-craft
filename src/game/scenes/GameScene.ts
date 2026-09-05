@@ -142,9 +142,10 @@ export class GameScene extends Phaser.Scene {
     this.player.body!.setSize(28, 40).setOffset(10, 12);
     this.player.play('player-idle');
 
-    this.robot = this.physics.add.sprite(SPAWN.playerOutdoor.x - 40, SPAWN.playerOutdoor.y, 'robot');
-    this.robot.setVisible(false).setDepth(9).setScale(0.9);
+    this.robot = this.physics.add.sprite(SPAWN.playerOutdoor.x - 40, SPAWN.playerOutdoor.y, 'robot_sheet', 0);
+    this.robot.setVisible(false).setDepth(9).setScale(0.95);
     this.robot.body!.enable = false;
+    this.robot.play('robot-idle');
 
     this.vehicle = this.physics.add.sprite(SPAWN.vehicle.x, SPAWN.vehicle.y, 'vehicle');
     this.vehicle.setImmovable(true).setDepth(8).setScale(1.05);
@@ -526,8 +527,10 @@ export class GameScene extends Phaser.Scene {
     if (this.flags.inHouse) this.flags.inHouse = false;
     this.player.setPosition(data.player.x, data.player.y);
     if (this.flags.robotActive) {
+      this.robot.setTexture('robot_sheet', 0);
+      this.syncRobotBesidePlayer();
       this.robot.setVisible(true);
-      this.robot.setPosition(this.player.x - 36, this.player.y);
+      this.robot.play('robot-idle', true);
     }
     if (this.flags.inVehicle) {
       this.vehicle.setVisible(false);
@@ -1242,6 +1245,16 @@ export class GameScene extends Phaser.Scene {
       sunVisible: this.dayNight?.phase?.() !== 'night',
       policeCars: this.patrolCars?.count?.() ?? 0,
       policeCarPositions: this.patrolCars?.snapshots?.() ?? [],
+      robot: {
+        active: this.flags.robotActive,
+        visible: !!this.robot?.visible,
+        x: this.robot?.x ?? 0,
+        y: this.robot?.y ?? 0,
+        anim: this.robot?.anims?.currentAnim?.key ?? null,
+        dist: this.robot
+          ? Math.round(Phaser.Math.Distance.Between(this.robot.x, this.robot.y, this.player.x, this.player.y))
+          : null,
+      },
     };
   }
 
@@ -1455,7 +1468,10 @@ export class GameScene extends Phaser.Scene {
         this.player.setPosition(LAIR.robotX, LAIR.robotY);
         this.equipTracker(true);
         this.flags.robotActive = true;
+        this.robot.setTexture('robot_sheet', 0);
         this.robot.setVisible(true);
+        this.robot.setPosition(this.player.x - 40, this.player.y);
+        this.robot.play('robot-idle', true);
         this.setPhase(MissionPhase.RobotActive);
         this.statusLine = 'Robot online!';
         break;
@@ -1558,7 +1574,10 @@ export class GameScene extends Phaser.Scene {
     }
     if (!this.flags.robotActive) {
       this.flags.robotActive = true;
+      this.robot.setTexture('robot_sheet', 0);
+      this.syncRobotBesidePlayer();
       this.robot.setVisible(true);
+      this.robot.play('robot-idle', true);
       this.setPhase(MissionPhase.RobotActive);
       this.statusLine = '[DEBUG] Robot online';
       return;
@@ -1605,18 +1624,65 @@ export class GameScene extends Phaser.Scene {
     this.touchAction = 'none';
   }
 
+  /** Keep robot beside the player — never leave it stranded in lair coords. */
+  private syncRobotBesidePlayer(): void {
+    if (!this.flags.robotActive) return;
+    this.robot.setPosition(this.player.x - 36, this.player.y + 8);
+    this.robot.setVelocity(0, 0);
+  }
+
   private updateRobotFollow(): void {
-    if (!this.flags.robotActive || this.flags.inLair || this.flags.inJailBuilding) {
+    if (!this.flags.robotActive) {
+      this.robot.setVisible(false);
       return;
     }
+
+    // In house/jail: robot waits outside (hidden). In lair: stand with you.
+    if (this.flags.inHouse || this.flags.inJailBuilding) {
+      this.robot.setVisible(false);
+      this.robot.setVelocity(0, 0);
+      return;
+    }
+    if (this.flags.inLair) {
+      this.robot.setVisible(true);
+      this.robot.body!.enable = false;
+      this.robot.setPosition(this.player.x - 40, this.player.y);
+      this.robot.setVelocity(0, 0);
+      if (this.robot.anims.currentAnim?.key !== 'robot-idle') this.robot.play('robot-idle', true);
+      return;
+    }
+
     this.robot.setVisible(true);
     this.robot.body!.enable = true;
-    const tx = this.player.x - 36;
-    const ty = this.player.y + 10;
-    this.physics.moveTo(this.robot, tx, ty, 150);
-    if (Phaser.Math.Distance.Between(this.robot.x, this.robot.y, tx, ty) < 12) {
-      this.robot.setVelocity(0);
+
+    // Riding shotgun while you drive
+    if (this.flags.inVehicle) {
+      this.robot.setPosition(this.player.x - 42, this.player.y - 22);
+      this.robot.setVelocity(0, 0);
+      this.robot.setDepth(12);
+      this.robot.setFlipX(this.facing < 0);
+      if (this.robot.anims.currentAnim?.key !== 'robot-idle') this.robot.play('robot-idle', true);
+      return;
     }
+
+    this.robot.setDepth(9);
+    const tx = this.player.x - 36;
+    const ty = this.player.y + 8;
+    const dist = Phaser.Math.Distance.Between(this.robot.x, this.robot.y, tx, ty);
+    // Warp if left behind (e.g. after exiting lair / fast travel)
+    if (dist > 240) {
+      this.syncRobotBesidePlayer();
+      if (this.robot.anims.currentAnim?.key !== 'robot-walk') this.robot.play('robot-walk', true);
+      return;
+    }
+    if (dist < 14) {
+      this.robot.setVelocity(0, 0);
+      if (this.robot.anims.currentAnim?.key !== 'robot-idle') this.robot.play('robot-idle', true);
+    } else {
+      this.physics.moveTo(this.robot, tx, ty, 280);
+      if (this.robot.anims.currentAnim?.key !== 'robot-walk') this.robot.play('robot-walk', true);
+    }
+    this.robot.setFlipX(this.player.x < this.robot.x - 4);
   }
 
   private updateSasquatch(delta: number): void {
@@ -1875,13 +1941,16 @@ export class GameScene extends Phaser.Scene {
         audio.pickup();
         return;
       }
-      if (this.flags.hasTracker && !this.flags.robotActive && this.near(LAIR.robotX, LAIR.robotY, 55)) {
+      if (this.flags.hasTracker && !this.flags.robotActive && this.near(LAIR.robotX, LAIR.robotY, 70)) {
         this.flags.robotActive = true;
-        this.robot.setPosition(this.player.x - 30, this.player.y);
+        this.robot.setTexture('robot_sheet', 0);
+        this.robot.setPosition(this.player.x - 40, this.player.y);
         this.robot.setVisible(true);
+        this.robot.play('robot-idle', true);
         this.setPhase(MissionPhase.RobotActive);
         audio.pickup();
-        this.statusLine = 'Robot online! Exit lair and take the security vehicle.';
+        this.statusLine = 'Robot online! It will follow you — EXIT then take a car.';
+        setDomStatus(this.statusLine);
         return;
       }
       if (this.near(LAIR.exitX + 40, LAIR.exitY + 10, 70)) {
@@ -2062,32 +2131,44 @@ export class GameScene extends Phaser.Scene {
   }
 
 
-  /** One-tap Activate: tracker then robot (works from lair or snaps into lair). */
+  /** Activate tracker + robot partner (one tap can do both). */
   private doActivate(): void {
-    if (!this.flags.hasTracker || !this.flags.robotActive) {
-      if (!this.flags.inLair) this.enterLair();
-      if (!this.flags.hasTracker || !this.trackerHeld) {
-        this.equipTracker();
-        this.setPhase(MissionPhase.HasTracker);
-        audio.pickup();
-        this.statusLine = 'HOLDING Tracker! Tap ACTIVATE again for robot.';
-        setDomStatus(this.statusLine);
-        return;
-      }
+    if (!this.flags.inLair && (!this.flags.hasTracker || !this.flags.robotActive)) {
+      this.enterLair();
+    }
+
+    let didSomething = false;
+    if (!this.flags.hasTracker || !this.trackerHeld) {
+      this.equipTracker(true);
+      this.setPhase(MissionPhase.HasTracker);
+      didSomething = true;
+    }
+    if (!this.flags.robotActive) {
       this.flags.robotActive = true;
+      this.robot.setTexture('robot_sheet', 0);
       this.robot.setVisible(true);
-      this.robot.setPosition(this.player.x - 30, this.player.y);
+      this.robot.setPosition(this.player.x - 40, this.player.y);
+      this.robot.play('robot-idle', true);
       this.setPhase(MissionPhase.RobotActive);
-      this.statusLine = 'Robot ONLINE! Exit lair, HOLD TRACKER, then CAR → forest trail.';
+      didSomething = true;
+    }
+
+    if (didSomething) {
       audio.pickup();
+      this.statusLine = this.flags.inLair
+        ? 'Tracker + Robot ONLINE! Tap EXIT — robot follows you outside.'
+        : 'Tracker + Robot ONLINE! Robot is following you.';
+      if (!this.flags.inLair) this.syncRobotBesidePlayer();
       setDomStatus(this.statusLine);
+      this.persistSave();
       return;
     }
-    // Already have both — ensure tracker is held so trail works
+
+    // Already online
     if (!this.trackerHeld) this.equipTracker();
-    this.statusLine = 'Tracker + Robot ready. Exit lair (E) then GET IN CAR.';
+    if (!this.flags.inLair) this.syncRobotBesidePlayer();
+    this.statusLine = 'Robot is with you! EXIT if indoors, then PATROL/RACE car.';
     setDomStatus(this.statusLine);
-    this.tryInteract();
   }
 
   /** Leave any indoor space so car / outdoor actions can't stack broken flags. */
@@ -2300,13 +2381,15 @@ export class GameScene extends Phaser.Scene {
       if (this.raceCar) this.raceCar.setVisible(true);
     }
     this.sasquatch.setVisible(!this.flags.sasquatchJailed);
-    if (this.flags.robotActive) this.robot.setVisible(true);
     this.player.setPosition(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     if (this.flags.hasTracker) this.equipTracker(true);
     if (this.flags.robotActive) {
+      this.syncRobotBesidePlayer();
+      this.robot.setVisible(true);
+      this.robot.play('robot-walk', true);
       this.setPhase(MissionPhase.CanDrive);
-      this.statusLine = 'Back outside. HOLD TRACKER on — take the car to the forest trail!';
+      this.statusLine = 'Robot following you! HOLD TRACKER · take a car to the forest.';
     } else if (this.flags.hasTracker) {
       this.setPhase(MissionPhase.HasTracker);
       this.statusLine = 'Holding Tracker. Activate robot next.';
@@ -2382,11 +2465,16 @@ export class GameScene extends Phaser.Scene {
       if (this.raceCar) this.raceCar.setVisible(true);
     }
     this.sasquatch.setVisible(!this.flags.sasquatchJailed);
-    if (this.flags.robotActive) this.robot.setVisible(true);
     this.player.setPosition(SPAWN.houseDoor.x, SPAWN.houseDoor.y);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     if (this.flags.hasTracker) this.equipTracker(true);
-    this.statusLine = 'Left the house. Have a great day!';
+    if (this.flags.robotActive) {
+      this.syncRobotBesidePlayer();
+      this.robot.setVisible(true);
+    }
+    this.statusLine = this.flags.robotActive
+      ? 'Left the house — robot is with you!'
+      : 'Left the house. Have a great day!';
     setDomStatus(this.statusLine);
   }
 
@@ -2444,9 +2532,12 @@ export class GameScene extends Phaser.Scene {
       this.vehicle.setVisible(true);
       if (this.raceCar) this.raceCar.setVisible(true);
     }
-    if (this.flags.robotActive) this.robot.setVisible(true);
     this.player.setPosition(800, 420);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    if (this.flags.robotActive) {
+      this.syncRobotBesidePlayer();
+      this.robot.setVisible(true);
+    }
     if (this.flags.rewardClaimed) this.setPhase(MissionPhase.FreeExplore);
   }
 

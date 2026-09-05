@@ -242,30 +242,80 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makeRobot(): void {
-    const g = this.g();
-    g.fillStyle(0x000000, 0.2);
-    g.fillEllipse(28, 52, 24, 8);
-    g.fillStyle(0xb0bec5, 1);
-    g.fillRoundedRect(12, 22, 32, 28, 6);
-    g.fillStyle(0xeceff1, 1);
-    g.fillCircle(28, 16, 12);
-    // eyes
-    g.fillStyle(0x00e5ff, 1);
-    g.fillCircle(23, 15, 4);
-    g.fillCircle(33, 15, 4);
-    g.fillStyle(0xffffff, 1);
-    g.fillCircle(24, 14, 1.5);
-    g.fillCircle(34, 14, 1.5);
-    // antenna
-    g.lineStyle(2, 0x90a4ae, 1);
-    g.lineBetween(28, 4, 28, 8);
-    g.fillStyle(0xff5252, 1);
-    g.fillCircle(28, 3, 3);
-    // smile LED
-    g.fillStyle(0x69f0ae, 1);
-    g.fillRoundedRect(22, 34, 12, 4, 2);
-    g.generateTexture('robot', 56, 56);
-    g.destroy();
+    // 4-frame walk sheet so the buddy clearly moves with you
+    const fw = 56;
+    const fh = 56;
+    const frames = 4;
+    const sheet = this.make.graphics({ x: 0, y: 0 });
+
+    const drawFrame = (g: Phaser.GameObjects.Graphics, ox: number, frame: number) => {
+      const bob = frame % 2 === 0 ? 0 : -2;
+      const leg = (frame % 2 === 0 ? -1 : 1) * 3;
+      // shadow
+      g.fillStyle(0x000000, 0.22);
+      g.fillEllipse(ox + 28, fh - 4, 24, 8);
+      // legs
+      g.fillStyle(0x78909c, 1);
+      g.fillRoundedRect(ox + 18 + leg, 40 + bob, 7, 12, 2);
+      g.fillRoundedRect(ox + 31 - leg, 40 + bob, 7, 12, 2);
+      // body
+      g.fillStyle(0xb0bec5, 1);
+      g.fillRoundedRect(ox + 12, 22 + bob, 32, 22, 6);
+      // head
+      g.fillStyle(0xeceff1, 1);
+      g.fillCircle(ox + 28, 14 + bob, 12);
+      // eyes
+      g.fillStyle(0x00e5ff, 1);
+      g.fillCircle(ox + 23, 13 + bob, 4);
+      g.fillCircle(ox + 33, 13 + bob, 4);
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(ox + 24, 12 + bob, 1.5);
+      g.fillCircle(ox + 34, 12 + bob, 1.5);
+      // antenna
+      g.lineStyle(2, 0x90a4ae, 1);
+      g.lineBetween(ox + 28, 2 + bob, ox + 28, 6 + bob);
+      g.fillStyle(frame % 2 === 0 ? 0xff5252 : 0x69f0ae, 1);
+      g.fillCircle(ox + 28, 1 + bob, 3);
+      // smile LED
+      g.fillStyle(0x69f0ae, 1);
+      g.fillRoundedRect(ox + 22, 32 + bob, 12, 4, 2);
+      // arms
+      g.fillStyle(0x90a4ae, 1);
+      g.fillRoundedRect(ox + 6, 26 + bob - leg, 8, 14, 2);
+      g.fillRoundedRect(ox + 42, 26 + bob + leg, 8, 14, 2);
+    };
+
+    for (let i = 0; i < frames; i++) drawFrame(sheet, i * fw, i);
+    sheet.generateTexture('robot_sheet_img', fw * frames, fh);
+    sheet.destroy();
+
+    const srcImg = this.textures.get('robot_sheet_img').getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    if (this.textures.exists('robot_sheet')) this.textures.remove('robot_sheet');
+    this.textures.addSpriteSheet('robot_sheet', srcImg as HTMLImageElement, {
+      frameWidth: fw,
+      frameHeight: fh,
+    });
+
+    const one = this.make.graphics({ x: 0, y: 0 });
+    drawFrame(one, 0, 0);
+    if (this.textures.exists('robot')) this.textures.remove('robot');
+    one.generateTexture('robot', fw, fh);
+    one.destroy();
+
+    if (this.anims.exists('robot-walk')) this.anims.remove('robot-walk');
+    if (this.anims.exists('robot-idle')) this.anims.remove('robot-idle');
+    this.anims.create({
+      key: 'robot-walk',
+      frames: this.anims.generateFrameNumbers('robot_sheet', { start: 0, end: frames - 1 }),
+      frameRate: 10,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'robot-idle',
+      frames: [{ key: 'robot_sheet', frame: 0 }],
+      frameRate: 1,
+      repeat: -1,
+    });
   }
 
   private makeSasquatch(): void {
