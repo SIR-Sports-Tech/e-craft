@@ -41,6 +41,7 @@ type EcraftApi = {
   sleep?: () => void;
   enterHouse?: () => void;
   pantherJump?: () => void;
+  pigDrop?: () => void;
   exitIndoor?: () => void;
   unpause?: () => void;
   getState?: () => { flags?: Record<string, boolean>; prompt?: string; status?: string; hour?: number; dayPhase?: string };
@@ -161,6 +162,7 @@ export function installDomOverlay(): void {
     #ecraft-actions .home { background: #ad1457; color: #fff; font-size: 10px; }
     #ecraft-actions .sleep { background: #283593; color: #e8eaf6; font-size: 10px; }
     #ecraft-actions .pan { background: #212121; color: #ffeb3b; font-size: 10px; }
+    #ecraft-actions .pig { background: #ad1457; color: #fce4ec; font-size: 10px; }
     #ecraft-actions .exit { background: #006064; color: #e0f7fa; font-size: 10px; }
 
     #ecraft-pad {
@@ -218,7 +220,8 @@ export function installDomOverlay(): void {
       <button type="button" class="sleep" id="btn-sleep">SLEEP</button>
       <button type="button" class="car" id="btn-car">PATROL</button>
       <button type="button" class="race" id="btn-race">RACE</button>
-      <button type="button" class="pan wide" id="btn-panther">PANTHER!</button>
+      <button type="button" class="pan" id="btn-panther">PANTHER!</button>
+      <button type="button" class="pig" id="btn-pig">PIG!</button>
       <button type="button" class="rec wide" id="btn-recover">UNFREEZE / SAVE</button>
     </div>
     <div id="ecraft-pad" aria-label="movement pad">
@@ -303,6 +306,7 @@ export function installDomOverlay(): void {
   bindAction('btn-house', 'enterHouse', 'Welcome home');
   bindAction('btn-sleep', 'sleep', 'Sleeping…');
   bindAction('btn-panther', 'pantherJump', 'Panther!');
+  bindAction('btn-pig', 'pigDrop', 'Oink!');
   bindAction('btn-car', 'enterCar', 'Patrol Car');
   bindAction('btn-race', 'enterRaceCar', 'Race Car');
   bindAction('btn-recover', 'recover', 'Recovered');
@@ -325,6 +329,7 @@ export function installDomOverlay(): void {
       if (e.code === 'KeyH') callApi('enterHouse', 'Welcome home');
       if (e.code === 'KeyZ') callApi('sleep', 'Sleeping…');
       if (e.code === 'KeyX') callApi('exitIndoor', 'Exited');
+      if (e.code === 'KeyP') callApi('pigDrop', 'Oink!');
     },
     { passive: false },
   );

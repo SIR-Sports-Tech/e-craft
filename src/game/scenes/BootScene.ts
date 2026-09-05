@@ -22,6 +22,7 @@ export class BootScene extends Phaser.Scene {
     this.makeTree();
     this.makeCitizen();
     this.makePanther();
+    this.makePig();
     this.makeBuilding('bldg_hq', 0x1a3d6d, 0x5dade2, 0x1abc9c, true);
     this.makeBuilding('bldg_jail', 0x6b2b2b, 0xf5b7b1, 0x922b21, true);
     this.makeBuilding('bldg_plaza', 0x4a5568, 0xf6c28b, 0x718096, false);
@@ -647,6 +648,46 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(13, 40, 5, 12);
     g.fillRect(22, 40, 5, 12);
     g.generateTexture('citizen', 40, 54);
+    g.destroy();
+  }
+
+  private makePig(): void {
+    const g = this.g();
+    // shadow
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(32, 50, 36, 10);
+    // body
+    g.fillStyle(0xf48fb1, 1);
+    g.fillEllipse(30, 30, 40, 28);
+    // head
+    g.fillStyle(0xf8bbd0, 1);
+    g.fillCircle(52, 26, 14);
+    // snout
+    g.fillStyle(0xf48fb1, 1);
+    g.fillEllipse(62, 28, 12, 10);
+    g.fillStyle(0xad1457, 1);
+    g.fillCircle(60, 27, 2);
+    g.fillCircle(66, 27, 2);
+    // eyes
+    g.fillStyle(0x212121, 1);
+    g.fillCircle(48, 22, 2.5);
+    g.fillCircle(55, 22, 2.5);
+    // ears
+    g.fillStyle(0xec407a, 1);
+    g.fillTriangle(42, 14, 48, 6, 50, 16);
+    g.fillTriangle(56, 14, 60, 5, 64, 16);
+    // legs
+    g.fillStyle(0xf48fb1, 1);
+    g.fillRect(14, 40, 7, 12);
+    g.fillRect(26, 40, 7, 12);
+    g.fillRect(36, 40, 7, 12);
+    g.fillRect(46, 40, 7, 12);
+    // curly tail
+    g.lineStyle(3, 0xec407a, 1);
+    g.beginPath();
+    g.arc(10, 28, 6, 0, Math.PI * 1.5, false);
+    g.strokePath();
+    g.generateTexture('pig', 72, 56);
     g.destroy();
   }
 

@@ -14,6 +14,7 @@ import { InventorySystem } from '../systems/InventorySystem';
 import { MysterySystem } from '../systems/MysterySystem';
 import { PoliceSystem } from '../systems/PoliceSystem';
 import { PantherSystem } from '../systems/PantherSystem';
+import { PigDropSystem } from '../systems/PigDropSystem';
 import { PatrolCarsSystem } from '../systems/PatrolCarsSystem';
 import { audio } from '../systems/AudioSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
@@ -103,6 +104,7 @@ export class GameScene extends Phaser.Scene {
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
   private dayNight!: DayNightSystem;
   private panther!: PantherSystem;
+  private pigDrop!: PigDropSystem;
   private patrolCars!: PatrolCarsSystem;
   private jobs = new JobSystem();
   private inventory = new InventorySystem();
@@ -225,6 +227,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.dayNight = new DayNightSystem(this, WORLD.width, WORLD.height);
     this.panther = new PantherSystem(this);
+    this.pigDrop = new PigDropSystem(this);
     this.patrolCars = new PatrolCarsSystem(this);
     this.patrolCars.spawn();
     // Soft dust when moving (visual juice)
@@ -316,6 +319,20 @@ export class GameScene extends Phaser.Scene {
           return;
         }
         this.panther.forceJump(this.player, (msg) => {
+          this.statusLine = msg;
+          setDomStatus(msg);
+          audio.talk();
+        });
+      },
+      pigDrop: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        if (this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse) {
+          this.statusLine = 'Go outside for the pig drop!';
+          setDomStatus(this.statusLine);
+          return;
+        }
+        this.pigDrop.forceDrop(this.player, (msg) => {
           this.statusLine = msg;
           setDomStatus(msg);
           audio.talk();
@@ -1431,6 +1448,7 @@ export class GameScene extends Phaser.Scene {
       },
       streetLights: true,
       trafficSignals: this.trafficSignals.length,
+      pigActive: this.pigDrop?.isActive?.() ?? false,
     };
   }
 
@@ -1497,6 +1515,11 @@ export class GameScene extends Phaser.Scene {
       this.patrolCars.update(d);
       if (outdoors) this.updateTrafficSignals(d);
       this.panther.update(d, this.player, outdoors, (msg) => {
+        this.statusLine = msg;
+        setDomStatus(msg);
+        audio.talk();
+      });
+      this.pigDrop.update(d, this.player, outdoors, (msg) => {
         this.statusLine = msg;
         setDomStatus(msg);
         audio.talk();

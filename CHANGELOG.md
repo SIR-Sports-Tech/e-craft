@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.2 — 2026-09-05 — PIG FALLS ON YOUR HEAD
+
+### Added
+- A **pig** can randomly fall from the sky onto your head (outdoors)
+- **PIG!** button (or keyboard `P`) to drop one anytime
+- Impact squash + stars + OINK toast, then it bounces away
+
+
 ## 1.5.1 — 2026-09-05 — OPENING DOORS + CLASSIC SASQUATCH
 
 ### Added
