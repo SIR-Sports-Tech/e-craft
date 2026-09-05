@@ -130,7 +130,7 @@ export class GameScene extends Phaser.Scene {
       'sasquatch_sheet',
       0,
     );
-    this.sasquatch.setDepth(9).setCollideWorldBounds(true).setScale(1.35);
+    this.sasquatch.setDepth(9).setCollideWorldBounds(true).setScale(0.95); // same size as player
     this.sasquatch.play('sasquatch-idle');
     this.pickSasquatchWander();
     // Seed trail immediately so player never starts with empty trail
@@ -1227,8 +1227,13 @@ export class GameScene extends Phaser.Scene {
     const sasqNear =
       this.flags.sasquatchCaptured &&
       Phaser.Math.Distance.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y) < 160;
-    if (sasqNear) {
+    if (sasqNear || this.flags.sasquatchCaptured) {
       this.flags.sasquatchInVehicle = true;
+      this.flags.sasquatchCaptured = true;
+      this.sasquatch.setAngle(0);
+      this.sasquatch.clearTint();
+      const body = this.sasquatch.body as Phaser.Physics.Arcade.Body | undefined;
+      if (body) body.enable = true;
       this.setPhase(MissionPhase.Transporting);
       this.statusLine = 'Sasquatch loaded! Drive to SUPER JAIL.';
     } else if (this.flags.sasquatchCaptured && !allowWithoutSasq) {
@@ -1286,38 +1291,58 @@ export class GameScene extends Phaser.Scene {
     if (this.flags.inJailBuilding) this.exitJail();
     // Always re-seat into car so DRIVE works even if state was weird
     this.player.setPosition(this.vehicle.x, this.vehicle.y);
+    // If Sasquatch is already DOWN anywhere, pull him in
+    if (this.flags.sasquatchCaptured) {
+      this.sasquatch.setPosition(this.player.x - 28, this.player.y);
+      this.sasquatch.setAngle(0);
+      this.sasquatch.clearTint();
+      const b = this.sasquatch.body as Phaser.Physics.Arcade.Body | undefined;
+      if (b) b.enable = true;
+      this.flags.sasquatchInVehicle = true;
+    }
     this.enterVehicle(true);
     this.player.setVelocity(480, 0);
-    this.statusLine = 'DRIVING — hold D-pad ▲◀▼▶ (or WASD)';
+    this.statusLine = this.flags.sasquatchInVehicle
+      ? 'Sasquatch in car — DRIVE to SUPER JAIL!'
+      : 'DRIVING — hold D-pad to steer';
     setDomStatus(this.statusLine);
   }
 
   private tryCapture(): void {
+    setDomStatus('CAPTURE pressed…');
     if (this.flags.sasquatchCaptured || this.flags.sasquatchJailed) {
-      setDomStatus('Already captured — load into the CAR!');
+      setDomStatus('Already DOWN — tap GET IN CAR!');
       return;
     }
     if (!this.flags.hasTracker) {
-      this.statusLine = 'Need Tracker first — tap ACTIVATE!';
+      this.statusLine = 'Need Tracker first — tap ACTIVATE twice!';
       setDomStatus(this.statusLine);
       return;
     }
-    // Exit car briefly if needed so capture feels close-range on foot/vehicle
-    const d = Phaser.Math.Distance.Between(
+    // If still in lair, get outside first
+    if (this.flags.inLair) this.exitLair();
+
+    let d = Phaser.Math.Distance.Between(
       this.player.x,
       this.player.y,
       this.sasquatch.x,
       this.sasquatch.y,
     );
-    // Big hitbox — scary sasquatch is large; phone aiming is hard
-    const range = this.flags.inVehicle ? 220 : 190;
+    const range = 500; // very forgiving on phone
     if (d > range) {
-      this.statusLine = `Too far (${Math.round(d)}) — get closer then hit CAP!`;
+      // Pull player toward sasquatch a bit so capture isn't impossible
+      this.statusLine = `Too far (${Math.round(d)}) — driving/running closer…`;
       setDomStatus(this.statusLine);
-      audio.beep?.(180, 0.08, 'square', 0.03);
-      // soft fail beep via audio system
-      try { audio.talk(); } catch { /* ignore */ }
-      return;
+      // Soft assist: if within 900px, snap nearer then knock down
+      if (d < 900) {
+        const ang = Phaser.Math.Angle.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y);
+        this.player.x = this.sasquatch.x - Math.cos(ang) * 80;
+        this.player.y = this.sasquatch.y - Math.sin(ang) * 80;
+        d = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y);
+      } else {
+        try { audio.talk(); } catch { /* ignore */ }
+        return;
+      }
     }
     this.knockDownSasquatch();
   }
