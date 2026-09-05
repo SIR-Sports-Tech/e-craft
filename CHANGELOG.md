@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 — 2026-09-05 — REAL BUILDING INTERIORS
+
+### Added
+- **Your House**: wood floors, wallpaper, couch, TV, table, plant, kitchen, curtains, nightstand lamp, door
+- **Gadget Lair**: metal floor, server racks, consoles, glowing tracker pedestal, robot charge bay, ceiling lights
+- **Super Jail**: concrete floor, booking desk, security cam, barred cell + bench, door frame
+
+
 ## 1.3.2 — 2026-09-05 — LIFELIKE STREETS
 
 ### Added

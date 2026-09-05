@@ -821,42 +821,77 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private pushIndoor(nodes: Phaser.GameObjects.GameObject[], ...objs: Phaser.GameObjects.GameObject[]): void {
+    for (const o of objs) {
+      nodes.push(o);
+      this.indoorLayer.add(o);
+    }
+  }
+
   private buildIndoorLair(): void {
-    const floor = this.add.rectangle(
-      LAIR.x + LAIR.w / 2,
-      LAIR.y + LAIR.h / 2,
-      LAIR.w,
-      LAIR.h,
-      LAIR.color,
-    );
-    floor.setStrokeStyle(4, 0x4fc3f7, 0.6);
+    this.lairNodes = [];
+    const cx = LAIR.x + LAIR.w / 2;
+    const cy = LAIR.y + LAIR.h / 2;
+
+    // Outer shell + metal floor
+    const shell = this.add.rectangle(cx, cy, LAIR.w + 24, LAIR.h + 24, 0x0d1b2a, 1).setStrokeStyle(6, 0x4fc3f7, 0.7);
+    const floor = this.add.tileSprite(cx, cy, LAIR.w, LAIR.h, 'floor_metal');
+    // Back wall band
+    const wall = this.add.rectangle(cx, LAIR.y + 50, LAIR.w, 100, 0x1a237e, 1).setStrokeStyle(2, 0x90caf9, 0.4);
+    // Ceiling lights
+    const light1 = this.add.rectangle(LAIR.x + 180, LAIR.y + 20, 80, 10, 0xe3f2fd, 0.9);
+    const light2 = this.add.rectangle(LAIR.x + 420, LAIR.y + 20, 80, 10, 0xe3f2fd, 0.9);
+    const light3 = this.add.rectangle(LAIR.x + 580, LAIR.y + 20, 80, 10, 0xe3f2fd, 0.9);
+
     const title = this.add
-      .text(LAIR.x + LAIR.w / 2, LAIR.y + 24, LAIR.label, {
+      .text(cx, LAIR.y + 36, '🔬 Secret Gadget Lair', {
         fontSize: '18px',
         color: '#90caf9',
         backgroundColor: '#000000aa',
         padding: { x: 8, y: 4 },
       })
       .setOrigin(0.5, 0);
-    const tracker = this.add.image(LAIR.trackerX, LAIR.trackerY, 'tracker').setScale(1.35);
+
+    // Server racks along left wall
+    const server1 = this.add.image(LAIR.x + 70, LAIR.y + 200, 'furn_server').setScale(1.1);
+    const server2 = this.add.image(LAIR.x + 70, LAIR.y + 300, 'furn_server').setScale(1.1);
+    const server3 = this.add.image(LAIR.x + 70, LAIR.y + 400, 'furn_server').setScale(1.1);
+
+    // Work consoles
+    const console1 = this.add.image(LAIR.x + 280, LAIR.y + 180, 'furn_console').setScale(1.05);
+    const console2 = this.add.image(LAIR.x + 520, LAIR.y + 180, 'furn_console').setScale(1.05);
+
+    // Tracker pedestal (glowing platform)
+    const pedestal = this.add.rectangle(LAIR.trackerX, LAIR.trackerY + 8, 70, 18, 0x263238, 1).setStrokeStyle(2, 0xffe082, 0.8);
+    const tracker = this.add.image(LAIR.trackerX, LAIR.trackerY - 10, 'tracker').setScale(1.35);
     this.trackerPedestal = tracker;
+    const glow = this.add.circle(LAIR.trackerX, LAIR.trackerY, 46, 0xffeb3b, 0.14);
     const trackerLbl = this.add
-      .text(LAIR.trackerX, LAIR.trackerY + 28, 'HOLD Tracker [E]', {
+      .text(LAIR.trackerX, LAIR.trackerY + 36, 'HOLD Tracker [E]', {
         fontSize: '13px',
         color: '#fff59d',
         backgroundColor: '#00000099',
         padding: { x: 4, y: 2 },
       })
       .setOrigin(0.5, 0);
-    const robotPad = this.add.circle(LAIR.robotX, LAIR.robotY, 28, 0x1565c0, 0.5);
+
+    // Robot charging bay
+    const robotPad = this.add.circle(LAIR.robotX, LAIR.robotY, 36, 0x0d47a1, 0.55).setStrokeStyle(3, 0x40c4ff, 0.9);
+    const chargeRing = this.add.circle(LAIR.robotX, LAIR.robotY, 48, 0x00e5ff, 0.12);
     const robotLbl = this.add
-      .text(LAIR.robotX, LAIR.robotY + 36, 'Robot Partner [E]', {
+      .text(LAIR.robotX, LAIR.robotY + 48, 'Robot Partner [E]', {
         fontSize: '12px',
         color: '#bbdefb',
+        backgroundColor: '#00000088',
+        padding: { x: 4, y: 2 },
       })
       .setOrigin(0.5, 0);
+
+    // Exit door frame
+    const doorFrame = this.add.rectangle(LAIR.exitX + 30, LAIR.exitY + 40, 50, 70, 0x1b5e20, 0.5).setStrokeStyle(3, 0x69f0ae, 0.8);
+    const doorImg = this.add.image(LAIR.exitX + 30, LAIR.exitY + 40, 'door').setScale(1.1);
     const exit = this.add
-      .text(LAIR.exitX, LAIR.exitY, '[E] Exit to surface', {
+      .text(LAIR.exitX, LAIR.exitY - 8, '[E] Exit to surface', {
         fontSize: '13px',
         color: '#a5d6a7',
         backgroundColor: '#00000088',
@@ -864,32 +899,62 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0, 0);
 
-    this.lairNodes = [floor, title, tracker, trackerLbl, robotPad, robotLbl, exit];
-    for (const n of this.lairNodes) this.indoorLayer.add(n);
-    for (let i = 0; i < 6; i++) {
-      const strip = this.add.rectangle(LAIR.x + 80 + i * 100, LAIR.y + LAIR.h / 2, 4, LAIR.h - 40, 0x4fc3f7, 0.15);
-      this.lairNodes.push(strip);
-      this.indoorLayer.add(strip);
-    }
-    const glow = this.add.circle(LAIR.trackerX, LAIR.trackerY, 40, 0xffeb3b, 0.12);
-    this.lairNodes.push(glow);
-    this.indoorLayer.add(glow);
+    const tip = this.add
+      .text(cx, LAIR.y + LAIR.h - 28, 'Grab the tracker · activate robot · then exit upstairs', {
+        fontSize: '12px',
+        color: '#b3e5fc',
+        backgroundColor: '#00000066',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5, 0);
 
+    this.pushIndoor(
+      this.lairNodes,
+      shell,
+      floor,
+      wall,
+      light1,
+      light2,
+      light3,
+      title,
+      server1,
+      server2,
+      server3,
+      console1,
+      console2,
+      pedestal,
+      glow,
+      tracker,
+      trackerLbl,
+      chargeRing,
+      robotPad,
+      robotLbl,
+      doorFrame,
+      doorImg,
+      exit,
+      tip,
+    );
   }
 
   private buildIndoorJail(): void {
-    const floor = this.add
-      .rectangle(
-        JAIL_INTERIOR.x + JAIL_INTERIOR.w / 2,
-        JAIL_INTERIOR.y + JAIL_INTERIOR.h / 2,
-        JAIL_INTERIOR.w,
-        JAIL_INTERIOR.h,
-        JAIL_INTERIOR.color,
-      )
-      .setStrokeStyle(4, 0xef9a9a, 0.6)
+    this.jailNodes = [];
+    const cx = JAIL_INTERIOR.x + JAIL_INTERIOR.w / 2;
+    const cy = JAIL_INTERIOR.y + JAIL_INTERIOR.h / 2;
+
+    const shell = this.add
+      .rectangle(cx, cy, JAIL_INTERIOR.w + 24, JAIL_INTERIOR.h + 24, 0x1a0a0a, 1)
+      .setStrokeStyle(6, 0xef9a9a, 0.7)
       .setVisible(false);
+    const floor = this.add.tileSprite(cx, cy, JAIL_INTERIOR.w, JAIL_INTERIOR.h, 'floor_concrete').setVisible(false);
+    const wall = this.add
+      .rectangle(cx, JAIL_INTERIOR.y + 48, JAIL_INTERIOR.w, 96, 0x3e2723, 1)
+      .setStrokeStyle(2, 0xbcaaa4, 0.35)
+      .setVisible(false);
+    const light1 = this.add.rectangle(JAIL_INTERIOR.x + 200, JAIL_INTERIOR.y + 18, 70, 8, 0xffecb3, 0.85).setVisible(false);
+    const light2 = this.add.rectangle(JAIL_INTERIOR.x + 500, JAIL_INTERIOR.y + 18, 70, 8, 0xffecb3, 0.85).setVisible(false);
+
     const title = this.add
-      .text(JAIL_INTERIOR.x + JAIL_INTERIOR.w / 2, JAIL_INTERIOR.y + 24, JAIL_INTERIOR.label, {
+      .text(cx, JAIL_INTERIOR.y + 32, '🔒 SUPER JAIL Interior', {
         fontSize: '18px',
         color: '#ef9a9a',
         backgroundColor: '#000000aa',
@@ -897,6 +962,21 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 0)
       .setVisible(false);
+
+    // Booking desk
+    const desk = this.add.image(JAIL_INTERIOR.x + 220, JAIL_INTERIOR.y + 220, 'furn_desk').setScale(1.15).setVisible(false);
+    const cam = this.add.circle(JAIL_INTERIOR.x + 100, JAIL_INTERIOR.y + 100, 8, 0xff1744, 0.9).setVisible(false);
+    const camLbl = this.add
+      .text(JAIL_INTERIOR.x + 100, JAIL_INTERIOR.y + 118, 'CAM', {
+        fontSize: '10px',
+        color: '#ff8a80',
+        backgroundColor: '#00000088',
+        padding: { x: 3, y: 1 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+
+    // Holding cell
     this.cellMarker = this.add
       .rectangle(
         JAIL_INTERIOR.cellX,
@@ -904,56 +984,121 @@ export class GameScene extends Phaser.Scene {
         JAIL_INTERIOR.cellW,
         JAIL_INTERIOR.cellH,
         0x111111,
-        0.9,
+        0.92,
       )
       .setStrokeStyle(3, 0xb0bec5)
       .setVisible(false);
+    const bars = this.add.image(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY, 'furn_bars').setScale(1.35).setVisible(false);
+    const bench = this.add
+      .rectangle(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY + 40, 90, 16, 0x455a64, 1)
+      .setVisible(false);
     const cellLbl = this.add
-      .text(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY - 90, 'Holding Cell [E]', {
+      .text(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY - 95, 'Holding Cell [E]', {
         fontSize: '14px',
         color: '#fff',
+        backgroundColor: '#b71c1ccc',
+        padding: { x: 6, y: 3 },
       })
       .setOrigin(0.5)
       .setVisible(false);
+
+    const doorFrame = this.add
+      .rectangle(JAIL_INTERIOR.exitX + 30, JAIL_INTERIOR.exitY + 40, 50, 70, 0x5d4037, 0.55)
+      .setStrokeStyle(3, 0xa5d6a7, 0.8)
+      .setVisible(false);
+    const doorImg = this.add.image(JAIL_INTERIOR.exitX + 30, JAIL_INTERIOR.exitY + 40, 'door').setScale(1.1).setVisible(false);
     const exit = this.add
-      .text(JAIL_INTERIOR.exitX, JAIL_INTERIOR.exitY, '[E] Exit Super Jail', {
+      .text(JAIL_INTERIOR.exitX, JAIL_INTERIOR.exitY - 8, '[E] Exit Super Jail', {
         fontSize: '13px',
         color: '#a5d6a7',
         backgroundColor: '#00000088',
         padding: { x: 6, y: 3 },
       })
       .setVisible(false);
-    this.jailNodes = [floor, title, this.cellMarker, cellLbl, exit];
-    for (const n of this.jailNodes) this.indoorLayer.add(n);
+
+    const tip = this.add
+      .text(cx, JAIL_INTERIOR.y + JAIL_INTERIOR.h - 28, 'Bring Sasquatch to the cell and lock him in', {
+        fontSize: '12px',
+        color: '#ffcdd2',
+        backgroundColor: '#00000066',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+
+    this.pushIndoor(
+      this.jailNodes,
+      shell,
+      floor,
+      wall,
+      light1,
+      light2,
+      title,
+      desk,
+      cam,
+      camLbl,
+      this.cellMarker,
+      bars,
+      bench,
+      cellLbl,
+      doorFrame,
+      doorImg,
+      exit,
+      tip,
+    );
   }
 
   private buildIndoorHouse(): void {
-    const floor = this.add
-      .rectangle(
-        HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2,
-        HOUSE_INTERIOR.y + HOUSE_INTERIOR.h / 2,
-        HOUSE_INTERIOR.w,
-        HOUSE_INTERIOR.h,
-        HOUSE_INTERIOR.color,
-      )
-      .setStrokeStyle(4, 0xffcc80, 0.7)
+    this.houseNodes = [];
+    const cx = HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2;
+    const cy = HOUSE_INTERIOR.y + HOUSE_INTERIOR.h / 2;
+
+    const shell = this.add
+      .rectangle(cx, cy, HOUSE_INTERIOR.w + 24, HOUSE_INTERIOR.h + 24, 0x3e2723, 1)
+      .setStrokeStyle(6, 0xffcc80, 0.75)
       .setVisible(false);
-    // cozy rug
-    const rug = this.add
-      .rectangle(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2, HOUSE_INTERIOR.y + HOUSE_INTERIOR.h / 2 + 40, 280, 160, 0x8d6e63, 0.55)
+    const floor = this.add.tileSprite(cx, cy, HOUSE_INTERIOR.w, HOUSE_INTERIOR.h, 'floor_wood').setVisible(false);
+    // Cream wallpaper back wall
+    const wall = this.add
+      .rectangle(cx, HOUSE_INTERIOR.y + 55, HOUSE_INTERIOR.w, 110, 0xfff3e0, 1)
+      .setStrokeStyle(2, 0xffe0b2, 0.8)
       .setVisible(false);
+    const baseboard = this.add
+      .rectangle(cx, HOUSE_INTERIOR.y + 108, HOUSE_INTERIOR.w, 8, 0x5d4037, 1)
+      .setVisible(false);
+
     const title = this.add
-      .text(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2, HOUSE_INTERIOR.y + 24, '🏠 Your House — sleep here!', {
+      .text(cx, HOUSE_INTERIOR.y + 28, '🏠 Your House', {
         fontSize: '18px',
-        color: '#ffe082',
-        backgroundColor: '#000000aa',
+        color: '#5d4037',
+        backgroundColor: '#ffe082cc',
         padding: { x: 8, y: 4 },
       })
       .setOrigin(0.5, 0)
       .setVisible(false);
-    const bed = this.add.image(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 'bed').setScale(1.35).setVisible(false);
+
+    // Living room
+    const couch = this.add.image(HOUSE_INTERIOR.x + 220, HOUSE_INTERIOR.y + 220, 'furn_couch').setScale(1.2).setVisible(false);
+    const table = this.add.image(HOUSE_INTERIOR.x + 220, HOUSE_INTERIOR.y + 290, 'furn_table').setScale(1.05).setVisible(false);
+    const tv = this.add.image(HOUSE_INTERIOR.x + 220, HOUSE_INTERIOR.y + 150, 'furn_tv').setScale(1.1).setVisible(false);
+    const plant = this.add.image(HOUSE_INTERIOR.x + 110, HOUSE_INTERIOR.y + 200, 'furn_plant').setScale(1.1).setVisible(false);
+    const picture = this.add.image(HOUSE_INTERIOR.x + 340, HOUSE_INTERIOR.y + 140, 'furn_picture').setScale(1.2).setVisible(false);
+    const rug = this.add
+      .ellipse(HOUSE_INTERIOR.x + 220, HOUSE_INTERIOR.y + 300, 200, 90, 0xc62828, 0.45)
+      .setVisible(false);
+
+    // Kitchen
+    const kitchen = this.add.image(HOUSE_INTERIOR.x + 480, HOUSE_INTERIOR.y + 200, 'furn_kitchen').setScale(1.15).setVisible(false);
+
+    // Bedroom / sleep area
+    const bed = this.add.image(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 'bed').setScale(1.4).setVisible(false);
+    const nightstand = this.add
+      .rectangle(HOUSE_INTERIOR.bedX - 70, HOUSE_INTERIOR.bedY + 10, 28, 24, 0x6d4c41, 1)
+      .setVisible(false);
+    const lamp = this.add.circle(HOUSE_INTERIOR.bedX - 70, HOUSE_INTERIOR.bedY - 10, 9, 0xffe082, 0.95).setVisible(false);
+    const lampGlow = this.add.circle(HOUSE_INTERIOR.bedX - 70, HOUSE_INTERIOR.bedY - 10, 22, 0xfff59d, 0.2).setVisible(false);
     const bedLbl = this.add
-      .text(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY + 44, 'BED — Sleep [E] / SLEEP', {
+      .text(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY + 48, 'BED — Sleep [E] / SLEEP', {
         fontSize: '13px',
         color: '#fffde7',
         backgroundColor: '#1565c0cc',
@@ -961,13 +1106,26 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 0)
       .setVisible(false);
+
+    // Window with curtains
     const window = this.add
-      .rectangle(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w - 90, HOUSE_INTERIOR.y + 120, 70, 50, 0x81d4fa, 0.55)
-      .setStrokeStyle(3, 0xfff8e1, 0.8)
+      .rectangle(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w - 100, HOUSE_INTERIOR.y + 130, 80, 56, 0x81d4fa, 0.7)
+      .setStrokeStyle(4, 0xfff8e1, 0.95)
       .setVisible(false);
-    const lamp = this.add.circle(HOUSE_INTERIOR.bedX - 90, HOUSE_INTERIOR.bedY - 10, 10, 0xffe082, 0.9).setVisible(false);
+    const curtainL = this.add
+      .rectangle(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w - 140, HOUSE_INTERIOR.y + 130, 14, 70, 0xef9a9a, 0.85)
+      .setVisible(false);
+    const curtainR = this.add
+      .rectangle(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w - 60, HOUSE_INTERIOR.y + 130, 14, 70, 0xef9a9a, 0.85)
+      .setVisible(false);
+
+    const doorFrame = this.add
+      .rectangle(HOUSE_INTERIOR.exitX + 30, HOUSE_INTERIOR.exitY + 40, 50, 70, 0x5d4037, 0.5)
+      .setStrokeStyle(3, 0xa5d6a7, 0.85)
+      .setVisible(false);
+    const doorImg = this.add.image(HOUSE_INTERIOR.exitX + 30, HOUSE_INTERIOR.exitY + 40, 'door').setScale(1.1).setVisible(false);
     const exit = this.add
-      .text(HOUSE_INTERIOR.exitX, HOUSE_INTERIOR.exitY, '[E] Exit house', {
+      .text(HOUSE_INTERIOR.exitX, HOUSE_INTERIOR.exitY - 8, '[E] Exit house', {
         fontSize: '13px',
         color: '#a5d6a7',
         backgroundColor: '#00000088',
@@ -975,23 +1133,44 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0, 0)
       .setVisible(false);
+
     const tip = this.add
-      .text(
-        HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2,
-        HOUSE_INTERIOR.y + HOUSE_INTERIOR.h - 36,
-        'Walk to the bed and sleep to skip to morning',
-        {
-          fontSize: '12px',
-          color: '#cfd8dc',
-          backgroundColor: '#00000066',
-          padding: { x: 6, y: 3 },
-        },
-      )
+      .text(cx, HOUSE_INTERIOR.y + HOUSE_INTERIOR.h - 28, 'Living room · kitchen · bedroom — sleep in the bed!', {
+        fontSize: '12px',
+        color: '#5d4037',
+        backgroundColor: '#ffe08299',
+        padding: { x: 6, y: 3 },
+      })
       .setOrigin(0.5, 0)
       .setVisible(false);
 
-    this.houseNodes = [floor, rug, title, bed, bedLbl, window, lamp, exit, tip];
-    for (const n of this.houseNodes) this.indoorLayer.add(n);
+    this.pushIndoor(
+      this.houseNodes,
+      shell,
+      floor,
+      wall,
+      baseboard,
+      title,
+      rug,
+      couch,
+      table,
+      tv,
+      plant,
+      picture,
+      kitchen,
+      bed,
+      nightstand,
+      lampGlow,
+      lamp,
+      bedLbl,
+      window,
+      curtainL,
+      curtainR,
+      doorFrame,
+      doorImg,
+      exit,
+      tip,
+    );
   }
 
   // —— Public API for UIScene ——

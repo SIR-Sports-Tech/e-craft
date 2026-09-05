@@ -29,6 +29,7 @@ export class BootScene extends Phaser.Scene {
     this.makeBuilding('bldg_house', 0xc62828, 0xfff8e1, 0x5d4037, false);
     this.makeBed();
     this.makeDoor();
+    this.makeInteriorProps();
     this.makeTrailIcons();
     const params = new URLSearchParams(location.search);
     const skip = params.get('skiptitle') === '1';
@@ -700,6 +701,180 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(4, 8, 88, 12);
     g.generateTexture('bed', 96, 64);
     g.destroy();
+  }
+
+  /** Floors + furniture props for real-looking building interiors. */
+  private makeInteriorProps(): void {
+    // Wood floor
+    {
+      const g = this.g();
+      g.fillStyle(0x8d6e63, 1);
+      g.fillRect(0, 0, 64, 64);
+      g.lineStyle(1, 0x6d4c41, 0.7);
+      for (let y = 0; y < 64; y += 16) g.lineBetween(0, y, 64, y);
+      g.lineStyle(1, 0xa1887f, 0.4);
+      for (let x = 0; x < 64; x += 32) g.lineBetween(x, 0, x, 64);
+      g.generateTexture('floor_wood', 64, 64);
+      g.destroy();
+    }
+    // Metal lab floor
+    {
+      const g = this.g();
+      g.fillStyle(0x37474f, 1);
+      g.fillRect(0, 0, 64, 64);
+      g.lineStyle(2, 0x546e7a, 0.8);
+      g.strokeRect(2, 2, 60, 60);
+      g.fillStyle(0x455a64, 1);
+      g.fillCircle(32, 32, 4);
+      g.generateTexture('floor_metal', 64, 64);
+      g.destroy();
+    }
+    // Concrete jail floor
+    {
+      const g = this.g();
+      g.fillStyle(0x616161, 1);
+      g.fillRect(0, 0, 64, 64);
+      g.lineStyle(1, 0x757575, 0.6);
+      g.strokeRect(0, 0, 64, 64);
+      g.fillStyle(0x9e9e9e, 0.25);
+      g.fillRect(8, 20, 18, 6);
+      g.generateTexture('floor_concrete', 64, 64);
+      g.destroy();
+    }
+    // Couch
+    {
+      const g = this.g();
+      g.fillStyle(0x5d4037, 1);
+      g.fillRoundedRect(4, 28, 88, 28, 6);
+      g.fillStyle(0x6d4c41, 1);
+      g.fillRoundedRect(8, 18, 24, 22, 4);
+      g.fillRoundedRect(64, 18, 24, 22, 4);
+      g.fillStyle(0x8d6e63, 1);
+      g.fillRoundedRect(20, 22, 56, 18, 4);
+      g.generateTexture('furn_couch', 96, 60);
+      g.destroy();
+    }
+    // Table
+    {
+      const g = this.g();
+      g.fillStyle(0xa1887f, 1);
+      g.fillRoundedRect(4, 16, 72, 28, 4);
+      g.fillStyle(0x5d4037, 1);
+      g.fillRect(10, 44, 8, 16);
+      g.fillRect(62, 44, 8, 16);
+      g.generateTexture('furn_table', 80, 64);
+      g.destroy();
+    }
+    // TV / monitor
+    {
+      const g = this.g();
+      g.fillStyle(0x212121, 1);
+      g.fillRoundedRect(4, 8, 72, 48, 4);
+      g.fillStyle(0x1565c0, 1);
+      g.fillRoundedRect(10, 14, 60, 36, 2);
+      g.fillStyle(0x81d4fa, 0.5);
+      g.fillRect(14, 18, 20, 12);
+      g.fillStyle(0x424242, 1);
+      g.fillRect(34, 56, 12, 8);
+      g.generateTexture('furn_tv', 80, 64);
+      g.destroy();
+    }
+    // Plant
+    {
+      const g = this.g();
+      g.fillStyle(0x6d4c41, 1);
+      g.fillRect(18, 40, 20, 18);
+      g.fillStyle(0x2e7d32, 1);
+      g.fillCircle(28, 28, 16);
+      g.fillCircle(18, 22, 10);
+      g.fillCircle(38, 22, 10);
+      g.generateTexture('furn_plant', 56, 60);
+      g.destroy();
+    }
+    // Lab console / desk
+    {
+      const g = this.g();
+      g.fillStyle(0x263238, 1);
+      g.fillRoundedRect(4, 28, 100, 32, 4);
+      g.fillStyle(0x00e5ff, 0.9);
+      g.fillRoundedRect(12, 8, 36, 24, 3);
+      g.fillStyle(0x69f0ae, 0.8);
+      g.fillRoundedRect(56, 10, 28, 20, 3);
+      g.fillStyle(0xff5252, 1);
+      g.fillCircle(92, 40, 5);
+      g.fillStyle(0xffee58, 1);
+      g.fillCircle(78, 40, 4);
+      g.generateTexture('furn_console', 112, 64);
+      g.destroy();
+    }
+    // Server rack
+    {
+      const g = this.g();
+      g.fillStyle(0x212121, 1);
+      g.fillRoundedRect(6, 4, 44, 72, 3);
+      for (let i = 0; i < 5; i++) {
+        g.fillStyle(0x37474f, 1);
+        g.fillRect(10, 10 + i * 12, 36, 8);
+        g.fillStyle(i % 2 ? 0x00e676 : 0xff1744, 1);
+        g.fillCircle(40, 14 + i * 12, 2);
+      }
+      g.generateTexture('furn_server', 56, 80);
+      g.destroy();
+    }
+    // Jail bars panel
+    {
+      const g = this.g();
+      g.fillStyle(0x263238, 0.4);
+      g.fillRect(0, 0, 80, 100);
+      g.lineStyle(4, 0xb0bec5, 1);
+      for (let x = 8; x < 80; x += 14) g.lineBetween(x, 4, x, 96);
+      g.lineStyle(5, 0x90a4ae, 1);
+      g.lineBetween(2, 12, 78, 12);
+      g.lineBetween(2, 88, 78, 88);
+      g.generateTexture('furn_bars', 80, 100);
+      g.destroy();
+    }
+    // Office desk
+    {
+      const g = this.g();
+      g.fillStyle(0x5d4037, 1);
+      g.fillRoundedRect(4, 20, 90, 30, 3);
+      g.fillStyle(0x3e2723, 1);
+      g.fillRect(8, 50, 10, 18);
+      g.fillRect(80, 50, 10, 18);
+      g.fillStyle(0xfffde7, 1);
+      g.fillRect(20, 26, 24, 16);
+      g.fillStyle(0x1565c0, 1);
+      g.fillRect(55, 28, 28, 18);
+      g.generateTexture('furn_desk', 100, 72);
+      g.destroy();
+    }
+    // Picture frame
+    {
+      const g = this.g();
+      g.fillStyle(0x5d4037, 1);
+      g.fillRect(0, 0, 48, 40);
+      g.fillStyle(0x81d4fa, 1);
+      g.fillRect(6, 6, 36, 28);
+      g.fillStyle(0x2e7d32, 1);
+      g.fillTriangle(8, 30, 24, 12, 40, 30);
+      g.generateTexture('furn_picture', 48, 40);
+      g.destroy();
+    }
+    // Kitchen counter
+    {
+      const g = this.g();
+      g.fillStyle(0xeceff1, 1);
+      g.fillRoundedRect(4, 18, 100, 28, 3);
+      g.fillStyle(0x78909c, 1);
+      g.fillRect(4, 46, 100, 18);
+      g.fillStyle(0x90caf9, 0.8);
+      g.fillCircle(30, 32, 8);
+      g.fillStyle(0xff7043, 1);
+      g.fillRect(70, 24, 22, 16);
+      g.generateTexture('furn_kitchen', 108, 68);
+      g.destroy();
+    }
   }
 
   private makeTrailIcons(): void {
