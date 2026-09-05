@@ -127,9 +127,11 @@ export class GameScene extends Phaser.Scene {
     this.sasquatch = this.physics.add.sprite(
       SPAWN.sasquatchForest.x,
       SPAWN.sasquatchForest.y,
-      'sasquatch',
+      'sasquatch_sheet',
+      0,
     );
-    this.sasquatch.setDepth(9).setCollideWorldBounds(true).setScale(1.05);
+    this.sasquatch.setDepth(9).setCollideWorldBounds(true).setScale(1.35);
+    this.sasquatch.play('sasquatch-idle');
     this.pickSasquatchWander();
     // Seed trail immediately so player never starts with empty trail
     for (let i = 0; i < 8; i++) {
@@ -888,10 +890,12 @@ export class GameScene extends Phaser.Scene {
       if (this.flags.sasquatchInVehicle && !this.flags.inVehicle) {
         // On foot with "loaded" cargo — keep beside player for jail walk-in
         this.physics.moveTo(this.sasquatch, this.player.x + 36, this.player.y + 8, 160);
+        this.updateSasquatchAnim();
         return;
       }
       // Follow player to the vehicle
       this.physics.moveTo(this.sasquatch, this.player.x + 40, this.player.y + 10, 140);
+      this.updateSasquatchAnim();
       return;
     }
 
@@ -908,11 +912,13 @@ export class GameScene extends Phaser.Scene {
       this.sasquatch,
       this.sasquatchWanderTarget.x,
       this.sasquatchWanderTarget.y,
-      70,
+      85,
     );
     // Clamp to forest
     this.sasquatch.x = Phaser.Math.Clamp(this.sasquatch.x, forest.x + 40, forest.x + forest.w - 40);
     this.sasquatch.y = Phaser.Math.Clamp(this.sasquatch.y, forest.y + 40, forest.y + forest.h - 40);
+
+    this.updateSasquatchAnim();
 
     // ALWAYS leave a trail
     this.trail.maybeDrop(this.sasquatch.x, this.sasquatch.y);
@@ -930,6 +936,21 @@ export class GameScene extends Phaser.Scene {
     }
 
     void delta;
+  }
+
+
+  private updateSasquatchAnim(): void {
+    const body = this.sasquatch.body as Phaser.Physics.Arcade.Body;
+    const speed = body ? Math.hypot(body.velocity.x, body.velocity.y) : 0;
+    if (speed > 12) {
+      if (this.sasquatch.anims.currentAnim?.key !== 'sasquatch-walk') {
+        this.sasquatch.play('sasquatch-walk', true);
+      }
+      if (body.velocity.x < -8) this.sasquatch.setFlipX(true);
+      else if (body.velocity.x > 8) this.sasquatch.setFlipX(false);
+    } else if (this.sasquatch.anims.currentAnim?.key !== 'sasquatch-idle') {
+      this.sasquatch.play('sasquatch-idle', true);
+    }
   }
 
   private pickSasquatchWander(): void {
@@ -1374,7 +1395,8 @@ export class GameScene extends Phaser.Scene {
       this.jailedSprite = this.add
         .sprite(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY, 'sasquatch')
         .setDepth(23)
-        .setTint(0xffab91);
+        .setScale(1.1)
+        .setTint(0xff5252);
       const bars = this.add
         .text(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY + 50, '║ JAILED ║', {
           fontSize: '14px',

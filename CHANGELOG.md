@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.4 — 2026-09-05 — SCARY WALKING SASQUATCH
+
+### Added
+- Terrifying Sasquatch redesign: glowing red eyes, fangs, claws, hunched bulk
+- Real **walk cycle animation** (4 frames) that plays while moving
+- Faces walk direction; larger scale in forest
+
+
 ## 1.0.3 — 2026-09-05 — CAR DRIVE FIX
 
 ### Fixed

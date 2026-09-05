@@ -127,39 +127,125 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makeSasquatch(): void {
-    const g = this.g();
-    g.fillStyle(0x000000, 0.25);
-    g.fillEllipse(36, 70, 34, 10);
-    // legs
-    g.fillStyle(0x4e342e, 1);
-    g.fillEllipse(24, 58, 14, 22);
-    g.fillEllipse(48, 58, 14, 22);
-    // body
-    g.fillStyle(0x5d4037, 1);
-    g.fillEllipse(36, 42, 40, 36);
-    // arms
-    g.fillEllipse(10, 44, 14, 30);
-    g.fillEllipse(62, 44, 14, 30);
-    // head
-    g.fillStyle(0x6d4c41, 1);
-    g.fillCircle(36, 18, 16);
-    // face patch
-    g.fillStyle(0xbcaaa4, 1);
-    g.fillEllipse(36, 20, 16, 14);
-    // eyes
-    g.fillStyle(0xfffde7, 1);
-    g.fillCircle(30, 17, 4);
-    g.fillCircle(42, 17, 4);
-    g.fillStyle(0x212121, 1);
-    g.fillCircle(30, 17, 2);
-    g.fillCircle(42, 17, 2);
-    // smile
-    g.lineStyle(2, 0x5d4037, 1);
-    g.beginPath();
-    g.arc(36, 24, 5, 0.1 * Math.PI, 0.9 * Math.PI, false);
-    g.strokePath();
-    g.generateTexture('sasquatch', 72, 76);
-    g.destroy();
+    // Scary bigfoot walk sheet: 4 frames, 96x110 each
+    const fw = 96;
+    const fh = 110;
+    const frames = 4;
+    const sheet = this.make.graphics({ x: 0, y: 0 });
+
+    const drawFrame = (g: Phaser.GameObjects.Graphics, ox: number, frame: number) => {
+      const stride = (frame % 2 === 0 ? -1 : 1) * (6 + frame);
+      const bob = frame % 2 === 0 ? 0 : -3;
+      const armSwing = (frame - 1.5) * 5;
+
+      // ground shadow
+      g.fillStyle(0x000000, 0.35);
+      g.fillEllipse(ox + 48, fh - 8, 44, 12);
+
+      // back leg
+      g.fillStyle(0x2a1810, 1);
+      g.fillEllipse(ox + 34 + stride, fh - 28 + bob, 16, 34);
+      // front leg
+      g.fillStyle(0x3b2418, 1);
+      g.fillEllipse(ox + 58 - stride, fh - 26 + bob, 17, 36);
+      // claws on feet
+      g.fillStyle(0x1a0e08, 1);
+      g.fillTriangle(ox + 28 + stride, fh - 12, ox + 24 + stride, fh - 4, ox + 34 + stride, fh - 4);
+      g.fillTriangle(ox + 64 - stride, fh - 10, ox + 58 - stride, fh - 2, ox + 70 - stride, fh - 2);
+
+      // massive hunched torso
+      g.fillStyle(0x2c1810, 1);
+      g.fillEllipse(ox + 48, 52 + bob, 54, 48);
+      // fur tufts
+      g.fillStyle(0x1a0f0a, 1);
+      g.fillCircle(ox + 28, 40 + bob, 8);
+      g.fillCircle(ox + 68, 42 + bob, 9);
+      g.fillCircle(ox + 48, 30 + bob, 10);
+
+      // long arms + claws
+      g.fillStyle(0x24150e, 1);
+      g.fillEllipse(ox + 14 - armSwing, 58 + bob, 16, 42);
+      g.fillEllipse(ox + 82 + armSwing, 58 + bob, 16, 42);
+      g.fillStyle(0x4a1510, 1);
+      // left claws
+      g.fillTriangle(ox + 8 - armSwing, 78 + bob, ox + 2 - armSwing, 90 + bob, ox + 12 - armSwing, 88 + bob);
+      g.fillTriangle(ox + 14 - armSwing, 80 + bob, ox + 10 - armSwing, 94 + bob, ox + 18 - armSwing, 90 + bob);
+      // right claws
+      g.fillTriangle(ox + 88 + armSwing, 78 + bob, ox + 82 + armSwing, 92 + bob, ox + 94 + armSwing, 90 + bob);
+      g.fillTriangle(ox + 80 + armSwing, 80 + bob, ox + 76 + armSwing, 94 + bob, ox + 86 + armSwing, 90 + bob);
+
+      // head — ape-like, heavy brow
+      g.fillStyle(0x1f120c, 1);
+      g.fillCircle(ox + 48, 24 + bob, 20);
+      // brow ridge
+      g.fillStyle(0x140c08, 1);
+      g.fillEllipse(ox + 48, 16 + bob, 38, 14);
+      // snout
+      g.fillStyle(0x3a2218, 1);
+      g.fillEllipse(ox + 48, 30 + bob, 18, 14);
+      // nostrils
+      g.fillStyle(0x0a0503, 1);
+      g.fillCircle(ox + 44, 32 + bob, 2.5);
+      g.fillCircle(ox + 52, 32 + bob, 2.5);
+      // glowing red eyes
+      g.fillStyle(0xff1744, 1);
+      g.fillCircle(ox + 40, 20 + bob, 5);
+      g.fillCircle(ox + 56, 20 + bob, 5);
+      g.fillStyle(0xff8a80, 0.9);
+      g.fillCircle(ox + 40, 20 + bob, 2);
+      g.fillCircle(ox + 56, 20 + bob, 2);
+      // eye glow bloom
+      g.fillStyle(0xff1744, 0.25);
+      g.fillCircle(ox + 40, 20 + bob, 9);
+      g.fillCircle(ox + 56, 20 + bob, 9);
+      // grim mouth
+      g.lineStyle(3, 0x4a0000, 1);
+      g.beginPath();
+      g.moveTo(ox + 40, 38 + bob);
+      g.lineTo(ox + 44, 42 + bob);
+      g.lineTo(ox + 48, 40 + bob);
+      g.lineTo(ox + 52, 42 + bob);
+      g.lineTo(ox + 56, 38 + bob);
+      g.strokePath();
+      // fangs
+      g.fillStyle(0xffe0b2, 1);
+      g.fillTriangle(ox + 43, 40 + bob, ox + 41, 46 + bob, ox + 46, 40 + bob);
+      g.fillTriangle(ox + 53, 40 + bob, ox + 50, 46 + bob, ox + 56, 40 + bob);
+    };
+
+    for (let i = 0; i < frames; i++) {
+      drawFrame(sheet, i * fw, i);
+    }
+    sheet.generateTexture('sasquatch_sheet_img', fw * frames, fh);
+    sheet.destroy();
+    // Convert strip image into a real spritesheet
+    const srcImg = this.textures.get('sasquatch_sheet_img').getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    if (this.textures.exists('sasquatch_sheet')) this.textures.remove('sasquatch_sheet');
+    this.textures.addSpriteSheet('sasquatch_sheet', srcImg as HTMLImageElement, {
+      frameWidth: fw,
+      frameHeight: fh,
+    });
+
+    // Legacy single-frame texture for jail / static uses
+    const one = this.make.graphics({ x: 0, y: 0 });
+    drawFrame(one, 0, 0);
+    one.generateTexture('sasquatch', fw, fh);
+    one.destroy();
+
+    if (!this.anims.exists('sasquatch-walk')) {
+      this.anims.create({
+        key: 'sasquatch-walk',
+        frames: this.anims.generateFrameNumbers('sasquatch_sheet', { start: 0, end: 3 }),
+        frameRate: 8,
+        repeat: -1,
+      });
+      this.anims.create({
+        key: 'sasquatch-idle',
+        frames: [{ key: 'sasquatch_sheet', frame: 0 }],
+        frameRate: 1,
+        repeat: -1,
+      });
+    }
   }
 
   private makeVehicle(): void {
