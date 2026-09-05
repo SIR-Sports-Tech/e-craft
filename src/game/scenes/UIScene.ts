@@ -151,93 +151,18 @@ export class UIScene extends Phaser.Scene {
   }
 
   private buildTouchControls(): void {
+    // DOM overlay owns ALL phone controls (left actions + right D-pad).
+    // Phaser stick/buttons used to sit on top of them and overlap — keep hidden forever.
     this.touchRoot = this.add.container(0, 0).setDepth(150).setScrollFactor(0);
-    this.stickBase = this.add.circle(0, 0, 54, 0xffffff, 0.15).setStrokeStyle(2, 0xffffff, 0.35);
-    this.stickKnob = this.add.circle(0, 0, 24, 0x4fc3f7, 0.7);
-    this.touchRoot.add([this.stickBase, this.stickKnob]);
-
-    const mkBtn = (label: string, color: number, action: string) => {
-      const c = this.add.container(0, 0);
-      const r = this.add.circle(0, 0, 32, color, 0.55).setStrokeStyle(2, 0xffffff, 0.4);
-      const t = this.add.text(0, 0, label, { fontSize: '13px', color: '#fff' }).setOrigin(0.5);
-      c.add([r, t]);
-      c.setSize(64, 64);
-      c.setInteractive(
-        new Phaser.Geom.Circle(0, 0, 32),
-        Phaser.Geom.Circle.Contains,
-      );
-      c.on('pointerdown', () => {
-        this.gameScene.queueTouchAction(action as 'interact' | 'capture' | 'map' | 'pause');
-      });
-      this.touchRoot.add(c);
-      return c;
-    };
-
-    const btnE = mkBtn('E', 0x2e7d32, 'interact');
-    const btnSpace = mkBtn('CAP', 0xc62828, 'capture');
-    const btnM = mkBtn('MAP', 0x1565c0, 'map');
-    const btnP = mkBtn('II', 0x6a1b9a, 'pause');
-    (this as unknown as { touchBtns: Phaser.GameObjects.Container[] }).touchBtns = [
-      btnE,
-      btnSpace,
-      btnM,
-      btnP,
-    ];
-
-    this.stickBase.setInteractive(
-      new Phaser.Geom.Circle(0, 0, 54),
-      Phaser.Geom.Circle.Contains,
-    );
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      const local = this.stickBase.getBounds();
-      if (Phaser.Geom.Rectangle.Contains(local, p.x, p.y)) {
-        this.stickPointerId = p.id;
-      }
-    });
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (this.stickPointerId !== p.id) return;
-      const dx = p.x - this.stickBase.x;
-      const dy = p.y - this.stickBase.y;
-      const max = 42;
-      const len = Math.hypot(dx, dy) || 1;
-      const nx = (dx / len) * Math.min(len, max);
-      const ny = (dy / len) * Math.min(len, max);
-      this.stickKnob.setPosition(this.stickBase.x + nx, this.stickBase.y + ny);
-      this.gameScene.setTouchVector(nx / max, ny / max);
-    });
-    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
-      if (this.stickPointerId === p.id) {
-        this.stickPointerId = null;
-        this.stickKnob.setPosition(this.stickBase.x, this.stickBase.y);
-        this.gameScene.setTouchVector(0, 0);
-      }
-    });
-
-    this.layoutTouch(this.scale.width, this.scale.height);
-    // Desktop keyboard play: hide touch overlay so it cannot steal input
-    const touchDevice =
-      this.sys.game.device.os.android ||
-      this.sys.game.device.os.iOS ||
-      (this.sys.game.device.input.touch && this.scale.width < 900);
-    this.touchRoot.setVisible(!!touchDevice);
-    this.touchRoot.setActive(!!touchDevice);
-    if (!touchDevice) {
-      // Ensure no residual stick vector on desktop
-      this.gameScene.setTouchVector(0, 0);
-    }
+    this.stickBase = this.add.circle(0, 0, 1, 0xffffff, 0).setVisible(false);
+    this.stickKnob = this.add.circle(0, 0, 1, 0xffffff, 0).setVisible(false);
+    this.touchRoot.setVisible(false);
+    this.touchRoot.setActive(false);
+    this.gameScene.setTouchVector(0, 0);
   }
 
-  private layoutTouch(w: number, h: number): void {
-    this.stickBase.setPosition(90, h - 90);
-    this.stickKnob.setPosition(90, h - 90);
-    const btns = (this as unknown as { touchBtns: Phaser.GameObjects.Container[] }).touchBtns || [];
-    const positions = [
-      { x: w - 90, y: h - 90 },
-      { x: w - 90, y: h - 170 },
-      { x: w - 170, y: h - 90 },
-      { x: w - 170, y: h - 170 },
-    ];
-    btns.forEach((b, i) => b.setPosition(positions[i].x, positions[i].y));
+  private layoutTouch(_w: number, _h: number): void {
+    // no-op — DOM layout handles phone controls without overlap
   }
 
   update(_t: number, delta: number): void {

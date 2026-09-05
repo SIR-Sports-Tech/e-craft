@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1 — 2026-09-05 — NO-OVERLAP TOUCH CONTROLS
+
+### Fixed
+- Removed duplicate Phaser virtual stick + on-canvas buttons that sat on top of DOM controls
+- LEFT actions + RIGHT D-pad now use separate columns with a hard middle gap
+- Smaller buttons + safe-area insets so phone screens never collide
+- Layout smoke test across 320 / 375 / 390 widths
+
+
 ## 1.1.0 — 2026-09-05 — HOLD TRACKER + WORKING TRAIL
 
 ### Fixed / Added

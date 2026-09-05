@@ -1,6 +1,6 @@
 /**
  * Direct-wired controls for phone/Chrome.
- * Buttons call window.__ecraft.* immediately — no fragile pulse queue.
+ * Layout law: LEFT = actions only · RIGHT = D-pad only · never overlap.
  */
 
 export type DomInputState = {
@@ -71,65 +71,122 @@ export function installDomOverlay(): void {
     }
     #ecraft-toast {
       pointer-events: none;
-      position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
-      background: rgba(0,0,0,.6); color: #fffde7;
-      border-radius: 999px; padding: 8px 14px;
-      font-size: 13px; max-width: 92vw; text-align: center;
+      position: absolute; left: 50%; top: max(8px, env(safe-area-inset-top));
+      transform: translateX(-50%);
+      background: rgba(0,0,0,.65); color: #fffde7;
+      border-radius: 999px; padding: 7px 12px;
+      font-size: 12px; max-width: min(88vw, 420px); text-align: center;
       opacity: 0; transition: opacity .15s ease;
+      z-index: 5;
     }
     #ecraft-toast.show { opacity: 1; }
-    /* Action buttons: LEFT side only */
+
+    /*
+      NO-OVERLAP LAYOUT
+      - Left column: actions only (max ~36vw)
+      - Right column: D-pad only (max ~42vw)
+      - Middle gap reserved; columns never share x-space
+    */
     #ecraft-actions {
       pointer-events: auto;
-      position: absolute; left: 10px; bottom: 10px;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-      width: 168px;
+      position: absolute;
+      left: max(6px, env(safe-area-inset-left));
+      bottom: max(6px, env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: min(132px, 34vw);
+      max-height: min(58vh, 420px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
       touch-action: none;
-      z-index: 2;
+      z-index: 3;
+      padding-right: 2px;
     }
-    /* Round/D-pad controller: RIGHT side only — nothing else on the right */
-    #ecraft-pad {
-      pointer-events: auto;
-      position: absolute; right: 12px; bottom: 14px;
-      display: grid; grid-template-columns: 70px 70px 70px; gap: 8px;
-      touch-action: none;
-      z-index: 2;
-    }
-    #ecraft-pad button {
-      width: 70px; height: 70px; border-radius: 50%;
-      border: 2px solid rgba(255,255,255,.45);
-      background: rgba(13,71,161,.95); color: #fff;
-      font-weight: 900; font-size: 18px;
-      box-shadow: 0 8px 18px rgba(0,0,0,.45);
-      -webkit-user-select: none; user-select: none;
-      touch-action: none;
+    #ecraft-actions .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
     }
     #ecraft-actions button {
-      height: 64px; border-radius: 16px;
+      height: 44px;
+      border-radius: 12px;
       border: 2px solid rgba(255,255,255,.4);
       background: rgba(13,71,161,.95); color: #fff;
-      font-weight: 900; font-size: 15px;
-      box-shadow: 0 8px 18px rgba(0,0,0,.45);
+      font-weight: 900; font-size: 12px;
+      box-shadow: 0 6px 14px rgba(0,0,0,.4);
       -webkit-user-select: none; user-select: none;
       touch-action: none;
+      width: 100%;
+      line-height: 1.05;
+      padding: 0 4px;
     }
     #ecraft-actions .act { background: #1b5e20; }
-    #ecraft-actions .cap { background: #b71c1c; font-size: 12px; }
-    #ecraft-actions .car { background: #ef6c00; color: #111; grid-column: 1 / -1; }
-    #ecraft-actions .actv { background: #6a1b9a; grid-column: 1 / -1; }
-    #ecraft-actions .race { background: #d50000; color: #fff; grid-column: 1 / -1; }
-    #ecraft-actions .rec { background: #455a64; color: #fff; grid-column: 1 / -1; font-size: 11px; }
-    #ecraft-actions .trk { background: #00695c; color: #b9f6ca; grid-column: 1 / -1; font-size: 12px; }
+    #ecraft-actions .cap { background: #b71c1c; font-size: 11px; }
+    #ecraft-actions .car { background: #ef6c00; color: #111; }
+    #ecraft-actions .actv { background: #6a1b9a; }
+    #ecraft-actions .race { background: #d50000; color: #fff; }
+    #ecraft-actions .rec { background: #455a64; color: #fff; font-size: 10px; height: 36px; }
+    #ecraft-actions .trk { background: #00695c; color: #b9f6ca; font-size: 11px; }
+
+    /* D-pad: RIGHT only — fixed square, never under left actions */
+    #ecraft-pad {
+      pointer-events: auto;
+      position: absolute;
+      right: max(6px, env(safe-area-inset-right));
+      bottom: max(6px, env(safe-area-inset-bottom));
+      width: min(168px, 42vw);
+      height: min(168px, 42vw);
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr 1fr;
+      gap: 5px;
+      touch-action: none;
+      z-index: 3;
+    }
+    #ecraft-pad button {
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.45);
+      background: rgba(13,71,161,.95); color: #fff;
+      font-weight: 900; font-size: clamp(14px, 4.2vw, 18px);
+      box-shadow: 0 6px 14px rgba(0,0,0,.4);
+      -webkit-user-select: none; user-select: none;
+      touch-action: none;
+      padding: 0;
+    }
+    #ecraft-pad .pad-dead {
+      pointer-events: none;
+      visibility: hidden;
+    }
+
+    /* Narrow phones: shrink further so columns never collide */
+    @media (max-width: 400px) {
+      #ecraft-actions { width: min(118px, 32vw); gap: 5px; }
+      #ecraft-actions button { height: 40px; font-size: 11px; border-radius: 10px; }
+      #ecraft-actions .rec { height: 32px; font-size: 9px; }
+      #ecraft-pad { width: min(148px, 40vw); height: min(148px, 40vw); gap: 4px; }
+    }
+    @media (max-width: 340px) {
+      #ecraft-actions { width: 108px; }
+      #ecraft-pad { width: 132px; height: 132px; }
+    }
   `;
   document.head.appendChild(style);
 
   const root = document.createElement('div');
   root.id = 'ecraft-dom-root';
   root.innerHTML = `
-    <div id="ecraft-toast">HOLD TRACKER lights the gold trail</div>
-    <div id="ecraft-actions">
-      <button type="button" class="act" id="btn-e">E</button>
-      <button type="button" class="cap" id="btn-cap">CAPTURE</button>
+    <div id="ecraft-toast">Left = actions · Right = D-pad (no overlap)</div>
+    <div id="ecraft-actions" aria-label="action buttons">
+      <div class="row">
+        <button type="button" class="act" id="btn-e">E</button>
+        <button type="button" class="cap" id="btn-cap">CAPTURE</button>
+      </div>
       <button type="button" class="trk" id="btn-tracker">HOLD TRACKER</button>
       <button type="button" class="actv" id="btn-activate">ACTIVATE</button>
       <button type="button" class="car" id="btn-car">PATROL CAR</button>
@@ -137,10 +194,15 @@ export function installDomOverlay(): void {
       <button type="button" class="rec" id="btn-recover">UNFREEZE / SAVE</button>
     </div>
     <div id="ecraft-pad" aria-label="movement pad">
-      <span></span><button type="button" data-dir="up">▲</button><span></span>
+      <span class="pad-dead"></span>
+      <button type="button" data-dir="up">▲</button>
+      <span class="pad-dead"></span>
       <button type="button" data-dir="left">◀</button>
-      <button type="button" data-dir="down">▼</button>
+      <span class="pad-dead"></span>
       <button type="button" data-dir="right">▶</button>
+      <span class="pad-dead"></span>
+      <button type="button" data-dir="down">▼</button>
+      <span class="pad-dead"></span>
     </div>
   `;
   document.body.appendChild(root);
@@ -153,7 +215,7 @@ export function installDomOverlay(): void {
     window.setTimeout(() => el.classList.remove('show'), 2500);
   };
   (window as unknown as { __ecraftToast: (m: string) => void }).__ecraftToast = toast;
-  toast('Controls ready — use pad + ACTIVATE / CAR');
+  toast('Controls: LEFT actions · RIGHT D-pad');
 
   // Movement pad
   root.querySelectorAll<HTMLButtonElement>('#ecraft-pad [data-dir]').forEach((btn) => {
@@ -169,7 +231,11 @@ export function installDomOverlay(): void {
       e.preventDefault();
       e.stopPropagation();
       api()?.unpause?.();
-      try { btn.setPointerCapture(e.pointerId); } catch {}
+      try {
+        btn.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
       pressed.add(code);
       recomputeMove();
       flash(btn);
@@ -179,12 +245,15 @@ export function installDomOverlay(): void {
       e.stopPropagation();
       pressed.delete(code);
       recomputeMove();
-      try { btn.releasePointerCapture(e.pointerId); } catch {}
+      try {
+        btn.releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
     };
     btn.addEventListener('pointerdown', down);
     btn.addEventListener('pointerup', up);
     btn.addEventListener('pointercancel', up);
-    // Do NOT clear on pointerleave while captured — that was killing drive input
   });
 
   const bindAction = (id: string, fn: () => void, label: string) => {
@@ -194,7 +263,6 @@ export function installDomOverlay(): void {
     const fire = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
-      // Debounce: pointerdown + click both fire on phones — was toggling tracker off
       const now = Date.now();
       if (now - last < 280) return;
       last = now;
