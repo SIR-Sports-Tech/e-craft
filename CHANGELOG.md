@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.2 — 2026-09-05 — CONTROLS ACTUALLY WORK
+
+### Fixed
+- Buttons now call the game directly (ACTIVATE / CAR / E / CAP / D-pad)
+- Added explicit **ACTIVATE** button (tracker + robot)
+- **GET IN CAR / DRIVE** one-tap enter + proven driving
+- Removed covering instruction boxes
+- Realistic dirt trail prints
+- Playwright phone-viewport test: ACTIVATE → CAR → drive PASSED
+
+
 ## 1.0.1 — 2026-09-05 — UX HOTFIX
 
 ### Fixed

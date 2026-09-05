@@ -30,7 +30,7 @@ export class DayNightSystem {
     const alpha = Phaser.Math.Clamp(night * 0.45, 0, 0.45);
     this.overlay.setAlpha(alpha);
     const hour = this.getHour();
-    this.label.setText(`🕒 ${this.phase()} · ${hour.toString().padStart(2, '0')}:00`);
+    this.label.setVisible(false);
   }
 
   getHour(): number {

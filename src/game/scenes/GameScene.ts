@@ -178,28 +178,40 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch('UI', { game: this });
     this.setPhase(MissionPhase.AtSecurityHQ);
     this.statusLine = 'Welcome to E-CRAFT Security Division. Find Sasquatch!';
-    (window as unknown as { __ecraft: unknown }).__ecraft = {
+    (window as unknown as { __ecraft: Record<string, unknown> }).__ecraft = {
       getState: () => this.getHud(),
       advance: () => this.debugAdvance(),
       complete: () => this.debugCompleteMission(),
       save: () => this.persistSave(),
-      /** Run each v1 acceptance step in order (real systems, not a fake ending). */
+      unpause: () => {
+        this.paused = false;
+        this.mapOpen = false;
+      },
+      interact: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.tryInteract();
+      },
+      capture: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.tryCapture();
+      },
+      activate: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.doActivate();
+      },
+      enterCar: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.doEnterCar();
+      },
       runAcceptanceStep: (step: string) => this.runAcceptanceStep(step),
       runFullAcceptance: async () => {
         const steps = [
-          'enter_lair',
-          'get_tracker',
-          'activate_robot',
-          'exit_lair',
-          'enter_vehicle',
-          'go_forest',
-          'find_sasquatch',
-          'capture',
-          'load_vehicle',
-          'go_jail',
-          'enter_jail',
-          'lock_cell',
-          'claim_reward',
+          'enter_lair','get_tracker','activate_robot','exit_lair','enter_vehicle',
+          'go_forest','find_sasquatch','capture','load_vehicle','go_jail','enter_jail','lock_cell','claim_reward',
         ];
         for (const s of steps) {
           this.runAcceptanceStep(s);
@@ -580,12 +592,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.paused || this.mapOpen) {
-      this.player.setVelocity(0);
-      return;
-    }
-
+    // Always apply DOM/keyboard movement — never let pause eat controls
     this.handleMovement();
+    if (this.paused || this.mapOpen) {
+      // keep velocity from handleMovement; only skip world sims if map open
+      if (this.mapOpen) this.player.setVelocity(0, 0);
+    }
     this.handleHotkeys();
     this.updateRobotFollow();
     this.updateSasquatch(delta);
@@ -637,18 +649,6 @@ export class GameScene extends Phaser.Scene {
     const dom = pollDomInput();
     vx += dom.x;
     vy += dom.y;
-    if (dom.interact) this.tryInteract();
-    if (dom.capture) this.tryCapture();
-    if (dom.map) this.mapOpen = !this.mapOpen;
-    if (dom.pause) this.paused = !this.paused;
-    if (dom.radio) {
-      if (this.flags.robotActive) {
-        this.statusLine = 'Robot radio: ' + this.mysteries.revealNext();
-        audio.talk();
-      } else {
-        this.statusLine = 'Activate your robot to use radio tips (R).';
-      }
-    }
     // Phaser touch stick (mobile)
     if (Math.abs(this.touchVec.x) > 0.15 || Math.abs(this.touchVec.y) > 0.15) {
       vx += this.touchVec.x;
@@ -1206,6 +1206,53 @@ export class GameScene extends Phaser.Scene {
       this.statusLine = 'Driving! Use WASD / pad — go east to the forest.';
     }
     audio.drive();
+  }
+
+
+  /** One-tap Activate: tracker then robot (works from lair or snaps into lair). */
+  private doActivate(): void {
+    if (!this.flags.hasTracker || !this.flags.robotActive) {
+      if (!this.flags.inLair) this.enterLair();
+      if (!this.flags.hasTracker) {
+        this.flags.hasTracker = true;
+        this.inventory.add('tracker');
+        this.setPhase(MissionPhase.HasTracker);
+        this.statusLine = 'Tracker ON. Tap ACTIVATE again for robot!';
+        audio.pickup();
+        setDomStatus(this.statusLine);
+        return;
+      }
+      this.flags.robotActive = true;
+      this.robot.setVisible(true);
+      this.robot.setPosition(this.player.x - 30, this.player.y);
+      this.setPhase(MissionPhase.RobotActive);
+      this.statusLine = 'Robot ONLINE! Exit lair, then tap GET IN CAR.';
+      audio.pickup();
+      setDomStatus(this.statusLine);
+      return;
+    }
+    this.statusLine = 'Already activated. Exit lair (E) then GET IN CAR.';
+    setDomStatus(this.statusLine);
+    this.tryInteract();
+  }
+
+  /** One-tap car: requires robot, snaps to vehicle and drives. */
+  private doEnterCar(): void {
+    if (!this.flags.robotActive) {
+      this.statusLine = 'Activate robot first (ACTIVATE button)!';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    if (this.flags.inLair) this.exitLair();
+    if (this.flags.inJailBuilding) this.exitJail();
+    if (this.flags.inVehicle) {
+      this.statusLine = 'Already driving — use the D-pad / WASD!';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    this.player.setPosition(this.vehicle.x, this.vehicle.y);
+    this.enterVehicle(true);
+    setDomStatus(this.statusLine || 'Driving!');
   }
 
   private tryCapture(): void {
