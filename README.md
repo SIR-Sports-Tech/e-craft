@@ -44,6 +44,10 @@ Sasquatch **always** leaves a trail. If you drift away, a tracking marker / robo
 | Esc | Pause |
 | On-screen stick + buttons | Touch / tablet |
 
+## Living-world seed (v0.1.3)
+
+Talk to **Builder Jun** in the City Plaza (`E`). The game queues a **Robot Garage** behind Security HQ and builds it over time — early version of “the world remembers what you ask for.”
+
 ## Kid safety
 
 Single-player only in v0.1. No stranger chat. No collection of children's personal information. Multiplayer is explicitly later.
