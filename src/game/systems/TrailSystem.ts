@@ -22,7 +22,7 @@ export class TrailSystem {
   private nextId = 1;
   private lastDropDist = 0;
   private readonly dropEvery = 70;
-  private readonly MAX_CLUES = 60;
+  private readonly MAX_CLUES = 40;
   private pathDirty = false;
   private pathRedrawCooldown = 0;
   private fallbackMarker?: Phaser.GameObjects.Container;
@@ -177,11 +177,18 @@ export class TrailSystem {
     }
     const dist = Phaser.Math.Distance.Between(playerX, playerY, target.x, target.y);
 
-    // Reveal tiny labels only when close
+    // Reveal tiny labels only when close (skip far clues — cheaper on phones)
     for (const c of this.clues) {
-      const d = Phaser.Math.Distance.Between(playerX, playerY, c.x, c.y);
       const label = (c.sprite as unknown as { label?: Phaser.GameObjects.Text }).label;
-      if (label) label.setAlpha(d < 70 ? 0.9 : 0);
+      if (!label) continue;
+      const dx = playerX - c.x;
+      const dy = playerY - c.y;
+      if (dx * dx + dy * dy > 120 * 120) {
+        if (label.alpha > 0) label.setAlpha(0);
+        continue;
+      }
+      const d = Math.hypot(dx, dy);
+      label.setAlpha(d < 70 ? 0.9 : 0);
     }
 
     const needsHelp = dist > 300 || robotHelps;
@@ -226,8 +233,19 @@ export class TrailSystem {
     if (this.pathDirty && this.pathRedrawCooldown <= 0) {
       this.redrawSoftPath();
       this.pathDirty = false;
-      this.pathRedrawCooldown = 250;
+      this.pathRedrawCooldown = 400;
     }
+  }
+
+  /** Emergency cleanup when FPS tanks — keeps mission state, drops heavy graphics. */
+  emergencyTrim(): void {
+    while (this.clues.length > 20) {
+      const old = this.clues.shift();
+      old?.sprite.destroy(true);
+    }
+    this.pathGfx?.clear();
+    this.pathDirty = false;
+    this.clearFallback();
   }
 
   markNearbyDiscovered(px: number, py: number, radius = 60): number {

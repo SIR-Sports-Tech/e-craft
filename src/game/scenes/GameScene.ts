@@ -91,6 +91,10 @@ export class GameScene extends Phaser.Scene {
   private garageCredited = false;
   private mysteries = new MysterySystem();
   private police = new PoliceSystem();
+  private slowFrameStreak = 0;
+  private lastHudWrite = 0;
+  private citizenTick = 0;
+  private onVisSave?: () => void;
 
   constructor() {
     super('Game');
@@ -184,15 +188,21 @@ export class GameScene extends Phaser.Scene {
     gfx.fillCircle(3, 3, 3);
     gfx.generateTexture('dust', 6, 6);
     gfx.destroy();
-    this.dust = this.add.particles(0, 0, 'dust', {
-      speed: { min: 10, max: 30 },
-      angle: { min: 200, max: 340 },
-      scale: { start: 0.8, end: 0 },
-      lifespan: 280,
-      frequency: 80,
-      alpha: { start: 0.45, end: 0 },
-      emitting: false,
-    }).setDepth(6);
+    const lowPower =
+      /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
+    // Skip dust particles on phones — major freeze source under load
+    if (!lowPower) {
+      this.dust = this.add.particles(0, 0, 'dust', {
+        speed: { min: 10, max: 30 },
+        angle: { min: 200, max: 340 },
+        scale: { start: 0.8, end: 0 },
+        lifespan: 280,
+        frequency: 80,
+        alpha: { start: 0.45, end: 0 },
+        emitting: false,
+      }).setDepth(6);
+    }
 
     this.scene.launch('UI', { game: this });
     this.setPhase(MissionPhase.AtSecurityHQ);
@@ -206,13 +216,7 @@ export class GameScene extends Phaser.Scene {
         this.paused = false;
         this.mapOpen = false;
       },
-      recover: () => {
-        this.paused = false;
-        this.mapOpen = false;
-        this.player?.setVelocity(0, 0);
-        this.persistSave();
-        setDomStatus('Recovered + saved. Continue!');
-      },
+      recover: () => this.hardRecover('Recovered + saved. Keep playing!'),
       interact: () => {
         this.paused = false;
         this.mapOpen = false;
@@ -254,8 +258,46 @@ export class GameScene extends Phaser.Scene {
 
     if (this.registry.get('loadSave')) {
       this.applySave();
+      setDomStatus('Continued from last save — progress kept!');
     }
-    this.time.addEvent({ delay: 3000, loop: true, callback: () => this.persistSave() });
+    this.time.addEvent({ delay: 2000, loop: true, callback: () => this.persistSave() });
+    // Save when phone tabs away / app backgrounds — prevents start-over after freeze kill
+    this.onVisSave = () => {
+      try {
+        this.persistSave();
+      } catch {
+        /* ignore */
+      }
+    };
+    document.addEventListener('visibilitychange', this.onVisSave);
+    window.addEventListener('pagehide', this.onVisSave);
+    window.addEventListener('beforeunload', this.onVisSave);
+  }
+
+  private hardRecover(msg: string): void {
+    this.paused = false;
+    this.mapOpen = false;
+    this.player?.setVelocity(0, 0);
+    try {
+      this.tweens.killAll();
+    } catch {
+      /* ignore */
+    }
+    if (this.dust) this.dust.emitting = false;
+    try {
+      this.trail?.emergencyTrim();
+    } catch {
+      /* ignore */
+    }
+    if (this.trailPath) {
+      try {
+        this.trailPath.clear();
+      } catch {
+        /* ignore */
+      }
+    }
+    this.persistSave();
+    setDomStatus(msg);
   }
 
   private persistSave(): void {
@@ -627,48 +669,66 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    // Clamp delta so one hitch doesn't explode physics / trail drops
+    const d = Math.min(delta, 50);
     try {
-    // Always apply DOM/keyboard movement — never let pause eat controls
-    this.handleMovement();
-    if (this.paused || this.mapOpen) {
-      // keep velocity from handleMovement; only skip world sims if map open
-      if (this.mapOpen) this.player.setVelocity(0, 0);
-    }
-    this.handleHotkeys();
-    this.updateRobotFollow();
-    this.updateSasquatch(delta);
-    this.updateTrailHelp(delta);
-    this.updateInteractPrompt();
-    this.consumeTouchActions();
-    this.syncIndoorVisibility();
-    this.updateObjectiveMarker();
-    this.construction.update(delta);
-    const policeMsg = this.police.update(delta);
-    if (policeMsg) this.statusLine = policeMsg;
-    this.updateCitizenSchedules();
-    this.dayNight.update(delta);
-    // Notify jobs when garage completes
-    const garage = this.construction.getOrders().find((o) => o.id === 'robot_garage' && o.done);
-    if (garage && !this.garageCredited) {
-      this.garageCredited = true;
-      this.jobs.onGarageBuilt();
-      this.statusLine = 'Builder Aide unlocked — Job Board updated!';
-      audio.success();
-    }
-    const hudLine = this.interactPrompt || this.statusLine || PHASE_HINTS[this.phase];
-    if (hudLine && hudLine !== this.lastToast) {
-      this.lastToast = hudLine;
-      setDomStatus(hudLine);
-    }
-    setDomMeta(this.inventory.summary() + " · " + this.mysteries.summary(), `Job: ${this.jobs.title()}`);
-    this.trail.updateThrottle(delta);
+      // FPS watchdog — auto-unfreeze without requiring a full restart
+      if (delta > 120) {
+        this.slowFrameStreak++;
+        if (this.slowFrameStreak >= 8) {
+          this.slowFrameStreak = 0;
+          this.hardRecover('Auto-unfroze + saved. Keep playing!');
+          return;
+        }
+      } else {
+        this.slowFrameStreak = 0;
+      }
+
+      // Always apply DOM/keyboard movement — never let pause eat controls
+      this.handleMovement();
+      if (this.paused || this.mapOpen) {
+        // keep velocity from handleMovement; only skip world sims if map open
+        if (this.mapOpen) this.player.setVelocity(0, 0);
+      }
+      this.handleHotkeys();
+      this.updateRobotFollow();
+      this.updateSasquatch(d);
+      this.updateTrailHelp(d);
+      this.updateInteractPrompt();
+      this.consumeTouchActions();
+      this.syncIndoorVisibility();
+      this.updateObjectiveMarker();
+      this.construction.update(d);
+      const policeMsg = this.police.update(d);
+      if (policeMsg) this.statusLine = policeMsg;
+      this.citizenTick += d;
+      if (this.citizenTick > 1000) {
+        this.citizenTick = 0;
+        this.updateCitizenSchedules();
+      }
+      this.dayNight.update(d);
+      // Notify jobs when garage completes
+      const garage = this.construction.getOrders().find((o) => o.id === 'robot_garage' && o.done);
+      if (garage && !this.garageCredited) {
+        this.garageCredited = true;
+        this.jobs.onGarageBuilt();
+        this.statusLine = 'Builder Aide unlocked — Job Board updated!';
+        audio.success();
+      }
+      const now = _time;
+      if (now - this.lastHudWrite > 400) {
+        this.lastHudWrite = now;
+        const hudLine = this.interactPrompt || this.statusLine || PHASE_HINTS[this.phase];
+        if (hudLine && hudLine !== this.lastToast) {
+          this.lastToast = hudLine;
+          setDomStatus(hudLine);
+        }
+        setDomMeta(this.inventory.summary() + ' · ' + this.mysteries.summary(), `Job: ${this.jobs.title()}`);
+      }
+      this.trail.updateThrottle(d);
     } catch (err) {
       console.error('[E-CRAFT] frame error', err);
-      this.paused = false;
-      this.mapOpen = false;
-      this.player?.setVelocity(0, 0);
-      setDomStatus('Glitch recovered — keep playing (progress autosaved)');
-      try { this.persistSave(); } catch { /* ignore */ }
+      this.hardRecover('Glitch recovered — keep playing (progress autosaved)');
     }
   }
 

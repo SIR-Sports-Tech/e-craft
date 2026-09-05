@@ -29,8 +29,27 @@ export class BootScene extends Phaser.Scene {
     const params = new URLSearchParams(location.search);
     const skip = params.get('skiptitle') === '1';
     const cont = params.get('continue') === '1';
-    if (cont) this.registry.set('loadSave', true);
-    this.scene.start(skip || cont ? 'Game' : 'Title');
+    const forceNew = params.get('new') === '1';
+    // Auto-resume saved progress unless explicitly starting new.
+    // This stops "freeze → reload → start over" on phone.
+    let hasSave = false;
+    try {
+      hasSave = !!localStorage.getItem('ecraft_save_v02');
+    } catch {
+      hasSave = false;
+    }
+    if (!forceNew && (cont || hasSave)) {
+      this.registry.set('loadSave', true);
+    }
+    if (forceNew) {
+      try {
+        localStorage.removeItem('ecraft_save_v02');
+      } catch {
+        /* ignore */
+      }
+      this.registry.set('loadSave', false);
+    }
+    this.scene.start(skip || cont || (!forceNew && hasSave) ? 'Game' : 'Title');
   }
 
   private g(): Phaser.GameObjects.Graphics {

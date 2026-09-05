@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { hasSave } from '../systems/SaveSystem';
+import { clearSave, hasSave } from '../systems/SaveSystem';
 import { audio } from '../systems/AudioSystem';
 
 export class TitleScene extends Phaser.Scene {
@@ -64,6 +64,7 @@ export class TitleScene extends Phaser.Scene {
     };
 
     mkBtn(h * 0.42, 'NEW GAME', 0x2e7d32, () => {
+      clearSave();
       this.registry.set('loadSave', false);
       this.scene.start('Game');
     });

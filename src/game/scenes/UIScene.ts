@@ -17,6 +17,9 @@ export class UIScene extends Phaser.Scene {
   private stickPointerId: number | null = null;
   private rewardedShown = false;
   private checklistText!: Phaser.GameObjects.Text;
+  private hudTick = 0;
+  private lastHudKey = '';
+  private mapOpenCached = false;
 
   constructor() {
     super('UI');
@@ -237,23 +240,31 @@ export class UIScene extends Phaser.Scene {
     btns.forEach((b, i) => b.setPosition(positions[i].x, positions[i].y));
   }
 
-  update(): void {
+  update(_t: number, delta: number): void {
     if (!this.gameScene) return;
+    this.hudTick += delta;
+    // Throttle HUD string rebuilds — every-frame text was freezing phones
+    if (this.hudTick < 250 && !this.mapOpenCached) return;
+    this.hudTick = 0;
     const hud = this.gameScene.getHud();
-    this.phaseText.setText(`E-CRAFT v0.1 · ${hud.phase}`);
-    this.hintText.setText(hud.hint);
-    this.statusText.setText(hud.status);
-    // prompt via DOM toast only
-    if (hud.checklist) {
-      const police = (hud.policeLines || []).join('\n');
-      this.checklistText.setText(
-        `E-CRAFT · ${hud.dayPhase || ''}\nJob: ${hud.jobTitle || ''}\n\nMISSION\n` +
-          hud.checklist
-            .map((c: { done: boolean; label: string }) => `${c.done ? '✓' : '○'} ${c.label}`)
-            .join('\n') +
-          (police ? `\n\nPOLICE\n${police}` : '') +
-          '\n\nF9 debug · F10 complete',
-      );
+    this.mapOpenCached = hud.mapOpen;
+    const key = `${hud.phase}|${hud.status}|${hud.dayPhase}|${hud.jobTitle}|${hud.paused}|${hud.mapOpen}|${hud.reward ? 1 : 0}|${hud.checklist?.map((c) => (c.done ? 1 : 0)).join('')}`;
+    if (key !== this.lastHudKey) {
+      this.lastHudKey = key;
+      this.phaseText.setText(`E-CRAFT v1 · ${hud.phase}`);
+      this.hintText.setText(hud.hint);
+      this.statusText.setText(hud.status);
+      if (hud.checklist) {
+        const police = (hud.policeLines || []).join('\n');
+        this.checklistText.setText(
+          `E-CRAFT · ${hud.dayPhase || ''}\nJob: ${hud.jobTitle || ''}\n\nMISSION\n` +
+            hud.checklist
+              .map((c: { done: boolean; label: string }) => `${c.done ? '✓' : '○'} ${c.label}`)
+              .join('\n') +
+            (police ? `\n\nPOLICE\n${police}` : '') +
+            '\n\nAutosave ON · UNFREEZE if stuck',
+        );
+      }
     }
 
     this.pauseOverlay.setVisible(hud.paused);

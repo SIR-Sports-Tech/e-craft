@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.9 — 2026-09-05 — NO MORE START-OVER
+
+### Fixed
+- **Auto-resume**: reload keeps your save (no more start from scratch after freeze)
+- FPS watchdog auto-UNFREEZE + trail emergency trim
+- HUD text rebuild throttled (was freezing phones every frame)
+- Dust particles disabled on phones
+- Autosave every 2s + on tab hide / page close
+- Trail cap 40 + cheaper label updates
+- Phone FPS capped ~40 for stability
+
+### Play
+- Same phone link auto-continues if you already played
+- Fresh start: add `&new=1`
+- Stuck: tap **UNFREEZE / SAVE**
+
+
 ## 1.0.8 — 2026-09-05 — ANTI-FREEZE
 
 ### Fixed
