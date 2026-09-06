@@ -40,6 +40,7 @@ type EcraftApi = {
   holdTracker?: () => void;
   sleep?: () => void;
   enterHouse?: () => void;
+  visitJail?: () => void;
   pantherJump?: () => void;
   pigDrop?: () => void;
   exitIndoor?: () => void;
@@ -163,6 +164,7 @@ export function installDomOverlay(): void {
     #ecraft-actions .sleep { background: #283593; color: #e8eaf6; font-size: 10px; }
     #ecraft-actions .pan { background: #212121; color: #ffeb3b; font-size: 10px; }
     #ecraft-actions .pig { background: #ad1457; color: #fce4ec; font-size: 10px; }
+    #ecraft-actions .jail { background: #4a148c; color: #e1bee7; font-size: 10px; }
     #ecraft-actions .exit { background: #006064; color: #e0f7fa; font-size: 10px; }
 
     #ecraft-pad {
@@ -217,8 +219,9 @@ export function installDomOverlay(): void {
       <button type="button" class="actv wide" id="btn-activate">ACTIVATE ROBOT</button>
       <button type="button" class="exit wide" id="btn-exit">EXIT</button>
       <button type="button" class="home" id="btn-house">GO HOME</button>
+      <button type="button" class="jail" id="btn-jail">VISIT JAIL</button>
       <button type="button" class="sleep" id="btn-sleep">SLEEP</button>
-      <button type="button" class="car" id="btn-car">PATROL</button>
+      <button type="button" class="car" id="btn-car">GET IN CAR</button>
       <button type="button" class="race" id="btn-race">RACE</button>
       <button type="button" class="pan" id="btn-panther">PANTHER!</button>
       <button type="button" class="pig" id="btn-pig">PIG!</button>
@@ -304,6 +307,7 @@ export function installDomOverlay(): void {
   bindAction('btn-activate', 'activateRobot', 'Robot ON');
   bindAction('btn-exit', 'exitIndoor', 'Exited');
   bindAction('btn-house', 'enterHouse', 'Welcome home');
+  bindAction('btn-jail', 'visitJail', 'Visiting jail');
   bindAction('btn-sleep', 'sleep', 'Sleeping…');
   bindAction('btn-panther', 'pantherJump', 'Panther!');
   bindAction('btn-pig', 'pigDrop', 'Oink!');

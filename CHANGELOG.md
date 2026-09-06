@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.6 — 2026-09-05 — GET IN CARS + VISIT JAIL
+
+### Fixed / Added
+- **GET IN CAR works without robot** (robot no longer required)
+- Stand near a city police cruiser + E / GET IN CAR → hop into that **POLICE CAR**
+- **VISIT JAIL** button — see Sasquatch in his cell (mouth moves) after he’s locked up
+
+
 ## 1.5.5 — 2026-09-05 — POLICE RUN YOU OVER
 
 ### Added

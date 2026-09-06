@@ -146,11 +146,57 @@ export class PatrolCarsSystem {
     if (!this.outdoor) return null;
     for (const c of this.cars) {
       if (!c.sprite.visible) continue;
+      if ((c as PatrolCar & { claimed?: boolean }).claimed) continue;
       const d = Phaser.Math.Distance.Between(playerX, playerY, c.sprite.x, c.sprite.y);
       if (d <= hitRadius) {
         return { x: playerX, y: playerY, carX: c.sprite.x, carY: c.sprite.y };
       }
     }
     return null;
+  }
+
+  /** Nearest visible unclaimed patrol cruiser within range (for hopping in). */
+  nearestCar(
+    playerX: number,
+    playerY: number,
+    range = 90,
+  ): { index: number; x: number; y: number } | null {
+    if (!this.outdoor) return null;
+    let bestIndex = -1;
+    let bestX = 0;
+    let bestY = 0;
+    let bestD = Infinity;
+    for (let index = 0; index < this.cars.length; index++) {
+      const c = this.cars[index];
+      if (!c.sprite.visible) continue;
+      if ((c as PatrolCar & { claimed?: boolean }).claimed) continue;
+      const d = Phaser.Math.Distance.Between(playerX, playerY, c.sprite.x, c.sprite.y);
+      if (d <= range && d < bestD) {
+        bestD = d;
+        bestIndex = index;
+        bestX = c.sprite.x;
+        bestY = c.sprite.y;
+      }
+    }
+    return bestIndex >= 0 ? { index: bestIndex, x: bestX, y: bestY } : null;
+  }
+
+  claimCar(index: number): void {
+    const c = this.cars[index];
+    if (!c) return;
+    (c as PatrolCar & { claimed?: boolean }).claimed = true;
+    c.sprite.setVisible(false);
+    const light = (c.sprite as unknown as { light?: Phaser.GameObjects.Arc }).light;
+    light?.setVisible(false);
+  }
+
+  releaseCar(index: number, x: number, y: number): void {
+    const c = this.cars[index];
+    if (!c) return;
+    (c as PatrolCar & { claimed?: boolean }).claimed = false;
+    c.sprite.setPosition(x, y);
+    c.sprite.setVisible(this.outdoor);
+    const light = (c.sprite as unknown as { light?: Phaser.GameObjects.Arc }).light;
+    light?.setVisible(this.outdoor);
   }
 }

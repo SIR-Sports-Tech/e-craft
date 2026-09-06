@@ -39,7 +39,9 @@ export class GameScene extends Phaser.Scene {
   private robot!: Phaser.Physics.Arcade.Sprite;
   private vehicle!: Phaser.Physics.Arcade.Sprite;
   private raceCar!: Phaser.Physics.Arcade.Sprite;
-  private activeCarKey: 'vehicle' | 'race_car' = 'vehicle';
+  private activeCarKey: 'vehicle' | 'race_car' | 'police_car' = 'vehicle';
+  private claimedPatrolIndex: number | null = null;
+  private jailedLabel?: Phaser.GameObjects.Text;
   private sasquatch!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keys!: {
@@ -318,6 +320,11 @@ export class GameScene extends Phaser.Scene {
         this.paused = false;
         this.mapOpen = false;
         this.doEnterHouse();
+      },
+      visitJail: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.doVisitJail();
       },
       pantherJump: () => {
         this.paused = false;
@@ -1696,7 +1703,13 @@ export class GameScene extends Phaser.Scene {
       this.player.setVelocity(0, 0);
       return;
     }
-    const speed = this.flags.inVehicle ? (this.activeCarKey === 'race_car' ? 720 : 560) : 240;
+    const speed = this.flags.inVehicle
+      ? this.activeCarKey === 'race_car'
+        ? 720
+        : this.activeCarKey === 'police_car'
+          ? 640
+          : 560
+      : 240;
     let vx = 0;
     let vy = 0;
     const left = this.cursors.left?.isDown || this.keys.A?.isDown;
@@ -1745,11 +1758,15 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.flags.inVehicle) {
-      const car = this.activeCarKey === 'race_car' ? this.raceCar : this.vehicle;
-      car.setPosition(this.player.x, this.player.y);
-      if (this.player.texture.key !== this.activeCarKey) {
+      const tex = this.activeCarKey;
+      if (this.activeCarKey === 'vehicle') {
+        this.vehicle.setPosition(this.player.x, this.player.y);
+      } else if (this.activeCarKey === 'race_car') {
+        this.raceCar.setPosition(this.player.x, this.player.y);
+      }
+      if (this.player.texture.key !== tex) {
         this.player.anims.stop();
-        this.player.setTexture(this.activeCarKey);
+        this.player.setTexture(tex);
         this.player.setScale(1.05);
         const body = this.player.body as Phaser.Physics.Arcade.Body;
         body.setSize(70, 36).setOffset(10, 12);
@@ -1890,6 +1907,15 @@ export class GameScene extends Phaser.Scene {
         if (!this.flags.inJailBuilding) this.enterJail(true);
         this.player.setPosition(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY);
         this.jailSasquatch();
+        break;
+      case 'exit_jail':
+        if (this.flags.inJailBuilding) this.exitJail();
+        break;
+      case 'visit_jail':
+        this.flags.sasquatchJailed = true;
+        this.doVisitJail();
+        // skip door wait in tests by forcing immediate enter
+        if (!this.flags.inJailBuilding) this.enterJail(true);
         break;
       case 'claim_reward':
         this.grantReward();
@@ -2239,8 +2265,13 @@ export class GameScene extends Phaser.Scene {
     const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
     const jail = CITY_ZONES.find((z) => z.id === 'super_jail')!;
     const house = CITY_ZONES.find((z) => z.id === 'player_house')!;
+    const nearCop = this.patrolCars?.nearestCar?.(this.player.x, this.player.y, 100);
+    if (nearCop) return '[E] Hop in POLICE CAR';
     if (pointInRect(this.player.x, this.player.y, house) || this.near(SPAWN.houseDoor.x, SPAWN.houseDoor.y, 70)) {
       return '[E] Enter Your House (sleep)';
+    }
+    if (pointInRect(this.player.x, this.player.y, jail) || this.near(jail.x + jail.w / 2, jail.y + jail.h, 80)) {
+      return this.flags.sasquatchJailed ? '[E] Visit Sasquatch in jail' : '[E] Enter SUPER JAIL';
     }
     if (!this.flags.hasTracker && pointInRect(this.player.x, this.player.y, hq)) {
       return '[E] Enter underground gadget lair';
@@ -2328,6 +2359,19 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.flags.inJailBuilding) {
+      if (this.flags.sasquatchJailed) {
+        if (this.near(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY, 100)) {
+          this.statusLine = 'Sasquatch growls behind bars… still locked up.';
+          setDomStatus(this.statusLine);
+          if (this.jailedSprite?.anims) this.jailedSprite.play('sasquatch-talk', true);
+          return;
+        }
+        if (this.near(JAIL_INTERIOR.exitX + 40, JAIL_INTERIOR.exitY + 40, 90)) {
+          this.exitJail();
+          return;
+        }
+        return;
+      }
       if (
         !this.flags.sasquatchJailed &&
         this.near(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY, 80) &&
@@ -2436,38 +2480,68 @@ export class GameScene extends Phaser.Scene {
 
     if (this.flags.inVehicle) {
       this.flags.inVehicle = false;
-      const car = this.activeCarKey === 'race_car' ? this.raceCar : this.vehicle;
-      car.setPosition(this.player.x, this.player.y);
-      car.setVisible(true);
+      if (this.activeCarKey === 'police_car' && this.claimedPatrolIndex != null) {
+        this.patrolCars.releaseCar(this.claimedPatrolIndex, this.player.x, this.player.y);
+        this.claimedPatrolIndex = null;
+      } else {
+        const car = this.activeCarKey === 'race_car' ? this.raceCar : this.vehicle;
+        car.setPosition(this.player.x, this.player.y);
+        car.setVisible(true);
+      }
+      this.activeCarKey = 'vehicle';
       this.ensurePlayerOnFootSheet();
       this.updatePlayerAnim(false);
       if (this.flags.sasquatchInVehicle) {
         this.sasquatch.setPosition(this.player.x + 40, this.player.y);
       }
       this.statusLine = 'Exited vehicle.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+
+    // Hop into nearby police cruiser with E
+    const nearCop = this.patrolCars.nearestCar(this.player.x, this.player.y, 100);
+    if (nearCop) {
+      this.doEnterCar('police_car');
       return;
     }
   }
 
 
-  private enterVehicle(allowWithoutSasq = true, kind: 'vehicle' | 'race_car' = 'vehicle'): void {
+  private enterVehicle(allowWithoutSasq = true, kind: 'vehicle' | 'race_car' | 'police_car' = 'vehicle'): void {
     this.flags.inVehicle = true;
     this.activeCarKey = kind;
-    const car = kind === 'race_car' ? this.raceCar : this.vehicle;
-    const other = kind === 'race_car' ? this.vehicle : this.raceCar;
-    this.player.setPosition(car.x, car.y);
-    car.setVisible(false);
-    other.setVisible(true);
-    this.player.anims.stop();
-    this.player.setTexture(kind);
-    this.player.setScale(1.05);
-    this.player.setDrag(0);
-    this.player.setMaxVelocity(kind === 'race_car' ? 900 : 700);
-    const body = this.player.body as Phaser.Physics.Arcade.Body;
-    body.enable = true;
-    body.setAllowGravity(false);
-    body.setSize(70, 36).setOffset(10, 12);
-    body.setVelocity(0, 0);
+    if (kind === 'police_car') {
+      // Driving a claimed city cruiser — park bay cars stay visible
+      this.vehicle.setVisible(true);
+      this.raceCar.setVisible(true);
+      this.player.anims.stop();
+      this.player.setTexture('police_car');
+      this.player.setScale(1.05);
+      this.player.setDrag(0);
+      this.player.setMaxVelocity(780);
+      const body = this.player.body as Phaser.Physics.Arcade.Body;
+      body.enable = true;
+      body.setAllowGravity(false);
+      body.setSize(70, 36).setOffset(10, 12);
+      body.setVelocity(0, 0);
+    } else {
+      const car = kind === 'race_car' ? this.raceCar : this.vehicle;
+      const other = kind === 'race_car' ? this.vehicle : this.raceCar;
+      this.player.setPosition(car.x, car.y);
+      car.setVisible(false);
+      other.setVisible(true);
+      this.player.anims.stop();
+      this.player.setTexture(kind);
+      this.player.setScale(1.05);
+      this.player.setDrag(0);
+      this.player.setMaxVelocity(kind === 'race_car' ? 900 : 700);
+      const body = this.player.body as Phaser.Physics.Arcade.Body;
+      body.enable = true;
+      body.setAllowGravity(false);
+      body.setSize(70, 36).setOffset(10, 12);
+      body.setVelocity(0, 0);
+    }
     const sasqNear =
       this.flags.sasquatchCaptured &&
       Phaser.Math.Distance.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y) < 160;
@@ -2551,21 +2625,39 @@ export class GameScene extends Phaser.Scene {
     if (this.flags.inJailBuilding) this.exitJail();
   }
 
-  /** One-tap car: requires robot, snaps to vehicle and drives. */
-  private doEnterCar(kind: 'vehicle' | 'race_car' = 'vehicle'): void {
-    if (!this.flags.robotActive) {
-      this.statusLine = 'Activate robot first (tap ACTIVATE twice)!';
-      setDomStatus(this.statusLine);
-      return;
-    }
+  /** One-tap car — no robot required. Prefers nearby AI police cruiser if close. */
+  private doEnterCar(kind: 'vehicle' | 'race_car' | 'police_car' = 'vehicle'): void {
+    if (this.flattened) this.unflattenPlayer();
     this.leaveIndoorsIfNeeded();
     this.flags.inHouse = false;
     this.flags.inLair = false;
     this.flags.inJailBuilding = false;
 
+    // Hop into a nearby city police car if standing close
+    if (kind !== 'race_car') {
+      const near = this.patrolCars.nearestCar(this.player.x, this.player.y, 110);
+      if (near) {
+        this.claimedPatrolIndex = near.index;
+        this.patrolCars.claimCar(near.index);
+        this.activeCarKey = 'police_car';
+        this.player.setPosition(near.x, near.y);
+        if (this.flags.sasquatchCaptured && !this.flags.sasquatchJailed) {
+          this.sasquatch.setPosition(this.player.x - 28, this.player.y);
+          this.sasquatch.setAngle(0);
+          this.sasquatch.clearTint();
+          this.flags.sasquatchInVehicle = true;
+        }
+        this.enterVehicle(true, 'police_car');
+        this.player.setVelocity(500, 0);
+        this.statusLine = '🚔 POLICE CAR — you hopped in! Hold D-pad to drive.';
+        setDomStatus(this.statusLine);
+        return;
+      }
+    }
+
     const car = kind === 'race_car' ? this.raceCar : this.vehicle;
-    this.activeCarKey = kind;
-    // Park the other car visibly if switching
+    this.activeCarKey = kind === 'race_car' ? 'race_car' : 'vehicle';
+    this.claimedPatrolIndex = null;
     if (kind === 'race_car') {
       this.vehicle.setVisible(true);
     } else {
@@ -2573,7 +2665,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.player.setPosition(car.x, car.y);
-    if (this.flags.sasquatchCaptured) {
+    if (this.flags.sasquatchCaptured && !this.flags.sasquatchJailed) {
       this.sasquatch.setPosition(this.player.x - 28, this.player.y);
       this.sasquatch.setAngle(0);
       this.sasquatch.clearTint();
@@ -2581,12 +2673,17 @@ export class GameScene extends Phaser.Scene {
       if (b) b.enable = true;
       this.flags.sasquatchInVehicle = true;
     }
-    this.enterVehicle(true, kind);
+    this.enterVehicle(true, this.activeCarKey);
     const kick = kind === 'race_car' ? 620 : 480;
     this.player.setVelocity(kick, 0);
-    this.statusLine = kind === 'race_car'
-      ? (this.flags.sasquatchInVehicle ? 'RACE CAR + Sasquatch — GO!' : 'RACE CAR — hold D-pad!')
-      : (this.flags.sasquatchInVehicle ? 'Patrol car + Sasquatch — DRIVE!' : 'PATROL CAR — hold D-pad!');
+    this.statusLine =
+      kind === 'race_car'
+        ? this.flags.sasquatchInVehicle
+          ? 'RACE CAR + Sasquatch — GO!'
+          : 'RACE CAR — hold D-pad!'
+        : this.flags.sasquatchInVehicle
+          ? 'Security car + Sasquatch — DRIVE!'
+          : 'Security car — hold D-pad! (Stand near a cruiser to hop in a POLICE CAR)';
     setDomStatus(this.statusLine);
   }
 
@@ -2792,15 +2889,76 @@ export class GameScene extends Phaser.Scene {
     this.trailLayer.setVisible(false);
     this.vehicle.setVisible(false);
     if (this.raceCar) this.raceCar.setVisible(false);
-    this.sasquatch.setVisible(false);
     this.robot.setVisible(false);
     if (this.heldTracker) this.heldTracker.setVisible(false);
     this.player.setPosition(JAIL_INTERIOR.exitX + 100, JAIL_INTERIOR.exitY + 100);
     this.cameras.main.stopFollow();
     this.cameras.main.centerOn(JAIL_INTERIOR.x + JAIL_INTERIOR.w / 2, JAIL_INTERIOR.y + JAIL_INTERIOR.h / 2);
-    this.setPhase(MissionPhase.AtSuperJail);
-    this.statusLine = 'Door opened — SUPER JAIL. Lock Sasquatch in the cell!';
-    setDomStatus(this.statusLine);
+
+    // Visiting jailed Sasquatch — show him in the cell
+    if (this.flags.sasquatchJailed) {
+      this.showJailedSasquatchVisit();
+      this.statusLine = 'Visiting Sasquatch in his cell. He is locked up!';
+      setDomStatus(this.statusLine);
+    } else {
+      this.sasquatch.setVisible(false);
+      this.setPhase(MissionPhase.AtSuperJail);
+      this.statusLine = 'Door opened — SUPER JAIL. Lock Sasquatch in the cell!';
+      setDomStatus(this.statusLine);
+    }
+  }
+
+  /** Show Sasquatch behind bars so you can visit him. */
+  private showJailedSasquatchVisit(): void {
+    this.sasquatch.setVisible(false);
+    if (!this.jailedSprite) {
+      this.jailedSprite = this.add
+        .sprite(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY, 'sasquatch_sheet', 0)
+        .setDepth(23)
+        .setScale(1.05);
+      this.indoorLayer.add(this.jailedSprite);
+      this.jailNodes.push(this.jailedSprite);
+    }
+    this.jailedSprite.setTexture('sasquatch_sheet', 0);
+    this.jailedSprite.setPosition(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY);
+    this.jailedSprite.setVisible(true);
+    this.jailedSprite.clearTint();
+    if (this.jailedSprite.anims) {
+      this.jailedSprite.play('sasquatch-idle', true); // mouth moves while you visit
+    }
+    this.cellMarker?.setVisible(true);
+
+    if (!this.jailedLabel) {
+      this.jailedLabel = this.add
+        .text(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY + 58, '║ VISITING SASQUATCH ║', {
+          fontSize: '13px',
+          color: '#ffe082',
+          backgroundColor: '#000000cc',
+          padding: { x: 6, y: 3 },
+        })
+        .setOrigin(0.5)
+        .setDepth(24);
+      this.indoorLayer.add(this.jailedLabel);
+      this.jailNodes.push(this.jailedLabel);
+    }
+    this.jailedLabel.setVisible(true);
+    this.jailedLabel.setText('║ VISITING SASQUATCH ║');
+  }
+
+  private doVisitJail(): void {
+    if (this.flags.inVehicle) {
+      // exit car first so we can walk in
+      this.flags.inVehicle = false;
+      if (this.claimedPatrolIndex != null) {
+        this.patrolCars.releaseCar(this.claimedPatrolIndex, this.player.x, this.player.y);
+        this.claimedPatrolIndex = null;
+      }
+      this.ensurePlayerOnFootSheet();
+    }
+    this.leaveIndoorsIfNeeded();
+    const jail = CITY_ZONES.find((z) => z.id === 'super_jail')!;
+    this.player.setPosition(jail.x + jail.w / 2, jail.y + jail.h - 20);
+    this.enterJail();
   }
 
   private doEnterHouse(): void {
@@ -2933,24 +3091,8 @@ export class GameScene extends Phaser.Scene {
     this.flags.sasquatchInVehicle = false;
     this.flags.sasquatchCaptured = true;
     this.sasquatch.setVisible(false);
-    if (!this.jailedSprite) {
-      this.jailedSprite = this.add
-        .sprite(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY, 'sasquatch')
-        .setDepth(23)
-        .setScale(1.1)
-        .setTint(0xff5252);
-      const bars = this.add
-        .text(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY + 50, '║ JAILED ║', {
-          fontSize: '14px',
-          color: '#ffe082',
-          backgroundColor: '#000000cc',
-          padding: { x: 6, y: 3 },
-        })
-        .setOrigin(0.5)
-        .setDepth(24);
-      void bars;
-    }
-    this.jailedSprite.setVisible(true);
+    this.showJailedSasquatchVisit();
+    if (this.jailedLabel) this.jailedLabel.setText('║ JAILED ║');
     this.cellMarker?.setVisible(true);
     this.inventory.add('keycard');
     this.jobs.onMissionJailed();
