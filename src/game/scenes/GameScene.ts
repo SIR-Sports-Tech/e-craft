@@ -141,6 +141,13 @@ export class GameScene extends Phaser.Scene {
   private sasquatchDragging = false;
   private sasquatchDragAngle = 90;
   private ropeGfx?: Phaser.GameObjects.Graphics;
+  /** Roof lights when driving Cybertruck police */
+  private playerPoliceLights?: {
+    red: Phaser.GameObjects.Arc;
+    blue: Phaser.GameObjects.Arc;
+    glow: Phaser.GameObjects.Arc;
+    t: number;
+  };
   /** Flattened by a police car — can't move until recovered. */
   private flattened = false;
   private flattenInvuln = 0;
@@ -650,6 +657,36 @@ export class GameScene extends Phaser.Scene {
     document.addEventListener('visibilitychange', this.onVisSave);
     window.addEventListener('pagehide', this.onVisSave);
     window.addEventListener('beforeunload', this.onVisSave);
+  }
+
+  /** Flashing roof lights while driving the Cybertruck police vehicle. */
+  private updatePlayerPoliceLights(delta: number, outdoors: boolean): void {
+    const drivingPolice = this.flags.inVehicle && this.activeCarKey === 'police_car' && outdoors;
+    if (!drivingPolice) {
+      if (this.playerPoliceLights) {
+        this.playerPoliceLights.red.setVisible(false);
+        this.playerPoliceLights.blue.setVisible(false);
+        this.playerPoliceLights.glow.setVisible(false);
+      }
+      return;
+    }
+    if (!this.playerPoliceLights) {
+      this.playerPoliceLights = {
+        glow: this.add.circle(0, 0, 14, 0xffffff, 0.2).setDepth(14),
+        red: this.add.circle(0, 0, 6, 0xff1744, 0.95).setDepth(15),
+        blue: this.add.circle(0, 0, 6, 0x2979ff, 0.95).setDepth(15),
+        t: 0,
+      };
+    }
+    const L = this.playerPoliceLights;
+    L.t += delta;
+    const blink = Math.floor(L.t / 200) % 2 === 0;
+    const ox = this.player.x;
+    const oy = this.player.y - 22;
+    L.glow.setPosition(ox, oy).setVisible(true);
+    L.glow.setFillStyle(blink ? 0xff1744 : 0x2979ff, 0.25);
+    L.red.setPosition(ox - 8, oy).setVisible(true).setAlpha(blink ? 1 : 0.2);
+    L.blue.setPosition(ox + 8, oy).setVisible(true).setAlpha(blink ? 0.2 : 1);
   }
 
   /**
@@ -2290,6 +2327,7 @@ export class GameScene extends Phaser.Scene {
       this.dayNight.setOutdoorVisible(outdoors);
       this.patrolCars.setOutdoorVisible(outdoors);
       this.patrolCars.update(d);
+      this.updatePlayerPoliceLights(d, outdoors);
       if (outdoors) this.updateTrafficSignals(d);
       if (this.flattenInvuln > 0) this.flattenInvuln -= d;
       if (
@@ -2630,9 +2668,11 @@ export class GameScene extends Phaser.Scene {
       if (this.player.texture.key !== tex) {
         this.player.anims.stop();
         this.player.setTexture(tex);
-        this.player.setScale(1.05);
+        this.player.setScale(tex === 'police_car' ? 0.95 : 1.05);
         const body = this.player.body as Phaser.Physics.Arcade.Body;
-        body.setSize(70, 36).setOffset(10, 12);
+        // Cybertruck police is larger; other cars keep compact hitbox
+        if (tex === 'police_car') body.setSize(88, 40).setOffset(18, 22);
+        else body.setSize(70, 36).setOffset(10, 12);
       }
     } else {
       this.updatePlayerAnim(true);
@@ -3521,13 +3561,13 @@ export class GameScene extends Phaser.Scene {
       this.raceCar.setVisible(true);
       this.player.anims.stop();
       this.player.setTexture('police_car');
-      this.player.setScale(1.05);
+      this.player.setScale(0.95);
       this.player.setDrag(0);
       this.player.setMaxVelocity(780);
       const body = this.player.body as Phaser.Physics.Arcade.Body;
       body.enable = true;
       body.setAllowGravity(false);
-      body.setSize(70, 36).setOffset(10, 12);
+      body.setSize(88, 40).setOffset(18, 22);
       body.setVelocity(0, 0);
     } else {
       const car = kind === 'race_car' ? this.raceCar : this.vehicle;
@@ -3660,7 +3700,7 @@ export class GameScene extends Phaser.Scene {
         }
         this.enterVehicle(true, 'police_car');
         this.player.setVelocity(500, 0);
-        this.statusLine = '🚔 POLICE CAR — you hopped in! Hold D-pad to drive.';
+        this.statusLine = '🚔 CYBERTRUCK POLICE — hopped in! Lights on — drive with the stick.';
         setDomStatus(this.statusLine);
         return;
       }

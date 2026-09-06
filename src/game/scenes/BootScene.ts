@@ -811,46 +811,121 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makePoliceCar(): void {
-    // Classic black-and-white city police cruiser (distinct from green security car)
+    // Cybertruck-style police vehicle — angular stainless wedge + roof lightbar
     const g = this.g();
-    g.fillStyle(0x000000, 0.25);
-    g.fillEllipse(48, 54, 70, 12);
-    // body white
-    g.fillStyle(0xf5f5f5, 1);
-    g.fillRoundedRect(6, 18, 84, 30, 10);
-    // black doors / hood band
-    g.fillStyle(0x212121, 1);
-    g.fillRect(28, 18, 40, 30);
-    // cabin
-    g.fillStyle(0x37474f, 1);
-    g.fillRoundedRect(34, 6, 34, 20, 5);
-    // glass
-    g.fillStyle(0x81d4fa, 1);
-    g.fillRoundedRect(38, 9, 12, 12, 2);
-    g.fillRoundedRect(54, 9, 12, 12, 2);
-    // lightbar
-    g.fillStyle(0xf44336, 1);
-    g.fillRect(40, 2, 10, 5);
-    g.fillStyle(0x2196f3, 1);
-    g.fillRect(52, 2, 10, 5);
-    // POLICE text block
-    g.fillStyle(0xffee58, 1);
-    g.fillRect(32, 28, 32, 10);
-    g.fillStyle(0x000000, 1);
-    g.fillRect(34, 30, 6, 6);
-    g.fillRect(42, 30, 6, 6);
-    g.fillRect(50, 30, 6, 6);
-    // wheels
-    g.fillStyle(0x111111, 1);
-    g.fillCircle(22, 48, 9);
-    g.fillCircle(74, 48, 9);
-    g.fillStyle(0xbdbdbd, 1);
-    g.fillCircle(22, 48, 3);
-    g.fillCircle(74, 48, 3);
-    // bumper
+    const W = 128;
+    const H = 72;
+    // ground shadow
+    g.fillStyle(0x000000, 0.28);
+    g.fillEllipse(W / 2, H - 6, 96, 14);
+
+    // —— Stainless exoskeleton (flat angular panels, no soft curves) ——
+    // Main body slab
+    g.fillStyle(0xb0bec5, 1);
+    g.fillTriangle(8, 44, 118, 44, 108, 22); // upper wedge plane
     g.fillStyle(0x90a4ae, 1);
-    g.fillRect(88, 26, 6, 14);
-    g.generateTexture('police_car', 96, 60);
+    g.fillTriangle(8, 44, 118, 44, 14, 58); // lower belly plane
+    // Hard side panel
+    g.fillStyle(0xcfd8dc, 1);
+    g.fillPoints(
+      [
+        { x: 14, y: 28 },
+        { x: 102, y: 20 },
+        { x: 116, y: 42 },
+        { x: 108, y: 56 },
+        { x: 18, y: 56 },
+        { x: 8, y: 44 },
+      ],
+      true,
+    );
+    // Panel seam lines (Cybertruck facet look)
+    g.lineStyle(2, 0x78909c, 0.9);
+    g.lineBetween(22, 30, 100, 24);
+    g.lineBetween(18, 44, 110, 44);
+    g.lineBetween(100, 24, 112, 48);
+
+    // Angular nose / front fascia
+    g.fillStyle(0x78909c, 1);
+    g.fillTriangle(108, 28, 126, 42, 108, 54);
+    g.fillStyle(0x455a64, 1);
+    g.fillRect(118, 38, 8, 6); // LED headlight strip
+    g.fillStyle(0xfff59d, 1);
+    g.fillRect(119, 39, 6, 4);
+
+    // Cabin / windshield (steep angular glass)
+    g.fillStyle(0x263238, 1);
+    g.fillPoints(
+      [
+        { x: 48, y: 18 },
+        { x: 88, y: 14 },
+        { x: 96, y: 28 },
+        { x: 52, y: 32 },
+      ],
+      true,
+    );
+    g.fillStyle(0x4fc3f7, 0.95);
+    g.fillPoints(
+      [
+        { x: 52, y: 20 },
+        { x: 86, y: 16 },
+        { x: 92, y: 27 },
+        { x: 54, y: 30 },
+      ],
+      true,
+    );
+
+    // Roof lightbar housing
+    g.fillStyle(0x212121, 1);
+    g.fillRect(56, 6, 36, 10);
+    g.fillStyle(0x37474f, 1);
+    g.fillRect(58, 7, 32, 8);
+    // Red / blue police lamps
+    g.fillStyle(0xff1744, 1);
+    g.fillRect(60, 8, 12, 6);
+    g.fillStyle(0x2979ff, 1);
+    g.fillRect(76, 8, 12, 6);
+    // Lamp glow tips
+    g.fillStyle(0xff8a80, 0.85);
+    g.fillRect(61, 9, 4, 4);
+    g.fillStyle(0x82b1ff, 0.85);
+    g.fillRect(83, 9, 4, 4);
+
+    // Door POLICE badge (dark band + gold)
+    g.fillStyle(0x212121, 1);
+    g.fillRect(40, 36, 44, 12);
+    g.fillStyle(0xffd54f, 1);
+    g.fillRect(44, 38, 36, 8);
+    g.fillStyle(0x000000, 1);
+    // Simple block letters as bars (reads as POLICE at game scale)
+    g.fillRect(46, 40, 3, 4);
+    g.fillRect(51, 40, 3, 4);
+    g.fillRect(56, 40, 3, 4);
+    g.fillRect(61, 40, 3, 4);
+    g.fillRect(66, 40, 3, 4);
+    g.fillRect(71, 40, 3, 4);
+
+    // Rear bed / angular tail
+    g.fillStyle(0x90a4ae, 1);
+    g.fillTriangle(8, 30, 28, 24, 28, 52);
+    g.fillStyle(0xff1744, 1);
+    g.fillRect(10, 40, 4, 8); // rear marker
+
+    // Oversized black wheels (Cybertruck stance)
+    g.fillStyle(0x111111, 1);
+    g.fillCircle(34, 56, 11);
+    g.fillCircle(92, 56, 11);
+    g.fillStyle(0x424242, 1);
+    g.fillCircle(34, 56, 6);
+    g.fillCircle(92, 56, 6);
+    g.fillStyle(0xbdbdbd, 1);
+    g.fillCircle(34, 56, 2);
+    g.fillCircle(92, 56, 2);
+
+    // Lower stainless rocker
+    g.fillStyle(0x607d8b, 1);
+    g.fillRect(24, 52, 80, 4);
+
+    g.generateTexture('police_car', W, H);
     g.destroy();
   }
 

@@ -46,6 +46,9 @@ interface PatrolCar {
   idx: number;
   speed: number;
   lightT: number;
+  lightRed: Phaser.GameObjects.Arc;
+  lightBlue: Phaser.GameObjects.Arc;
+  lightGlow: Phaser.GameObjects.Arc;
 }
 
 /**
@@ -65,21 +68,27 @@ export class PatrolCarsSystem {
       const route = ROUTES[i];
       const start = route[0];
       const sprite = this.scene.physics.add.sprite(start.x, start.y, 'police_car');
-      sprite.setDepth(8).setScale(0.95);
+      sprite.setDepth(8).setScale(0.92);
       // MUST be movable vs static walls — immovable+static skips separation (ghosting)
       sprite.setImmovable(false);
       sprite.body!.enable = true;
-      sprite.body!.setSize(70, 36).setOffset(10, 12);
+      // Cybertruck footprint (texture 128×72)
+      sprite.body!.setSize(88, 40).setOffset(18, 22);
       sprite.body!.setBounce(0, 0);
       sprite.body!.setDrag(0, 0);
-      const light = this.scene.add.circle(0, -18, 5, 0x2979ff, 0.9).setDepth(9);
-      (sprite as unknown as { light: Phaser.GameObjects.Arc }).light = light;
+      // Dual roof lightbar + soft glow (Cybertruck police)
+      const lightGlow = this.scene.add.circle(0, -22, 14, 0xffffff, 0.18).setDepth(8);
+      const lightRed = this.scene.add.circle(0, -22, 6, 0xff1744, 0.95).setDepth(9);
+      const lightBlue = this.scene.add.circle(0, -22, 6, 0x2979ff, 0.95).setDepth(9);
       this.cars.push({
         sprite,
         route,
         idx: 1 % route.length,
         speed: 140 + i * 25,
         lightT: i * 200,
+        lightRed,
+        lightBlue,
+        lightGlow,
       });
     }
   }
@@ -88,8 +97,9 @@ export class PatrolCarsSystem {
     this.outdoor = vis;
     for (const c of this.cars) {
       c.sprite.setVisible(vis);
-      const light = (c.sprite as unknown as { light?: Phaser.GameObjects.Arc }).light;
-      light?.setVisible(vis);
+      c.lightRed.setVisible(vis);
+      c.lightBlue.setVisible(vis);
+      c.lightGlow.setVisible(vis);
     }
   }
 
@@ -99,8 +109,11 @@ export class PatrolCarsSystem {
 
   update(delta: number): void {
     if (!this.outdoor) return;
-    const dt = delta / 1000;
     for (const c of this.cars) {
+      if ((c as PatrolCar & { claimed?: boolean }).claimed) {
+        c.sprite.setVelocity(0, 0);
+        continue;
+      }
       const target = c.route[c.idx];
       const dx = target.x - c.sprite.x;
       const dy = target.y - c.sprite.y;
@@ -109,12 +122,8 @@ export class PatrolCarsSystem {
         c.idx = (c.idx + 1) % c.route.length;
         continue;
       }
-      const step = Math.min(c.speed * dt, dist);
       // Use velocity so Arcade colliders with buildings/craft walls apply
       c.sprite.setVelocity((dx / dist) * c.speed, (dy / dist) * c.speed);
-      if (dist < step + 2) {
-        c.sprite.setVelocity(0, 0);
-      }
       // Face travel direction (cars are side-view-ish / top-down oval)
       if (Math.abs(dx) > Math.abs(dy)) {
         c.sprite.setFlipX(dx < 0);
@@ -124,15 +133,23 @@ export class PatrolCarsSystem {
         c.sprite.setAngle(dy > 0 ? 90 : -90);
       }
 
-      // Flashing light
+      // Flashing Cybertruck roof lightbar (alternating red / blue)
       c.lightT += delta;
-      const light = (c.sprite as unknown as { light?: Phaser.GameObjects.Arc }).light;
-      if (light) {
-        light.setPosition(c.sprite.x, c.sprite.y - 16);
-        const blink = Math.floor(c.lightT / 280) % 2 === 0;
-        light.setFillStyle(blink ? 0x2979ff : 0xff1744, 0.95);
-        light.setVisible(true);
-      }
+      const blink = Math.floor(c.lightT / 220) % 2 === 0;
+      const ang = Phaser.Math.DegToRad(c.sprite.angle);
+      const roofOx = Math.sin(ang) * -2;
+      const roofOy = -22;
+      const sideX = Math.cos(ang) * 8;
+      const sideY = Math.sin(ang) * 8;
+      c.lightGlow.setPosition(c.sprite.x + roofOx, c.sprite.y + roofOy);
+      c.lightGlow.setFillStyle(blink ? 0xff1744 : 0x2979ff, 0.22);
+      c.lightRed.setPosition(c.sprite.x + roofOx - sideX, c.sprite.y + roofOy - sideY);
+      c.lightBlue.setPosition(c.sprite.x + roofOx + sideX, c.sprite.y + roofOy + sideY);
+      c.lightRed.setAlpha(blink ? 1 : 0.25);
+      c.lightBlue.setAlpha(blink ? 0.25 : 1);
+      c.lightRed.setVisible(true);
+      c.lightBlue.setVisible(true);
+      c.lightGlow.setVisible(true);
     }
   }
 
@@ -197,8 +214,10 @@ export class PatrolCarsSystem {
     if (!c) return;
     (c as PatrolCar & { claimed?: boolean }).claimed = true;
     c.sprite.setVisible(false);
-    const light = (c.sprite as unknown as { light?: Phaser.GameObjects.Arc }).light;
-    light?.setVisible(false);
+    c.sprite.setVelocity(0, 0);
+    c.lightRed.setVisible(false);
+    c.lightBlue.setVisible(false);
+    c.lightGlow.setVisible(false);
   }
 
   releaseCar(index: number, x: number, y: number): void {
@@ -207,7 +226,8 @@ export class PatrolCarsSystem {
     (c as PatrolCar & { claimed?: boolean }).claimed = false;
     c.sprite.setPosition(x, y);
     c.sprite.setVisible(this.outdoor);
-    const light = (c.sprite as unknown as { light?: Phaser.GameObjects.Arc }).light;
-    light?.setVisible(this.outdoor);
+    c.lightRed.setVisible(this.outdoor);
+    c.lightBlue.setVisible(this.outdoor);
+    c.lightGlow.setVisible(this.outdoor);
   }
 }
