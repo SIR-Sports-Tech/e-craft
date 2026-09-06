@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.3 — 2026-09-05 — SIDE-VIEW WALK + FACE TURN
+
+### Fixed / Added
+- Player is now a true **side-view** walk cycle (profile face + nose + stride)
+- Turning left/right **points his face** that direction (flipX)
+- Up/down keeps last facing so he still looks like a side walker
+
+
 ## 1.5.2 — 2026-09-05 — PIG FALLS ON YOUR HEAD
 
 ### Added

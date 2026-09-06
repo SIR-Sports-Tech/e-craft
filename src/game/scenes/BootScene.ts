@@ -167,81 +167,93 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makePlayer(): void {
-    // Security officer walk cycle — legs + feet actually step (not a slide)
-    const fw = 64;
-    const fh = 64;
-    const frames = 6;
+    /**
+     * SIDE-VIEW security officer (faces RIGHT by default).
+     * FlipX in-game to face LEFT. Clear stride + profile face.
+     */
+    const fw = 72;
+    const fh = 72;
+    const frames = 8;
     const sheet = this.make.graphics({ x: 0, y: 0 });
 
-    const drawFrame = (g: Phaser.GameObjects.Graphics, ox: number, frame: number) => {
-      // Walk cycle phase 0..5 — alternating stride with plant / lift feet
-      const phase = frame / frames;
-      const swing = Math.sin(phase * Math.PI * 2); // -1..1
-      const swing2 = Math.sin(phase * Math.PI * 2 + Math.PI); // opposite leg
-      const bob = Math.abs(Math.sin(phase * Math.PI * 2)) * -2;
-      const leftStride = swing * 7;
-      const rightStride = swing2 * 7;
-      // Lift planted foot slightly when swinging forward
-      const leftLift = Math.max(0, swing) * 4;
-      const rightLift = Math.max(0, swing2) * 4;
-      const leftArm = swing2 * 5;
-      const rightArm = swing * 5;
+    const drawSideFrame = (g: Phaser.GameObjects.Graphics, ox: number, frame: number, walking: boolean) => {
+      const phase = walking ? frame / frames : 0;
+      const swing = walking ? Math.sin(phase * Math.PI * 2) : 0;
+      const bob = walking ? Math.abs(Math.sin(phase * Math.PI * 2)) * -2 : 0;
+      // Back leg / front leg in profile
+      const backLegX = swing * 8;
+      const frontLegX = -swing * 8;
+      const backLift = Math.max(0, -swing) * 5;
+      const frontLift = Math.max(0, swing) * 5;
+      const armSwing = walking ? -swing * 7 : 0;
 
-      // ground shadow (stretches a bit with stride)
+      // shadow
       g.fillStyle(0x000000, 0.28);
-      g.fillEllipse(ox + 32, fh - 3, 30 + Math.abs(swing) * 2, 9);
+      g.fillEllipse(ox + 36, fh - 3, 34 + Math.abs(swing) * 3, 8);
 
-      // LEFT LEG (navy pants)
-      g.fillStyle(0x1a237e, 1);
-      g.fillRoundedRect(ox + 22 + leftStride * 0.35, 40 + bob - leftLift * 0.3, 9, 16 + leftLift * 0.2, 2);
-      // left boot / foot — clear heel-toe plant
-      g.fillStyle(0x212121, 1);
-      g.fillEllipse(ox + 26 + leftStride, 58 + bob - leftLift, 14, 7);
-      g.fillStyle(0x424242, 1);
-      g.fillEllipse(ox + 30 + leftStride, 57 + bob - leftLift, 6, 4);
+      // BACK LEG (far, navy)
+      g.fillStyle(0x0d1b4a, 1);
+      g.fillRoundedRect(ox + 28 + backLegX, 42 + bob - backLift, 10, 18 + backLift * 0.3, 2);
+      g.fillStyle(0x111111, 1);
+      g.fillEllipse(ox + 36 + backLegX, 60 + bob - backLift, 14, 6);
 
-      // RIGHT LEG
-      g.fillStyle(0x1a237e, 1);
-      g.fillRoundedRect(ox + 33 + rightStride * 0.35, 40 + bob - rightLift * 0.3, 9, 16 + rightLift * 0.2, 2);
-      // right boot
-      g.fillStyle(0x212121, 1);
-      g.fillEllipse(ox + 38 + rightStride, 58 + bob - rightLift, 14, 7);
-      g.fillStyle(0x424242, 1);
-      g.fillEllipse(ox + 42 + rightStride, 57 + bob - rightLift, 6, 4);
-
-      // torso / jacket (slight counter-rotate feel via bob)
+      // TORSO side profile
       g.fillStyle(0x1565c0, 1);
-      g.fillRoundedRect(ox + 18, 24 + bob, 28, 22, 6);
-      // badge
+      g.fillRoundedRect(ox + 24, 24 + bob, 26, 24, 5);
+      // badge on chest
       g.fillStyle(0xffe082, 1);
-      g.fillCircle(ox + 32, 34 + bob, 4);
-      g.lineStyle(2, 0xffffff, 0.35);
-      g.strokeRoundedRect(ox + 18, 24 + bob, 28, 22, 6);
+      g.fillCircle(ox + 40, 34 + bob, 3.5);
+      g.lineStyle(2, 0xffffff, 0.3);
+      g.strokeRoundedRect(ox + 24, 24 + bob, 26, 24, 5);
 
-      // arms swing opposite to legs
-      g.fillStyle(0x0d47a1, 1);
-      g.fillRoundedRect(ox + 8 + leftArm * 0.2, 26 + bob + leftArm * 0.15, 10, 16, 3);
-      g.fillRoundedRect(ox + 46 + rightArm * 0.2, 26 + bob + rightArm * 0.15, 10, 16, 3);
-      // hands
-      g.fillStyle(0xffcc80, 1);
-      g.fillCircle(ox + 13 + leftArm * 0.25, 44 + bob + leftArm * 0.2, 4);
-      g.fillCircle(ox + 51 + rightArm * 0.25, 44 + bob + rightArm * 0.2, 4);
-
-      // head
-      g.fillStyle(0xffcc80, 1);
-      g.fillCircle(ox + 32, 16 + bob, 12);
-      // helmet
-      g.fillStyle(0x0d47a1, 1);
-      g.fillEllipse(ox + 32, 10 + bob, 26, 16);
-      g.fillStyle(0x4fc3f7, 1);
-      g.fillRoundedRect(ox + 22, 12 + bob, 20, 7, 2);
-      // eyes
+      // FRONT LEG (near)
+      g.fillStyle(0x1a237e, 1);
+      g.fillRoundedRect(ox + 30 + frontLegX, 42 + bob - frontLift, 11, 18 + frontLift * 0.3, 2);
       g.fillStyle(0x212121, 1);
-      g.fillCircle(ox + 28, 18 + bob, 1.6);
-      g.fillCircle(ox + 36, 18 + bob, 1.6);
+      g.fillEllipse(ox + 40 + frontLegX, 60 + bob - frontLift, 15, 7);
+      g.fillStyle(0x424242, 1);
+      g.fillEllipse(ox + 46 + frontLegX, 59 + bob - frontLift, 6, 4);
+
+      // BACK ARM
+      g.fillStyle(0x0d47a1, 1);
+      g.fillRoundedRect(ox + 20 - armSwing * 0.3, 26 + bob + armSwing * 0.15, 8, 16, 2);
+      g.fillStyle(0xffcc80, 1);
+      g.fillCircle(ox + 24 - armSwing * 0.35, 44 + bob + armSwing * 0.2, 3.5);
+
+      // FRONT ARM (pumping)
+      g.fillStyle(0x0d47a1, 1);
+      g.fillRoundedRect(ox + 42 + armSwing * 0.25, 26 + bob - armSwing * 0.2, 9, 17, 2);
+      g.fillStyle(0xffcc80, 1);
+      g.fillCircle(ox + 48 + armSwing * 0.3, 45 + bob - armSwing * 0.25, 4);
+
+      // HEAD — side profile facing RIGHT
+      g.fillStyle(0xffcc80, 1);
+      g.fillCircle(ox + 44, 16 + bob, 11);
+      // nose pointing right (face direction!)
+      g.fillTriangle(ox + 52, 16 + bob, ox + 60, 18 + bob, ox + 52, 20 + bob);
+      // ear
+      g.fillStyle(0xffb74d, 1);
+      g.fillEllipse(ox + 36, 16 + bob, 5, 7);
+      // eye looking right
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(ox + 48, 14 + bob, 3.2);
+      g.fillStyle(0x212121, 1);
+      g.fillCircle(ox + 49, 14 + bob, 1.8);
+      // mouth
+      g.lineStyle(2, 0x5d4037, 1);
+      g.lineBetween(ox + 50, 21 + bob, ox + 55, 22 + bob);
+
+      // HELMET side profile
+      g.fillStyle(0x0d47a1, 1);
+      g.fillEllipse(ox + 42, 10 + bob, 24, 16);
+      g.fillStyle(0x4fc3f7, 0.9);
+      g.fillRoundedRect(ox + 40, 12 + bob, 14, 6, 2); // visor toward face/right
+      // chin strap
+      g.lineStyle(2, 0x37474f, 0.8);
+      g.lineBetween(ox + 40, 20 + bob, ox + 48, 24 + bob);
     };
 
-    for (let i = 0; i < frames; i++) drawFrame(sheet, i * fw, i);
+    for (let i = 0; i < frames; i++) drawSideFrame(sheet, i * fw, i, true);
     sheet.generateTexture('player_sheet_img', fw * frames, fh);
     sheet.destroy();
 
@@ -252,9 +264,9 @@ export class BootScene extends Phaser.Scene {
       frameHeight: fh,
     });
 
-    // Idle / static alias used by title + fallbacks
+    // Idle standing side-view
     const one = this.make.graphics({ x: 0, y: 0 });
-    drawFrame(one, 0, 0);
+    drawSideFrame(one, 0, 0, false);
     if (this.textures.exists('player')) this.textures.remove('player');
     one.generateTexture('player', fw, fh);
     one.destroy();
@@ -264,7 +276,7 @@ export class BootScene extends Phaser.Scene {
     this.anims.create({
       key: 'player-walk',
       frames: this.anims.generateFrameNumbers('player_sheet', { start: 0, end: frames - 1 }),
-      frameRate: 11,
+      frameRate: 12,
       repeat: -1,
     });
     this.anims.create({

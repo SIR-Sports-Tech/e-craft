@@ -148,10 +148,12 @@ export class GameScene extends Phaser.Scene {
     this.construction = new ConstructionSystem(this, this.worldLayer);
 
     this.player = this.physics.add.sprite(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y, 'player_sheet', 0);
-    this.player.setCollideWorldBounds(true).setDepth(10).setScale(0.95);
+    this.player.setCollideWorldBounds(true).setDepth(10).setScale(1);
     this.player.setDrag(0);
     this.player.setMaxVelocity(700);
-    this.player.body!.setSize(28, 40).setOffset(10, 12);
+    this.player.body!.setSize(28, 44).setOffset(22, 20);
+    this.player.setFlipX(false); // side-view faces right by default
+    this.facing = 1;
     this.player.play('player-idle');
 
     this.robot = this.physics.add.sprite(SPAWN.playerOutdoor.x - 40, SPAWN.playerOutdoor.y, 'robot_sheet', 0);
@@ -1432,6 +1434,8 @@ export class GameScene extends Phaser.Scene {
       tracking: this.trail.isTracking(),
       playerAnim: this.player?.anims?.currentAnim?.key ?? null,
       onFoot: !this.flags.inVehicle && this.player?.texture?.key === 'player_sheet',
+      facing: this.facing,
+      flipX: !!this.player?.flipX,
       pantherActive: this.panther?.isActive?.() ?? false,
       sunVisible: this.dayNight?.phase?.() !== 'night',
       policeCars: this.patrolCars?.count?.() ?? 0,
@@ -1598,9 +1602,15 @@ export class GameScene extends Phaser.Scene {
     }
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * speed, (vy / len) * speed);
-    if (vx !== 0) {
+    // Face the direction of travel — side-view sprite points that way
+    if (Math.abs(vx) >= Math.abs(vy) * 0.35 && vx !== 0) {
       this.facing = vx < 0 ? -1 : 1;
-      if (!this.flags.inVehicle) this.player.setFlipX(this.facing < 0);
+    } else if (vx !== 0) {
+      this.facing = vx < 0 ? -1 : 1;
+    }
+    // (pure up/down keeps last facing so the side-view still looks right)
+    if (!this.flags.inVehicle) {
+      this.player.setFlipX(this.facing < 0);
     }
     if (this.dust) {
       this.dust.setPosition(this.player.x, this.player.y + 18);
@@ -1962,24 +1972,26 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Put officer back on walk sheet after driving / texture swaps. */
+  /** Put officer back on side-view walk sheet after driving / texture swaps. */
   private ensurePlayerOnFootSheet(): void {
     if (this.flags.inVehicle) return;
     if (this.player.texture.key !== 'player_sheet') {
       this.player.setTexture('player_sheet', 0);
-      this.player.setScale(0.95);
+      this.player.setScale(1);
       const body = this.player.body as Phaser.Physics.Arcade.Body;
-      body.setSize(28, 40).setOffset(10, 12);
+      body.setSize(28, 44).setOffset(22, 20);
     }
+    this.player.setFlipX(this.facing < 0);
   }
 
-  /** Real walk cycle — legs/feet move when walking, idle when stopped. */
+  /** Side-view walk — face points the way you turn; legs stride. */
   private updatePlayerAnim(moving: boolean): void {
     if (this.flags.inVehicle) {
       this.player.anims.stop();
       return;
     }
     this.ensurePlayerOnFootSheet();
+    this.player.setFlipX(this.facing < 0);
     const key = moving ? 'player-walk' : 'player-idle';
     if (this.player.anims.currentAnim?.key !== key) {
       this.player.play(key, true);
