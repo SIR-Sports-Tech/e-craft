@@ -44,6 +44,7 @@ type EcraftApi = {
   toggleBuild?: () => void;
   cycleBlock?: () => void;
   breakBlock?: () => void;
+  placeBlock?: () => void;
   selectBlock?: (i: number) => void;
   layBed?: () => void;
   pantherJump?: () => void;
@@ -363,7 +364,7 @@ export function installDomOverlay(): void {
     #ecraft-actions .brk { background: #bf360c; color: #fff; font-size: 10px; }
     #ecraft-actions .bed { background: #1565c0; color: #e3f2fd; font-size: 10px; }
 
-    /* Craft Build hotbar (Minecraft-style, original blocks) */
+    /* Craft Build hotbar (Minecraft-style, original Craft Blocks) */
     #ecraft-hotbar {
       pointer-events: auto;
       position: absolute;
@@ -371,9 +372,12 @@ export function installDomOverlay(): void {
       bottom: max(178px, calc(env(safe-area-inset-bottom) + 170px));
       transform: translateX(-50%);
       display: none;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: min(420px, 92vw);
       gap: 4px;
       padding: 6px 8px;
-      background: rgba(0,0,0,.75);
+      background: rgba(0,0,0,.8);
       border: 2px solid #ffd54f;
       border-radius: 12px;
       z-index: 8;
@@ -381,14 +385,18 @@ export function installDomOverlay(): void {
     }
     #ecraft-hotbar.show { display: flex; }
     #ecraft-hotbar button {
-      width: 34px; height: 34px;
+      width: 32px; height: 32px;
       border-radius: 8px;
       border: 2px solid #546e7a;
-      font-size: 9px; font-weight: 900;
+      font-size: 8px; font-weight: 900;
       color: #fff; padding: 0;
       touch-action: manipulation;
     }
     #ecraft-hotbar button.sel { border-color: #ffd54f; box-shadow: 0 0 0 2px #ffd54f; }
+    #ecraft-hotbar #ecraft-hotbar-place {
+      width: auto; min-width: 52px; padding: 0 8px;
+      background: #2e7d32; border-color: #81c784; font-size: 10px;
+    }
     #ecraft-hotbar #ecraft-hotbar-count {
       color: #ffe082; font-size: 10px; font-weight: 800; margin-left: 4px; white-space: nowrap;
     }
@@ -460,6 +468,7 @@ export function installDomOverlay(): void {
       <button type="button" class="sleep" id="btn-sleep">SLEEP</button>
       <button type="button" class="bld" id="btn-build">BUILD</button>
       <button type="button" class="bld" id="btn-block">NEXT</button>
+      <button type="button" class="bld" id="btn-place">PLACE</button>
       <button type="button" class="brk" id="btn-break">BREAK</button>
       <button type="button" class="pan" id="btn-panther">PANTHER!</button>
       <button type="button" class="pig" id="btn-pig">PIG!</button>
@@ -477,14 +486,19 @@ export function installDomOverlay(): void {
       </div>
     </div>
     <div id="ecraft-hotbar" aria-label="craft block hotbar">
-      <button type="button" data-block="0" style="background:#8d6e63">1</button>
-      <button type="button" data-block="1" style="background:#43a047">2</button>
-      <button type="button" data-block="2" style="background:#78909c">3</button>
-      <button type="button" data-block="3" style="background:#a1887f">4</button>
-      <button type="button" data-block="4" style="background:#c62828">5</button>
-      <button type="button" data-block="5" style="background:#ffd54f;color:#111">6</button>
-      <button type="button" data-block="6" style="background:#29b6f6">7</button>
-      <button type="button" data-block="7" style="background:#fdd835;color:#111">8</button>
+      <button type="button" data-block="0" title="DIRT" style="background:#8d6e63">1</button>
+      <button type="button" data-block="1" title="GRASS" style="background:#43a047">2</button>
+      <button type="button" data-block="2" title="STONE" style="background:#78909c">3</button>
+      <button type="button" data-block="3" title="WOOD" style="background:#a1887f">4</button>
+      <button type="button" data-block="4" title="BRICK" style="background:#c62828">5</button>
+      <button type="button" data-block="5" title="GOLD" style="background:#ffd54f;color:#111">6</button>
+      <button type="button" data-block="6" title="WATER" style="background:#29b6f6">7</button>
+      <button type="button" data-block="7" title="SAND" style="background:#fdd835;color:#111">8</button>
+      <button type="button" data-block="8" title="LEAF" style="background:#66bb6a">9</button>
+      <button type="button" data-block="9" title="GLASS" style="background:#b3e5fc;color:#111">0</button>
+      <button type="button" data-block="10" title="IRON" style="background:#90a4ae">-</button>
+      <button type="button" data-block="11" title="WOOL" style="background:#f5f5f5;color:#111">=</button>
+      <button type="button" id="ecraft-hotbar-place">PLACE</button>
       <span id="ecraft-hotbar-count">0 blocks</span>
     </div>
     <div id="ecraft-pad" aria-label="movement pad">
@@ -573,6 +587,7 @@ export function installDomOverlay(): void {
   bindAction('btn-sleep', 'sleep', 'Sleeping…');
   bindAction('btn-build', 'toggleBuild', 'Build mode');
   bindAction('btn-block', 'cycleBlock', 'Next block');
+  bindAction('btn-place', 'placeBlock', 'Placed block');
   bindAction('btn-break', 'breakBlock', 'Broke block');
   document.querySelectorAll<HTMLButtonElement>('#ecraft-hotbar [data-block]').forEach((btn) => {
     btn.addEventListener('pointerdown', (e) => {
@@ -582,6 +597,11 @@ export function installDomOverlay(): void {
       api()?.selectBlock?.(i);
       flash(btn);
     });
+  });
+  document.getElementById('ecraft-hotbar-place')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    callApi('placeBlock', 'Placed block');
   });
   bindAction('btn-panther', 'pantherJump', 'Panther!');
   bindAction('btn-pig', 'pigDrop', 'Oink!');
@@ -603,6 +623,7 @@ export function installDomOverlay(): void {
     showToast('Restarting…');
     try {
       localStorage.removeItem('ecraft_save_v02');
+      localStorage.removeItem('ecraft_craft_blocks_v1');
     } catch {
       /* ignore */
     }
@@ -669,10 +690,14 @@ export function installDomOverlay(): void {
       if (e.code === 'KeyP') callApi('pigDrop', 'Oink!');
       if (e.code === 'KeyG') callApi('toggleBuild', 'Build mode');
       if (e.code === 'KeyQ') callApi('breakBlock', 'Broke block');
+      if (e.code === 'KeyR') callApi('placeBlock', 'Placed block');
       if (e.code.startsWith('Digit')) {
         const n = Number(e.code.replace('Digit', ''));
-        if (n >= 1 && n <= 8) api()?.selectBlock?.(n - 1);
+        if (n >= 1 && n <= 9) api()?.selectBlock?.(n - 1);
+        if (n === 0) api()?.selectBlock?.(9); // glass
       }
+      if (e.code === 'Minus') api()?.selectBlock?.(10); // iron
+      if (e.code === 'Equal') api()?.selectBlock?.(11); // wool
     },
     { passive: false },
   );

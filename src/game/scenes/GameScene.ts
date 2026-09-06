@@ -254,7 +254,19 @@ export class GameScene extends Phaser.Scene {
     this.patrolCars = new PatrolCarsSystem(this);
     this.patrolCars.spawn();
     this.craftBuild = new CraftBuildSystem(this, this.worldLayer);
+    this.craftBuild.bindPlayer(this.player);
     this.craftBuild.load();
+    // Tap/click world to aim + place (Minecraft-style pointer build)
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (!this.craftBuild?.isMode() || this.flags.inVehicle || this.paused) return;
+      // Ignore UI overlay taps (left/right chrome + hotbar band)
+      if (pointer.x < 120 || pointer.x > this.scale.width - 120) return;
+      if (pointer.y > this.scale.height - 200) return;
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      this.craftBuild.aimAtWorld(world.x, world.y);
+      if (pointer.rightButtonDown()) this.breakCraftBlock();
+      else this.placeCraftBlock();
+    });
     // Soft dust when moving (visual juice)
     const gfx = this.make.graphics({ x: 0, y: 0 });
     gfx.fillStyle(0xd7ccc8, 0.7);
@@ -355,12 +367,19 @@ export class GameScene extends Phaser.Scene {
         this.mapOpen = false;
         this.breakCraftBlock();
       },
+      placeBlock: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.craftBuild.setMode(true);
+        this.refreshBuildHotbar();
+        this.placeCraftBlock();
+      },
       selectBlock: (i: number) => {
         this.paused = false;
         this.mapOpen = false;
         this.craftBuild.select(i);
         this.craftBuild.setMode(true);
-        this.statusLine = `Block: ${this.craftBuild.selectedName()} — E place · BREAK removes`;
+        this.statusLine = `Block: ${this.craftBuild.selectedName()} — PLACE / E / tap world · BREAK removes`;
         setDomStatus(this.statusLine);
         this.refreshBuildHotbar();
       },
@@ -1922,16 +1941,21 @@ export class GameScene extends Phaser.Scene {
     const on = this.craftBuild.toggleMode();
     this.refreshBuildHotbar();
     this.statusLine = on
-      ? `🧱 CRAFT BUILD ON — ${this.craftBuild.selectedName()} · E=place · BREAK=remove · hotbar 1-8`
+      ? `🧱 CRAFT BUILD ON — ${this.craftBuild.selectedName()} · PLACE/E/tap · BREAK · hotbar 1-${this.craftBuild.blockCount()}`
       : 'Craft Build off.';
     setDomStatus(this.statusLine);
+    if (on) {
+      (window as unknown as { __ecraftToast?: (m: string) => void }).__ecraftToast?.(
+        'BUILD: tap world or PLACE · hotbar picks block · BREAK digs',
+      );
+    }
   }
 
   private cycleBuildBlock(): void {
     this.craftBuild.setMode(true);
     this.craftBuild.cycle(1);
     this.refreshBuildHotbar();
-    this.statusLine = `Block: ${this.craftBuild.selectedName()} — E place · BREAK remove`;
+    this.statusLine = `Block: ${this.craftBuild.selectedName()} — PLACE / tap world · BREAK digs`;
     setDomStatus(this.statusLine);
   }
 

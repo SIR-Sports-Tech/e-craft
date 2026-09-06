@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.0 — 2026-09-05 — CRAFT BUILD EXPANDED (MINECRAFT-LIKE)
+
+### Added
+- **PLACE** button + hotbar PLACE (phone-friendly)
+- **Tap/click world** to place in build mode (pointer aim)
+- **12 Craft Blocks**: dirt · grass · stone · wood · brick · gold · water · sand · leaf · glass · iron · wool
+- **Solid collision** — walk into / bump built walls (water/leaf soft)
+- Place/break **particle bursts**
+- Chunky cube textures with top/side faces (original art — not Minecraft IP)
+- Keyboard: **G** build · **R** place · **Q** break · **1–9 / 0 / - / =** hotbar
+- Restart clears craft blocks save
+
 ## 1.8.0 — 2026-09-05 — CRAFT BUILD (MINECRAFT-LIKE)
 
 ### Added

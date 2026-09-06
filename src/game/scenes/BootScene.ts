@@ -719,29 +719,37 @@ export class BootScene extends Phaser.Scene {
     food.generateTexture('food_plate', 48, 48);
     food.destroy();
 
-    // Original craft blocks (NOT Minecraft) — solid colored cubes
-    const mkBlock = (key: string, color: number) => {
+    // Original craft blocks (NOT Minecraft) — chunky cubes with top/side faces
+    const mkBlock = (key: string, side: number, lid: number, alpha = 1) => {
       const b = this.g();
-      b.fillStyle(color, 1);
-      b.fillRoundedRect(4, 8, 40, 40, 3);
-      b.fillStyle(0xffffff, 0.25);
-      b.fillRect(6, 10, 36, 8);
-      b.lineStyle(2, 0x000000, 0.35);
-      b.strokeRoundedRect(4, 8, 40, 40, 3);
-      // top face hint
-      b.fillStyle(color, 0.85);
-      b.fillTriangle(4, 8, 24, 0, 44, 8);
+      b.fillStyle(side, alpha);
+      b.fillRoundedRect(4, 12, 40, 32, 2);
+      b.fillStyle(0x000000, 0.22 * alpha);
+      b.fillRect(4, 36, 40, 8);
+      b.fillStyle(0xffffff, 0.18 * alpha);
+      b.fillRect(4, 12, 6, 32);
+      b.fillStyle(lid, alpha);
+      b.fillTriangle(4, 12, 24, 2, 44, 12);
+      b.fillTriangle(4, 12, 44, 12, 24, 18);
+      b.lineStyle(2, 0x000000, 0.4);
+      b.strokeRoundedRect(4, 12, 40, 32, 2);
+      b.lineBetween(4, 12, 24, 2);
+      b.lineBetween(24, 2, 44, 12);
       b.generateTexture(key, 48, 48);
       b.destroy();
     };
-    mkBlock('block_dirt', 0x8d6e63);
-    mkBlock('block_grass', 0x43a047);
-    mkBlock('block_stone', 0x78909c);
-    mkBlock('block_wood', 0xa1887f);
-    mkBlock('block_brick', 0xc62828);
-    mkBlock('block_gold', 0xffd54f);
-    mkBlock('block_water', 0x29b6f6);
-    mkBlock('block_sand', 0xfdd835);
+    mkBlock('block_dirt', 0x8d6e63, 0xa1887f);
+    mkBlock('block_grass', 0x6d4c41, 0x43a047);
+    mkBlock('block_stone', 0x78909c, 0x90a4ae);
+    mkBlock('block_wood', 0x8d6e63, 0xbcaaa4);
+    mkBlock('block_brick', 0xb71c1c, 0xc62828);
+    mkBlock('block_gold', 0xf9a825, 0xffd54f);
+    mkBlock('block_water', 0x0288d1, 0x4fc3f7, 0.75);
+    mkBlock('block_sand', 0xfbc02d, 0xffee58);
+    mkBlock('block_leaf', 0x2e7d32, 0x66bb6a, 0.85);
+    mkBlock('block_glass', 0x81d4fa, 0xe1f5fe, 0.55);
+    mkBlock('block_iron', 0x607d8b, 0xb0bec5);
+    mkBlock('block_wool', 0xe0e0e0, 0xfafafa);
   }
 
   /** Professional civic building plaque (used under labels). */
