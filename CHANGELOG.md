@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.5 — 2026-09-05 — POLICE RUN YOU OVER
+
+### Added
+- Get too close to a patrol police car → they **run you over**
+- You get **flattened** with a **blood pool** under you
+- Can't move until you get up (auto ~3s or tap **UNFREEZE**)
+- Short invulnerability after standing so you aren't instantly re-squashed
+
+
 ## 1.5.4 — 2026-09-05 — FACE THE WAY YOU WALK (4-WAY)
 
 ### Fixed

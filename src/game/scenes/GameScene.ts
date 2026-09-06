@@ -88,6 +88,10 @@ export class GameScene extends Phaser.Scene {
   private jailNodes: Phaser.GameObjects.GameObject[] = [];
   private houseNodes: Phaser.GameObjects.GameObject[] = [];
   private sleeping = false;
+  /** Flattened by a police car — can't move until recovered. */
+  private flattened = false;
+  private flattenInvuln = 0;
+  private bloodPool?: Phaser.GameObjects.Image;
   private objectiveMarker!: ObjectiveMarker;
   /** Animated traffic lights at intersections */
   private trafficSignals: Array<{
@@ -343,6 +347,16 @@ export class GameScene extends Phaser.Scene {
           audio.talk();
         });
       },
+      forceFlatten: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.forceFlatten();
+      },
+      unflatten: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.unflattenPlayer('Back up!');
+      },
       exitIndoor: () => {
         this.paused = false;
         this.mapOpen = false;
@@ -398,6 +412,11 @@ export class GameScene extends Phaser.Scene {
     this.paused = false;
     this.mapOpen = false;
     this.player?.setVelocity(0, 0);
+    if (this.flattened) {
+      this.unflattenPlayer('Got up after the police smash!');
+      this.persistSave();
+      return;
+    }
     try {
       this.tweens.killAll();
     } catch {
@@ -1462,7 +1481,13 @@ export class GameScene extends Phaser.Scene {
       streetLights: true,
       trafficSignals: this.trafficSignals.length,
       pigActive: this.pigDrop?.isActive?.() ?? false,
+      flattened: this.flattened,
     };
+  }
+
+  /** Test helper — force a police squash. */
+  forceFlatten(): void {
+    this.flattenByPolice(this.player.x + 30, this.player.y);
   }
 
   setTouchVector(x: number, y: number): void {
@@ -1527,6 +1552,17 @@ export class GameScene extends Phaser.Scene {
       this.patrolCars.setOutdoorVisible(outdoors);
       this.patrolCars.update(d);
       if (outdoors) this.updateTrafficSignals(d);
+      if (this.flattenInvuln > 0) this.flattenInvuln -= d;
+      if (
+        outdoors &&
+        !this.flags.inVehicle &&
+        !this.flattened &&
+        this.flattenInvuln <= 0 &&
+        !this.sleeping
+      ) {
+        const hit = this.patrolCars.checkRunOver(this.player.x, this.player.y, 44);
+        if (hit) this.flattenByPolice(hit.carX, hit.carY);
+      }
       this.panther.update(d, this.player, outdoors, (msg) => {
         this.statusLine = msg;
         setDomStatus(msg);
@@ -1577,7 +1613,89 @@ export class GameScene extends Phaser.Scene {
     this.objectiveMarker.update(this.player.x, this.player.y, target);
   }
 
+  private flattenByPolice(carX: number, carY: number): void {
+    if (this.flattened) return;
+    this.flattened = true;
+    this.player.setVelocity(0, 0);
+    // Knock slightly in car direction
+    const dx = this.player.x - carX;
+    const dy = this.player.y - carY;
+    const len = Math.hypot(dx, dy) || 1;
+    this.player.x += (dx / len) * 8;
+    this.player.y += (dy / len) * 8;
+
+    // Flatten sprite
+    this.player.setScale(1.55, 0.28);
+    this.player.setTint(0xff8a80);
+    this.player.anims.stop();
+
+    // Blood pool under player
+    if (this.bloodPool) this.bloodPool.destroy();
+    this.bloodPool = this.add
+      .image(this.player.x, this.player.y + 10, 'blood_pool')
+      .setDepth(9)
+      .setAlpha(0.95)
+      .setScale(0.4);
+    this.tweens.add({
+      targets: this.bloodPool,
+      scale: 1.35,
+      alpha: 0.9,
+      duration: 280,
+      ease: 'Back.easeOut',
+    });
+
+    // Impact stars
+    for (let i = 0; i < 5; i++) {
+      const star = this.add.star(this.player.x, this.player.y - 10, 5, 3, 7, 0xffe082, 1).setDepth(20);
+      this.tweens.add({
+        targets: star,
+        x: this.player.x + Phaser.Math.Between(-55, 55),
+        y: this.player.y - Phaser.Math.Between(30, 70),
+        alpha: 0,
+        duration: 550,
+        delay: i * 25,
+        onComplete: () => star.destroy(),
+      });
+    }
+
+    this.statusLine = '🚔 SQUASHED! Police ran you over — blood pool! Tap UNFREEZE to get up.';
+    setDomStatus(this.statusLine);
+    audio.talk();
+    this.persistSave();
+
+    // Auto get-up after a few seconds
+    this.time.delayedCall(3200, () => {
+      if (this.flattened) this.unflattenPlayer('You peeled yourself off the pavement…');
+    });
+  }
+
+  private unflattenPlayer(msg?: string): void {
+    if (!this.flattened && !this.bloodPool) return;
+    this.flattened = false;
+    this.flattenInvuln = 2500;
+    this.player.clearTint();
+    this.ensurePlayerOnFootSheet();
+    this.player.setScale(1);
+    this.updatePlayerAnim(false);
+    if (this.bloodPool) {
+      const pool = this.bloodPool;
+      this.tweens.add({
+        targets: pool,
+        alpha: 0,
+        duration: 600,
+        onComplete: () => pool.destroy(),
+      });
+      this.bloodPool = undefined;
+    }
+    this.statusLine = msg || 'Back on your feet — watch those police cars!';
+    setDomStatus(this.statusLine);
+  }
+
   private handleMovement(): void {
+    if (this.flattened) {
+      this.player.setVelocity(0, 0);
+      return;
+    }
     const speed = this.flags.inVehicle ? (this.activeCarKey === 'race_car' ? 720 : 560) : 240;
     let vx = 0;
     let vy = 0;

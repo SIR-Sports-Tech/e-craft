@@ -23,6 +23,7 @@ export class BootScene extends Phaser.Scene {
     this.makeCitizen();
     this.makePanther();
     this.makePig();
+    this.makeBloodPool();
     this.makeBuilding('bldg_hq', 0x1a3d6d, 0x5dade2, 0x1abc9c, true);
     this.makeBuilding('bldg_jail', 0x6b2b2b, 0xf5b7b1, 0x922b21, true);
     this.makeBuilding('bldg_plaza', 0x4a5568, 0xf6c28b, 0x718096, false);
@@ -748,6 +749,25 @@ export class BootScene extends Phaser.Scene {
     g.fillRect(13, 40, 5, 12);
     g.fillRect(22, 40, 5, 12);
     g.generateTexture('citizen', 40, 54);
+    g.destroy();
+  }
+
+  private makeBloodPool(): void {
+    const g = this.g();
+    g.fillStyle(0xb71c1c, 0.85);
+    g.fillEllipse(40, 28, 70, 40);
+    g.fillStyle(0xe53935, 0.7);
+    g.fillEllipse(28, 24, 24, 16);
+    g.fillEllipse(52, 32, 28, 18);
+    g.fillStyle(0x7f0000, 0.8);
+    g.fillCircle(22, 20, 6);
+    g.fillCircle(58, 36, 5);
+    g.fillCircle(40, 18, 4);
+    // drip edge
+    g.fillStyle(0xc62828, 0.75);
+    g.fillCircle(16, 34, 5);
+    g.fillCircle(64, 22, 4);
+    g.generateTexture('blood_pool', 80, 56);
     g.destroy();
   }
 

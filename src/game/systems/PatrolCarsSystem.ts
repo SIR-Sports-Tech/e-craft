@@ -133,4 +133,24 @@ export class PatrolCarsSystem {
   snapshots(): Array<{ x: number; y: number }> {
     return this.cars.map((c) => ({ x: c.sprite.x, y: c.sprite.y }));
   }
+
+  /**
+   * If player is too close to a moving patrol car, return that car's position
+   * so the game can flatten them.
+   */
+  checkRunOver(
+    playerX: number,
+    playerY: number,
+    hitRadius = 42,
+  ): { x: number; y: number; carX: number; carY: number } | null {
+    if (!this.outdoor) return null;
+    for (const c of this.cars) {
+      if (!c.sprite.visible) continue;
+      const d = Phaser.Math.Distance.Between(playerX, playerY, c.sprite.x, c.sprite.y);
+      if (d <= hitRadius) {
+        return { x: playerX, y: playerY, carX: c.sprite.x, carY: c.sprite.y };
+      }
+    }
+    return null;
+  }
 }
