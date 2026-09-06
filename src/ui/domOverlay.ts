@@ -73,6 +73,18 @@ type EcraftApi = {
   pantherJump?: () => void;
   tigerAmbush?: () => void;
   pigDrop?: () => void;
+  toggleBackpack?: () => void;
+  usePhone?: () => void;
+  closePhone?: () => void;
+  equipWhip?: () => void;
+  useWhip?: () => void;
+  getBackpack?: () => {
+    open: boolean;
+    phoneOpen: boolean;
+    whipEquipped: boolean;
+    items: Array<{ id: string; name: string; icon: string }>;
+    inventory: string;
+  };
   exitIndoor?: () => void;
   unpause?: () => void;
   getState?: () => { flags?: Record<string, boolean>; prompt?: string; status?: string; hour?: number; dayPhase?: string };
@@ -323,6 +335,121 @@ export function installDomOverlay(): void {
     #ecraft-actions .race { background: #d50000; color: #fff; }
     #ecraft-actions .rec { background: #455a64; color: #fff; font-size: 10px; height: 34px; }
     #ecraft-actions .rst { background: #b71c1c; color: #fff; font-size: 11px; height: 36px; }
+    #ecraft-actions .pack { background: #4e342e; color: #ffe0b2; }
+    #ecraft-actions .whip {
+      background: #bf360c; color: #fffde7; display: none;
+    }
+    #ecraft-actions .whip.show { display: block; }
+
+    /* Backpack panel */
+    #ecraft-backpack {
+      pointer-events: auto;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,.68);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 48;
+      padding: 16px;
+    }
+    #ecraft-backpack.show { display: flex; }
+    #ecraft-backpack .box {
+      background: linear-gradient(160deg, #3e2723, #1b100e);
+      border: 3px solid #ffcc80;
+      border-radius: 16px;
+      padding: 16px 14px;
+      width: min(92vw, 340px);
+      text-align: center;
+      box-shadow: 0 12px 40px rgba(0,0,0,.55);
+    }
+    #ecraft-backpack h2 {
+      margin: 0 0 6px;
+      color: #ffe0b2;
+      font-size: 18px;
+    }
+    #ecraft-backpack p {
+      margin: 0 0 12px;
+      color: #bcaaa4;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    #ecraft-backpack .items {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    #ecraft-backpack .items button {
+      height: 52px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,.35);
+      font-weight: 900;
+      font-size: 15px;
+      touch-action: manipulation;
+      color: #fff;
+    }
+    #ecraft-backpack #bp-phone { background: #1565c0; }
+    #ecraft-backpack #bp-whip { background: #e65100; }
+    #ecraft-backpack #bp-close {
+      width: 100%;
+      height: 44px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,.3);
+      background: #455a64;
+      color: #fff;
+      font-weight: 900;
+      font-size: 14px;
+      touch-action: manipulation;
+    }
+
+    /* Field phone screen */
+    #ecraft-phone {
+      pointer-events: auto;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 49;
+      padding: 16px;
+    }
+    #ecraft-phone.show { display: flex; }
+    #ecraft-phone .device {
+      width: min(88vw, 300px);
+      background: #111;
+      border: 4px solid #37474f;
+      border-radius: 28px;
+      padding: 14px 12px 12px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.6), inset 0 0 0 2px #90a4ae;
+    }
+    #ecraft-phone .notch {
+      width: 72px; height: 8px; border-radius: 8px;
+      background: #263238; margin: 0 auto 10px;
+    }
+    #ecraft-phone .screen {
+      background: #0d47a1;
+      border-radius: 14px;
+      min-height: 220px;
+      padding: 12px;
+      color: #e3f2fd;
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      text-align: left;
+    }
+    #ecraft-phone #phone-close {
+      margin-top: 10px;
+      width: 100%;
+      height: 44px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,.35);
+      background: #c62828;
+      color: #fff;
+      font-weight: 900;
+      font-size: 14px;
+      touch-action: manipulation;
+    }
 
     /* Restart confirm modal */
     #ecraft-confirm {
@@ -547,6 +674,8 @@ export function installDomOverlay(): void {
       <button type="button" class="act" id="btn-e">E</button>
       <button type="button" class="cap" id="btn-cap">CAPTURE</button>
       <button type="button" class="trk" id="btn-tracker">TRACKER</button>
+      <button type="button" class="pack" id="btn-pack">🎒 PACK</button>
+      <button type="button" class="whip" id="btn-whip">🪢 WHIP</button>
       <button type="button" class="bot" id="btn-robot">ROBOT</button>
       <button type="button" class="exit wide" id="btn-exit">EXIT</button>
       <button type="button" class="home" id="btn-house">GO HOME</button>
@@ -565,6 +694,24 @@ export function installDomOverlay(): void {
       <button type="button" class="pig" id="btn-pig">PIG!</button>
       <button type="button" class="rec wide" id="btn-recover">UNFREEZE / SAVE</button>
       <button type="button" class="rst wide" id="btn-restart">RESTART</button>
+    </div>
+    <div id="ecraft-backpack" role="dialog" aria-modal="true" aria-label="backpack">
+      <div class="box">
+        <h2>🎒 Field Backpack</h2>
+        <p>Gear you carry with you. Take out the phone or the whip.</p>
+        <div class="items">
+          <button type="button" id="bp-phone">📱 Use Phone</button>
+          <button type="button" id="bp-whip">🪢 Take Out Whip</button>
+        </div>
+        <button type="button" id="bp-close">Close backpack</button>
+      </div>
+    </div>
+    <div id="ecraft-phone" role="dialog" aria-modal="true" aria-label="field phone">
+      <div class="device">
+        <div class="notch"></div>
+        <div class="screen" id="phone-screen">📱 FIELD PHONE</div>
+        <button type="button" id="phone-close">CLOSE PHONE</button>
+      </div>
     </div>
     <div id="ecraft-confirm" role="dialog" aria-modal="true" aria-labelledby="ecraft-confirm-title">
       <div class="box">
@@ -729,6 +876,8 @@ export function installDomOverlay(): void {
   bindAction('btn-e', 'interact', 'Interact');
   bindAction('btn-cap', 'capture', 'Capture');
   bindAction('btn-tracker', 'holdTracker', 'Holding Tracker');
+  bindAction('btn-pack', 'toggleBackpack', 'Backpack');
+  bindAction('btn-whip', 'useWhip', 'Whip crack!');
   bindAction('btn-robot', 'activateRobot', 'Robot ON');
   bindAction('btn-activate', 'activateRobot', 'Robot ON');
   bindAction('btn-exit', 'exitIndoor', 'Exited');
@@ -743,6 +892,54 @@ export function installDomOverlay(): void {
   bindAction('btn-floor', 'toggleFloorMode', 'Floor/Stack');
   bindAction('btn-craft-view', 'cycleCraftView', 'Craft view');
   bindAction('btn-house-build', 'placeHouse', 'Craft house built');
+
+  const backpackEl = document.getElementById('ecraft-backpack');
+  const phoneEl = document.getElementById('ecraft-phone');
+  const whipBtn = document.getElementById('btn-whip');
+  const setBackpackOpen = (open: boolean) => {
+    backpackEl?.classList.toggle('show', open);
+  };
+  const setPhoneOpen = (open: boolean, lines?: string[]) => {
+    phoneEl?.classList.toggle('show', open);
+    if (open && lines?.length) {
+      const screen = document.getElementById('phone-screen');
+      if (screen) screen.textContent = lines.join('\n');
+    }
+  };
+  const setWhipEquipped = (eq: boolean) => {
+    whipBtn?.classList.toggle('show', eq);
+  };
+  (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi = setBackpackOpen;
+  (window as unknown as { __ecraftPhoneUi?: (o: boolean, lines?: string[]) => void }).__ecraftPhoneUi = setPhoneOpen;
+  (window as unknown as { __ecraftWhipUi?: (eq: boolean) => void }).__ecraftWhipUi = setWhipEquipped;
+
+  document.getElementById('bp-phone')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBackpackOpen(false);
+    callApi('usePhone', 'Phone out');
+  });
+  document.getElementById('bp-whip')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBackpackOpen(false);
+    callApi('equipWhip', 'Whip equipped');
+  });
+  document.getElementById('bp-close')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBackpackOpen(false);
+    // Only toggle game state if backpack was open (avoid accidental re-open)
+    const bp = api()?.getBackpack?.();
+    if (bp?.open) callApi('toggleBackpack', 'Backpack closed');
+    else showToast('Backpack closed');
+  });
+  document.getElementById('phone-close')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPhoneOpen(false);
+    callApi('closePhone', 'Phone away');
+  });
 
   const fillCraftUi = () => {
     const palette = api()?.getCraftPalette?.() || [];
@@ -897,6 +1094,8 @@ export function installDomOverlay(): void {
       if (e.code === 'KeyC') callApi('enterCar', 'Patrol Car');
       if (e.code === 'KeyF') callApi('activateRobot', 'Robot ON');
       if (e.code === 'KeyT') callApi('holdTracker', 'Holding Tracker');
+      if (e.code === 'KeyB') callApi('toggleBackpack', 'Backpack');
+      if (e.code === 'KeyV') callApi('useWhip', 'Whip crack!');
       if (e.code === 'KeyH') callApi('enterHouse', 'Welcome home');
       if (e.code === 'KeyZ') callApi('sleep', 'Sleeping…');
       if (e.code === 'KeyX') callApi('exitIndoor', 'Exited');

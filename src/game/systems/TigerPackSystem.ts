@@ -91,6 +91,54 @@ export class TigerPackSystem {
     this.beginEmerge(player, onScare);
   }
 
+  /**
+   * Whip crack — if any tiger is within range, scare the whole pack back to the jungle.
+   * Returns true when the whip connected and forced a retreat.
+   */
+  scareWithWhip(
+    player: Phaser.Physics.Arcade.Sprite,
+    range = 280,
+    onScare?: (msg: string) => void,
+  ): boolean {
+    if (this.phase === 'idle') return false;
+    const near = this.pack.some(
+      (t) =>
+        t.sprite.visible &&
+        Phaser.Math.Distance.Between(t.sprite.x, t.sprite.y, player.x, player.y) <= range,
+    );
+    if (!near) return false;
+    // Instant panic retreat — faster home run than a normal peel-off
+    this.phase = 'retreat';
+    this.phaseTimer = 2200;
+    for (const t of this.pack) {
+      if (!t.sprite.visible) continue;
+      t.sprite.setFlipX(false);
+      t.sprite.play('tiger-run', true);
+      // Nudge them east (away from player / toward jungle) immediately
+      const awayX = t.sprite.x + 180;
+      const awayY = t.homeY;
+      const dx = awayX - t.sprite.x;
+      const dy = awayY - t.sprite.y;
+      const len = Math.hypot(dx, dy) || 1;
+      t.sprite.setVelocity((dx / len) * 560, (dy / len) * 560);
+    }
+    const msg = '🪢 CRACK!! The whip scares the tigers — they bolt back to the jungle!';
+    this.lastToast = msg;
+    onScare?.(msg);
+    return true;
+  }
+
+  /** Closest visible tiger distance (Infinity if none). */
+  nearestDist(player: Phaser.Physics.Arcade.Sprite): number {
+    let best = Infinity;
+    for (const t of this.pack) {
+      if (!t.sprite.visible) continue;
+      const d = Phaser.Math.Distance.Between(t.sprite.x, t.sprite.y, player.x, player.y);
+      if (d < best) best = d;
+    }
+    return best;
+  }
+
   isActive(): boolean {
     return this.phase !== 'idle';
   }

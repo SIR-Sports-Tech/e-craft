@@ -169,6 +169,11 @@ export class GameScene extends Phaser.Scene {
   private patrolCars!: PatrolCarsSystem;
   private jobs = new JobSystem();
   private inventory = new InventorySystem();
+  private backpackOpen = false;
+  private phoneOpen = false;
+  private whipEquipped = false;
+  private whipCooldown = 0;
+  private whipGfx?: Phaser.GameObjects.Graphics;
   private facing = 1; // -1 left, 1 right (for side flip + tracker)
   /** Exact walk facing — always matches movement direction. */
   private facingDir: 'left' | 'right' | 'up' | 'down' = 'right';
@@ -506,6 +511,38 @@ export class GameScene extends Phaser.Scene {
           audio.talk();
         });
       },
+      toggleBackpack: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.toggleBackpack();
+      },
+      usePhone: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.usePhone();
+      },
+      closePhone: () => {
+        this.phoneOpen = false;
+        this.statusLine = 'Phone put away.';
+        setDomStatus(this.statusLine);
+      },
+      equipWhip: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.equipWhip();
+      },
+      useWhip: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.useWhip();
+      },
+      getBackpack: () => ({
+        open: this.backpackOpen,
+        phoneOpen: this.phoneOpen,
+        whipEquipped: this.whipEquipped,
+        items: this.inventory.backpackContents().map((i) => ({ id: i.id, name: i.name, icon: i.icon })),
+        inventory: this.inventory.summary(),
+      }),
       pigDrop: () => {
         this.paused = false;
         this.mapOpen = false;
@@ -699,6 +736,121 @@ export class GameScene extends Phaser.Scene {
     this.equipTracker();
     this.statusLine = 'Still HOLDING Tracker — gold trail ON. Follow the arrow!';
     setDomStatus(this.statusLine);
+  }
+
+  /** Open / close the field backpack (phone + whip inside). */
+  private toggleBackpack(): void {
+    this.backpackOpen = !this.backpackOpen;
+    if (this.backpackOpen) {
+      this.phoneOpen = false;
+      this.statusLine = '🎒 Backpack open — Phone + Whip inside. Tap an item.';
+    } else {
+      this.statusLine = 'Backpack closed.';
+    }
+    setDomStatus(this.statusLine);
+    // Sync DOM panel visibility
+    (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi?.(this.backpackOpen);
+  }
+
+  /** Use the field phone from the backpack. */
+  private usePhone(): void {
+    if (!this.inventory.has('phone')) {
+      this.statusLine = 'No phone in backpack.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    this.backpackOpen = false;
+    this.phoneOpen = true;
+    (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi?.(false);
+    (window as unknown as { __ecraftPhoneUi?: (o: boolean, lines?: string[]) => void }).__ecraftPhoneUi?.(true, [
+      '📱 FIELD PHONE',
+      `Status: ${this.statusLine || 'On duty'}`,
+      `Day: ${this.dayNight?.phase?.() ?? 'day'} · Hour ${Math.floor(this.dayNight?.getHour?.() ?? 12)}`,
+      this.tigers?.isActive?.()
+        ? '⚠️ TIGER ALERT — open backpack → WHIP!'
+        : 'HQ: All clear on tiger channel.',
+      this.whipEquipped ? '🪢 Whip is in hand.' : 'Tip: Equip WHIP before jungle runs.',
+      'Tap CLOSE when done.',
+    ]);
+    this.statusLine = '📱 Phone out — check HQ status.';
+    setDomStatus(this.statusLine);
+    audio.talk();
+  }
+
+  /** Take the whip out of the backpack (equip for quick WHIP taps). */
+  private equipWhip(): void {
+    if (!this.inventory.has('whip')) {
+      this.statusLine = 'No whip in backpack.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    this.backpackOpen = false;
+    this.whipEquipped = true;
+    (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi?.(false);
+    (window as unknown as { __ecraftWhipUi?: (eq: boolean) => void }).__ecraftWhipUi?.(true);
+    this.statusLine = '🪢 Whip in hand! When tigers get close — tap WHIP to crack them away.';
+    setDomStatus(this.statusLine);
+    audio.pickup();
+  }
+
+  /** Crack the whip — scare nearby tigers back to the jungle. */
+  private useWhip(): void {
+    if (!this.inventory.has('whip')) {
+      this.statusLine = 'No whip — open backpack first.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    if (!this.whipEquipped) this.equipWhip();
+    if (this.whipCooldown > 0) {
+      this.statusLine = `🪢 Whip cooling down… (${Math.ceil(this.whipCooldown / 1000)}s)`;
+      setDomStatus(this.statusLine);
+      return;
+    }
+    if (this.isIndoors()) {
+      this.statusLine = '🪢 Crack! (No tigers indoors.)';
+      setDomStatus(this.statusLine);
+      this.playWhipFx();
+      this.whipCooldown = 600;
+      return;
+    }
+    this.playWhipFx();
+    this.whipCooldown = 1400;
+    const hit = this.tigers.scareWithWhip(this.player, 300, (msg) => {
+      this.statusLine = msg;
+      setDomStatus(msg);
+      audio.talk();
+    });
+    if (hit) {
+      audio.success();
+      return;
+    }
+    if (this.tigers.isActive()) {
+      this.statusLine = '🪢 Crack! Tigers are too far — get closer, then whip again!';
+    } else {
+      this.statusLine = '🪢 Crack! (No tigers near — keep the whip ready for the jungle.)';
+    }
+    setDomStatus(this.statusLine);
+  }
+
+  private playWhipFx(): void {
+    if (!this.whipGfx) this.whipGfx = this.add.graphics().setDepth(40);
+    const g = this.whipGfx;
+    g.clear();
+    const dir = this.facing >= 0 ? 1 : -1;
+    const x0 = this.player.x + dir * 8;
+    const y0 = this.player.y - 4;
+    g.lineStyle(4, 0x5d4037, 1);
+    g.beginPath();
+    g.moveTo(x0, y0);
+    g.lineTo(x0 + dir * 70, y0 - 18);
+    g.lineTo(x0 + dir * 110, y0 + 8);
+    g.lineTo(x0 + dir * 140, y0 - 22);
+    g.strokePath();
+    g.lineStyle(3, 0xffecb3, 0.95);
+    g.strokeCircle(x0 + dir * 148, y0 - 24, 10);
+    g.fillStyle(0xfff59d, 0.55);
+    g.fillCircle(x0 + dir * 148, y0 - 24, 6);
+    this.time.delayedCall(180, () => g.clear());
   }
 
   private updateHeldTracker(delta: number): void {
@@ -1997,6 +2149,12 @@ export class GameScene extends Phaser.Scene {
       pantherActive: this.panther?.isActive?.() ?? false,
       tigersActive: this.tigers?.isActive?.() ?? false,
       tigerCount: this.tigers?.countVisible?.() ?? 0,
+      tigerNearDist: this.tigers?.nearestDist?.(this.player) ?? Infinity,
+      backpackOpen: this.backpackOpen,
+      phoneOpen: this.phoneOpen,
+      whipEquipped: this.whipEquipped,
+      whipReady: this.whipCooldown <= 0,
+      backpackItems: this.inventory.backpackContents().map((i) => i.id),
       sasquatchDragging: this.sasquatchDragging,
       sasquatchAngle: this.sasquatch?.angle ?? 0,
       sunVisible: this.dayNight?.phase?.() !== 'night',
@@ -2137,6 +2295,7 @@ export class GameScene extends Phaser.Scene {
         setDomStatus(msg);
         audio.talk();
       });
+      if (this.whipCooldown > 0) this.whipCooldown = Math.max(0, this.whipCooldown - d);
       this.pigDrop.update(d, this.player, outdoors, (msg) => {
         this.statusLine = msg;
         setDomStatus(msg);

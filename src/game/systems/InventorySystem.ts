@@ -1,6 +1,14 @@
 /** Simple gadget inventory for E-CRAFT. */
 
-export type ItemId = 'tracker' | 'radio' | 'badge' | 'keycard' | 'cooked_meal';
+export type ItemId =
+  | 'tracker'
+  | 'radio'
+  | 'badge'
+  | 'keycard'
+  | 'cooked_meal'
+  | 'backpack'
+  | 'phone'
+  | 'whip';
 
 export interface ItemDef {
   id: ItemId;
@@ -14,10 +22,14 @@ const DEFS: Record<ItemId, ItemDef> = {
   badge: { id: 'badge', name: 'HQ Badge', icon: '🏅' },
   keycard: { id: 'keycard', name: 'Jail Keycard', icon: '🔑' },
   cooked_meal: { id: 'cooked_meal', name: 'Home Meal', icon: '🍲' },
+  backpack: { id: 'backpack', name: 'Field Backpack', icon: '🎒' },
+  phone: { id: 'phone', name: 'Field Phone', icon: '📱' },
+  whip: { id: 'whip', name: 'Tiger Whip', icon: '🪢' },
 };
 
 export class InventorySystem {
-  private items = new Set<ItemId>(['badge', 'radio']);
+  /** Always start with pack gear + badge/radio. */
+  private items = new Set<ItemId>(['backpack', 'phone', 'whip', 'badge', 'radio']);
 
   has(id: ItemId): boolean {
     return this.items.has(id);
@@ -29,6 +41,13 @@ export class InventorySystem {
 
   list(): ItemDef[] {
     return [...this.items].map((id) => DEFS[id]);
+  }
+
+  /** Items that live inside the backpack UI. */
+  backpackContents(): ItemDef[] {
+    return (['phone', 'whip'] as ItemId[])
+      .filter((id) => this.items.has(id))
+      .map((id) => DEFS[id]);
   }
 
   summary(): string {
