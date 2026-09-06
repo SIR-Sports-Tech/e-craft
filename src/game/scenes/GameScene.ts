@@ -780,7 +780,8 @@ export class GameScene extends Phaser.Scene {
           const body = this.add.image(0, 0, key).setScale(scale);
           const localY = BLDG_TEX.doorLocalY * scale;
           const dScale = anchor.doorScale;
-          const frame = this.add.image(0, localY - 6 * dScale, 'door_frame').setScale(dScale * 1.05);
+          // Frame is 88×108 vs door 72×96 — match doorway recess snugly
+          const frame = this.add.image(0, localY - 2 * dScale, 'door_frame').setScale(dScale * 0.92);
           const door = this.add.image(0, localY, 'door').setScale(dScale);
           facade.add([body, frame, door]);
           this.worldLayer.add(facade);

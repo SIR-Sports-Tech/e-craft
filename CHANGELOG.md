@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.0 — 2026-09-05 — HI-RES BUILDING DESIGN
+
+### Added
+- **512×448 high-resolution** original building facades (crisp when scaled)
+- Distinct designs: Security HQ (glass) · Jail (brick/battlements) · House (cozy) · Plaza (limestone/columns) · Cabin (timber)
+- Matching hi-res doors (72×96) seated in facade doorways
+- Soft shadows, lit windows, roof tiles, trim, planters / flower boxes
+
 ## 1.10.1 — 2026-09-05 — DOORS ATTACHED TO BUILDINGS
 
 ### Fixed

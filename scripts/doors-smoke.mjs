@@ -24,8 +24,8 @@ const catalog = await page.evaluate(() => {
     // Door must be a child of the building facade container
     const parented = door.parentContainer === facade;
     const localY = Math.abs(door.y);
-    const expected = 43 * (id === 'security_hq' || id === 'super_jail' ? 1.6 : 1.2);
-    const onFacade = Math.abs(localY - expected) < 8;
+    const expected = 152 * (id === 'security_hq' || id === 'super_jail' ? 0.58 : 0.46);
+    const onFacade = Math.abs(localY - expected) < 10;
     attached.push({
       id,
       ok: parented && onFacade,
@@ -37,11 +37,15 @@ const catalog = await page.evaluate(() => {
       facadeY: Math.round(facade.y),
     });
   }
+  const tex = window.__phaserGame.textures.get('bldg_hq');
+  const hiRes = !!(tex && tex.source?.[0] && tex.source[0].width >= 480);
   return {
     doors: st.building?.doors ?? 0,
     enterable: st.building?.enterable ?? [],
     attached,
     allAttached: attached.length > 0 && attached.every((a) => a.ok),
+    hiRes,
+    hqW: tex?.source?.[0]?.width ?? 0,
   };
 });
 
@@ -94,7 +98,8 @@ const afterExit = await page.evaluate(() => {
 const allEnter = need.every((id) => results[id]?.indoors);
 const catalogOk = need.every((id) => catalog.enterable.includes(id)) && catalog.doors >= need.length;
 const attachedOk = !!catalog.allAttached;
-const ok = errs.length === 0 && allEnter && catalogOk && attachedOk && !afterExit.indoors;
+const hiResOk = !!catalog.hiRes;
+const ok = errs.length === 0 && allEnter && catalogOk && attachedOk && hiResOk && !afterExit.indoors;
 
 console.log(
   JSON.stringify(
@@ -104,6 +109,8 @@ console.log(
         doors: catalog.doors,
         enterable: catalog.enterable,
         allAttached: catalog.allAttached,
+        hiRes: catalog.hiRes,
+        hqW: catalog.hqW,
         attached: catalog.attached,
       },
       results,
@@ -111,6 +118,7 @@ console.log(
       allEnter,
       catalogOk,
       attachedOk,
+      hiResOk,
       ok,
     },
     null,

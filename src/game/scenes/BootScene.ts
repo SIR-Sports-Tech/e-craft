@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
+import { generateHiResBuildings } from '../art/HiResBuildings';
 
 /**
- * E-CRAFT v0.2.1 original art pack — cleaner, larger, readable sprites.
- * Still procedural (no third-party IP). Aimed at “cute top-down adventure” readability.
+ * E-CRAFT original art pack — hi-res buildings + readable adventure sprites.
+ * Still procedural (no third-party IP).
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -27,11 +28,7 @@ export class BootScene extends Phaser.Scene {
     this.makePanther();
     this.makePig();
     this.makeBloodPool();
-    this.makeBuilding('bldg_hq', 0x1a3d6d, 0x5dade2, 0x1abc9c, true);
-    this.makeBuilding('bldg_jail', 0x6b2b2b, 0xf5b7b1, 0x922b21, true);
-    this.makeBuilding('bldg_plaza', 0x4a5568, 0xf6c28b, 0x718096, false);
-    this.makeBuilding('bldg_forest_cabin', 0x5d4037, 0x81c784, 0x3e2723, false);
-    this.makeBuilding('bldg_house', 0xc62828, 0xfff8e1, 0x5d4037, false);
+    generateHiResBuildings(this);
     this.makeBed();
     this.makeDoor();
     this.makeInteriorProps();
@@ -1132,45 +1129,56 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makeDoor(): void {
-    // Closed door
+    // Hi-res closed door (matches 72×96 facade doorway)
+    const W = 72;
+    const H = 96;
     const g = this.g();
-    g.fillStyle(0x4e342e, 1);
-    g.fillRoundedRect(0, 0, 44, 64, 3);
+    g.fillStyle(0x3e2723, 1);
+    g.fillRoundedRect(0, 0, W, H, 5);
     g.fillStyle(0x6d4c41, 1);
-    g.fillRoundedRect(4, 4, 36, 56, 2);
-    g.lineStyle(2, 0x3e2723, 0.8);
-    g.strokeRoundedRect(4, 4, 36, 56, 2);
-    g.lineBetween(22, 4, 22, 60);
-    g.fillStyle(0xffe082, 1);
-    g.fillCircle(34, 34, 3.5);
+    g.fillRoundedRect(5, 5, W - 10, H - 10, 4);
+    g.fillStyle(0x8d6e63, 1);
+    g.fillRoundedRect(10, 10, W - 20, H - 20, 3);
+    g.lineStyle(3, 0x2d1f16, 0.9);
+    g.strokeRoundedRect(5, 5, W - 10, H - 10, 4);
+    g.lineBetween(W / 2, 8, W / 2, H - 8);
+    // Panels
     g.fillStyle(0x5d4037, 1);
-    g.fillRect(8, 10, 10, 14);
-    g.fillRect(26, 10, 10, 14);
-    g.generateTexture('door', 44, 64);
+    g.fillRoundedRect(12, 14, 20, 28, 2);
+    g.fillRoundedRect(40, 14, 20, 28, 2);
+    g.fillRoundedRect(12, 50, 20, 28, 2);
+    g.fillRoundedRect(40, 50, 20, 28, 2);
+    g.fillStyle(0xffe082, 1);
+    g.fillCircle(58, 50, 5);
+    g.fillStyle(0xfff59d, 0.7);
+    g.fillCircle(57, 49, 2);
+    g.generateTexture('door', W, H);
     g.destroy();
 
     // Open door (swung — shows interior gap)
     const o = this.g();
-    o.fillStyle(0x3e2723, 1);
-    o.fillRect(0, 0, 14, 64); // door edge / thickness
+    o.fillStyle(0x2d1f16, 1);
+    o.fillRect(0, 0, 18, H);
     o.fillStyle(0x6d4c41, 1);
-    o.fillRoundedRect(6, 2, 10, 60, 2);
+    o.fillRoundedRect(6, 4, 14, H - 8, 3);
     o.fillStyle(0xffe082, 1);
-    o.fillCircle(12, 34, 2);
-    o.fillStyle(0x152018, 0.5);
-    o.fillRect(16, 4, 28, 56); // dark opening
-    o.generateTexture('door_open', 44, 64);
+    o.fillCircle(16, 50, 3);
+    o.fillStyle(0x0a0a0c, 0.75);
+    o.fillRect(22, 6, W - 24, H - 12);
+    o.generateTexture('door_open', W, H);
     o.destroy();
 
-    // Door frame / doorway
+    // Door frame
     const f = this.g();
-    f.fillStyle(0x5d4037, 1);
-    f.fillRect(0, 0, 56, 8); // lintel
-    f.fillRect(0, 0, 8, 72);
-    f.fillRect(48, 0, 8, 72);
+    const fw = 88;
+    const fh = 108;
+    f.fillStyle(0x4e342e, 1);
+    f.fillRect(0, 0, fw, 10);
+    f.fillRect(0, 0, 10, fh);
+    f.fillRect(fw - 10, 0, 10, fh);
     f.fillStyle(0x3e2723, 1);
-    f.fillRect(8, 8, 40, 64);
-    f.generateTexture('door_frame', 56, 72);
+    f.fillRect(10, 10, fw - 20, fh - 10);
+    f.generateTexture('door_frame', fw, fh);
     f.destroy();
   }
 

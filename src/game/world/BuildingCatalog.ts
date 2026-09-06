@@ -11,8 +11,8 @@ export const CIVIC_INTERIOR = {
   exitY: 980,
 } as const;
 
-/** BootScene makeBuilding texture is 180×152; door center sits ~43px below image center. */
-export const BLDG_TEX = { w: 180, h: 152, doorLocalY: 43, doorTexW: 32 } as const;
+/** Hi-res facade textures are 512×448; door center sits 152px below image center. */
+export const BLDG_TEX = { w: 512, h: 448, doorLocalY: 152, doorTexW: 72 } as const;
 
 export type BuildingKind = 'lair' | 'jail' | 'house' | 'civic';
 
@@ -35,9 +35,12 @@ export interface EnterableBuilding {
   zone: RectZone;
 }
 
-/** Match HQ/Jail larger sprites vs civic buildings. */
+/**
+ * Display scale for 512px facades — keeps world footprint similar to old 180px art
+ * while staying crisp (HQ/Jail slightly larger).
+ */
 export function buildingSpriteScale(id: string): number {
-  return id === 'security_hq' || id === 'super_jail' ? 1.6 : 1.2;
+  return id === 'security_hq' || id === 'super_jail' ? 0.58 : 0.46;
 }
 
 /** World position of the facade doorway (door sits ON the building). */
@@ -53,8 +56,8 @@ export function facadeDoorAnchor(z: RectZone, scale = buildingSpriteScale(z.id))
   const buildingY = z.y + z.h / 2 - 10;
   const doorX = buildingX;
   const doorY = buildingY + BLDG_TEX.doorLocalY * scale;
-  // Fit interactive door into the ~32px painted doorway width
-  const doorScale = (BLDG_TEX.doorTexW * scale) / 44;
+  // Door texture is 72×96 — scale with facade so it fills the recess
+  const doorScale = scale;
   return { buildingX, buildingY, doorX, doorY, doorScale, buildingScale: scale };
 }
 
