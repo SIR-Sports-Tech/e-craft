@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.1 — 2026-09-05 — DOORS ATTACHED TO BUILDINGS
+
+### Fixed
+- Every door is **parented to its building facade** (no more floating at zone bottoms)
+- Doorway recess drawn into building art; interactive door sits in the opening
+- Door scale matches facade doorway; exit spawns at the real door
+
 ## 1.10.0 — 2026-09-05 — ALL BUILDING DOORS OPEN
 
 ### Added

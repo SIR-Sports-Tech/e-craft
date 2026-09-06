@@ -266,7 +266,8 @@ export const SPAWN = {
   vehicle: { x: 300, y: 545 },
   raceCar: { x: 480, y: 545 },
   sasquatchForest: { x: 3000, y: 900 },
-  houseDoor: { x: 830, y: 980 },
+  /** Updated at runtime to the house facade door (attached to building). */
+  houseDoor: { x: 830, y: 980 } as { x: number; y: number },
 };
 
 export function pointInRect(

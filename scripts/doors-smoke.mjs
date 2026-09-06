@@ -12,9 +12,36 @@ await page.waitForFunction(() => !!window.__ecraft?.enterBuilding && !!window.__
 
 const catalog = await page.evaluate(() => {
   const st = window.__ecraft.getState();
+  const scene = window.__phaserGame.scene.getScene('Game');
+  const attached = [];
+  for (const id of st.building?.enterable ?? []) {
+    const facade = scene.buildingFacades?.[id];
+    const door = scene.outdoorDoors?.[id];
+    if (!facade || !door) {
+      attached.push({ id, ok: false, reason: 'missing' });
+      continue;
+    }
+    // Door must be a child of the building facade container
+    const parented = door.parentContainer === facade;
+    const localY = Math.abs(door.y);
+    const expected = 43 * (id === 'security_hq' || id === 'super_jail' ? 1.6 : 1.2);
+    const onFacade = Math.abs(localY - expected) < 8;
+    attached.push({
+      id,
+      ok: parented && onFacade,
+      parented,
+      onFacade,
+      localY: Math.round(localY),
+      expected: Math.round(expected),
+      facadeX: Math.round(facade.x),
+      facadeY: Math.round(facade.y),
+    });
+  }
   return {
     doors: st.building?.doors ?? 0,
     enterable: st.building?.enterable ?? [],
+    attached,
+    allAttached: attached.length > 0 && attached.every((a) => a.ok),
   };
 });
 
@@ -66,17 +93,24 @@ const afterExit = await page.evaluate(() => {
 
 const allEnter = need.every((id) => results[id]?.indoors);
 const catalogOk = need.every((id) => catalog.enterable.includes(id)) && catalog.doors >= need.length;
-const ok = errs.length === 0 && allEnter && catalogOk && !afterExit.indoors;
+const attachedOk = !!catalog.allAttached;
+const ok = errs.length === 0 && allEnter && catalogOk && attachedOk && !afterExit.indoors;
 
 console.log(
   JSON.stringify(
     {
       errs: errs.slice(0, 5),
-      catalog,
+      catalog: {
+        doors: catalog.doors,
+        enterable: catalog.enterable,
+        allAttached: catalog.allAttached,
+        attached: catalog.attached,
+      },
       results,
       afterExit,
       allEnter,
       catalogOk,
+      attachedOk,
       ok,
     },
     null,

@@ -1,4 +1,4 @@
-import { CITY_ZONES, SPAWN, type RectZone } from './WorldLayout';
+import { CITY_ZONES, type RectZone } from './WorldLayout';
 
 /** Shared indoor footprint (same room shell as house/jail/lair). */
 export const CIVIC_INTERIOR = {
@@ -11,20 +11,51 @@ export const CIVIC_INTERIOR = {
   exitY: 980,
 } as const;
 
+/** BootScene makeBuilding texture is 180×152; door center sits ~43px below image center. */
+export const BLDG_TEX = { w: 180, h: 152, doorLocalY: 43, doorTexW: 32 } as const;
+
 export type BuildingKind = 'lair' | 'jail' | 'house' | 'civic';
 
 export interface EnterableBuilding {
   id: string;
   kind: BuildingKind;
   label: string;
-  /** Outdoor door world position */
+  /** Outdoor door world position (flush on facade) */
   doorX: number;
   doorY: number;
+  /** Building sprite world center */
+  buildingX: number;
+  buildingY: number;
+  buildingScale: number;
+  doorScale: number;
   /** Prompt on the door */
   prompt: string;
   /** Civic theme key (only for kind === 'civic') */
   theme?: string;
   zone: RectZone;
+}
+
+/** Match HQ/Jail larger sprites vs civic buildings. */
+export function buildingSpriteScale(id: string): number {
+  return id === 'security_hq' || id === 'super_jail' ? 1.6 : 1.2;
+}
+
+/** World position of the facade doorway (door sits ON the building). */
+export function facadeDoorAnchor(z: RectZone, scale = buildingSpriteScale(z.id)): {
+  buildingX: number;
+  buildingY: number;
+  doorX: number;
+  doorY: number;
+  doorScale: number;
+  buildingScale: number;
+} {
+  const buildingX = z.x + z.w / 2;
+  const buildingY = z.y + z.h / 2 - 10;
+  const doorX = buildingX;
+  const doorY = buildingY + BLDG_TEX.doorLocalY * scale;
+  // Fit interactive door into the ~32px painted doorway width
+  const doorScale = (BLDG_TEX.doorTexW * scale) / 44;
+  return { buildingX, buildingY, doorX, doorY, doorScale, buildingScale: scale };
 }
 
 export interface CivicTheme {
@@ -131,15 +162,10 @@ export const CIVIC_THEMES: Record<string, CivicTheme> = {
   },
 };
 
-const SPECIAL: Record<string, { kind: BuildingKind; prompt: string; doorX?: number; doorY?: number }> = {
-  security_hq: { kind: 'lair', prompt: '[E] HQ Door → Lair', doorX: 320, doorY: 455 },
+const SPECIAL: Record<string, { kind: BuildingKind; prompt: string }> = {
+  security_hq: { kind: 'lair', prompt: '[E] HQ Door → Lair' },
   super_jail: { kind: 'jail', prompt: '[E] Jail Door' },
-  player_house: {
-    kind: 'house',
-    prompt: '[E] Front Door',
-    doorX: SPAWN.houseDoor.x,
-    doorY: SPAWN.houseDoor.y,
-  },
+  player_house: { kind: 'house', prompt: '[E] Front Door' },
 };
 
 /** Zones that are props / outdoors only — no interior door. */
@@ -147,22 +173,25 @@ const SKIP = new Set(['forest', 'vehicle_bay', 'race_bay', 'job_board']);
 
 /**
  * Every labeled city building you can walk up to and enter.
- * Specials (HQ/Jail/House) keep their mission interiors; others use civic themes.
+ * Door anchors are computed from the building sprite facade (not zone bottom).
  */
 export function listEnterableBuildings(): EnterableBuilding[] {
   const out: EnterableBuilding[] = [];
   for (const z of CITY_ZONES) {
     if (SKIP.has(z.id)) continue;
     const special = SPECIAL[z.id];
-    const doorX = special?.doorX ?? z.x + z.w / 2;
-    const doorY = special?.doorY ?? z.y + z.h - 8;
+    const anchor = facadeDoorAnchor(z);
     if (special) {
       out.push({
         id: z.id,
         kind: special.kind,
         label: z.label,
-        doorX,
-        doorY,
+        doorX: anchor.doorX,
+        doorY: anchor.doorY,
+        buildingX: anchor.buildingX,
+        buildingY: anchor.buildingY,
+        buildingScale: anchor.buildingScale,
+        doorScale: anchor.doorScale,
         prompt: special.prompt,
         zone: z,
       });
@@ -171,8 +200,12 @@ export function listEnterableBuildings(): EnterableBuilding[] {
         id: z.id,
         kind: 'civic',
         label: z.label,
-        doorX,
-        doorY,
+        doorX: anchor.doorX,
+        doorY: anchor.doorY,
+        buildingX: anchor.buildingX,
+        buildingY: anchor.buildingY,
+        buildingScale: anchor.buildingScale,
+        doorScale: anchor.doorScale,
         prompt: `[E] Enter ${z.label}`,
         theme: z.id,
         zone: z,

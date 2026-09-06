@@ -1099,11 +1099,13 @@ export class BootScene extends Phaser.Scene {
     g.fillTriangle(0, 40, w / 2, 4, w, 40);
     g.fillStyle(trim, 1);
     g.fillTriangle(10, 40, w / 2, 14, w - 10, 40);
-    // door
-    g.fillStyle(0x212121, 1);
-    g.fillRoundedRect(w / 2 - 16, h - 42, 32, 42, 4);
-    g.fillStyle(0xffe082, 1);
-    g.fillCircle(w / 2 + 10, h - 22, 3);
+    // Doorway recess (interactive door sprite attaches on top)
+    g.fillStyle(0x1a1512, 1);
+    g.fillRoundedRect(w / 2 - 18, h - 44, 36, 44, 3);
+    g.fillStyle(0x3e2723, 1);
+    g.fillRect(w / 2 - 18, h - 44, 36, 6); // lintel
+    g.fillStyle(0x0d0d0d, 0.55);
+    g.fillRect(w / 2 - 14, h - 38, 28, 38); // dark opening behind door
     // windows
     const win = (x: number, y: number) => {
       g.fillStyle(0xbbdefb, 1);

@@ -33,8 +33,11 @@ import {
   pointInRect,
 } from '../world/WorldLayout';
 import {
+  BLDG_TEX,
   CIVIC_INTERIOR,
   CIVIC_THEMES,
+  buildingSpriteScale,
+  facadeDoorAnchor,
   getEnterable,
   listEnterableBuildings,
   type EnterableBuilding,
@@ -133,6 +136,9 @@ export class GameScene extends Phaser.Scene {
   }> = [];
   private trafficTick = 0;
   private outdoorDoors: Record<string, Phaser.GameObjects.Image> = {};
+  /** Rest pose for facade-attached doors (local if parented, else world). */
+  private doorRest: Record<string, { x: number; y: number; scale: number; localY: number }> = {};
+  private buildingFacades: Record<string, Phaser.GameObjects.Container> = {};
   private doorBusy = false;
   private citizens: { x: number; y: number; name: string; line: string }[] = [];
   private construction!: ConstructionSystem;
@@ -740,6 +746,7 @@ export class GameScene extends Phaser.Scene {
       race_bay: 'bldg_plaza',
       player_house: 'bldg_house',
     };
+    const enterableById = new Map(listEnterableBuildings().map((b) => [b.id, b]));
 
     for (const z of CITY_ZONES) {
       // ground pad under zone
@@ -749,27 +756,56 @@ export class GameScene extends Phaser.Scene {
         .setDepth(2);
       this.worldLayer.add(pad);
 
-      if (z.id !== 'forest' && z.id !== 'vehicle_bay') {
-        const key = buildingKey[z.id] || 'bldg_plaza';
-        const b = this.add
-          .image(z.x + z.w / 2, z.y + z.h / 2 - 10, key)
-          .setDepth(3)
-          .setScale(z.id === 'security_hq' || z.id === 'super_jail' ? 1.6 : 1.2);
-        this.worldLayer.add(b);
-      }
       if (z.id === 'vehicle_bay') {
         const bay = this.add
           .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, 0x1b5e20, 0.5)
           .setStrokeStyle(3, 0x69f0ae, 0.8)
           .setDepth(2);
         this.worldLayer.add(bay);
-      }
-      if (z.id === 'race_bay') {
+      } else if (z.id === 'race_bay') {
         const bay = this.add
           .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, 0x7f0000, 0.45)
           .setStrokeStyle(3, 0xff5252, 0.85)
           .setDepth(2);
         this.worldLayer.add(bay);
+      } else if (z.id !== 'forest') {
+        const key = buildingKey[z.id] || 'bldg_plaza';
+        const enterable = enterableById.get(z.id);
+        const scale = buildingSpriteScale(z.id);
+        const anchor = facadeDoorAnchor(z, scale);
+
+        if (enterable) {
+          // Building + door locked together as one facade
+          const facade = this.add.container(anchor.buildingX, anchor.buildingY).setDepth(3);
+          const body = this.add.image(0, 0, key).setScale(scale);
+          const localY = BLDG_TEX.doorLocalY * scale;
+          const dScale = anchor.doorScale;
+          const frame = this.add.image(0, localY - 6 * dScale, 'door_frame').setScale(dScale * 1.05);
+          const door = this.add.image(0, localY, 'door').setScale(dScale);
+          facade.add([body, frame, door]);
+          this.worldLayer.add(facade);
+          this.buildingFacades[z.id] = facade;
+          this.outdoorDoors[z.id] = door;
+          this.doorRest[z.id] = { x: 0, y: localY, scale: dScale, localY };
+          if (enterable.kind === 'lair') {
+            this.outdoorDoors.hq = door;
+            this.doorRest.hq = this.doorRest[z.id];
+          }
+          if (enterable.kind === 'house') {
+            this.outdoorDoors.house = door;
+            this.doorRest.house = this.doorRest[z.id];
+            // Keep exit-house spawn on the real facade door
+            SPAWN.houseDoor.x = anchor.doorX;
+            SPAWN.houseDoor.y = anchor.doorY + 18;
+          }
+          if (enterable.kind === 'jail') {
+            this.outdoorDoors.jail = door;
+            this.doorRest.jail = this.doorRest[z.id];
+          }
+        } else {
+          const b = this.add.image(anchor.buildingX, anchor.buildingY, key).setDepth(3).setScale(scale);
+          this.worldLayer.add(b);
+        }
       }
 
       // Professional civic plaque + clean typography
@@ -868,21 +904,11 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Every enterable building gets a working front door
+    // Door prompts sit just above each facade-attached door
     for (const b of listEnterableBuildings()) {
-      const scale = b.kind === 'house' ? 1.2 : b.kind === 'lair' || b.kind === 'jail' ? 1.15 : 1.05;
-      const frame = this.add.image(b.doorX, b.doorY - 8, 'door_frame').setDepth(4).setScale(scale);
-      const door = this.add.image(b.doorX, b.doorY, 'door').setDepth(5).setScale(scale);
-      this.outdoorDoors[b.id] = door;
-      // Alias special doors for legacy openDoorThen keys
-      if (b.kind === 'lair') this.outdoorDoors.hq = door;
-      if (b.kind === 'house') this.outdoorDoors.house = door;
-      if (b.kind === 'jail') this.outdoorDoors.jail = door;
-      this.worldLayer.add(frame);
-      this.worldLayer.add(door);
       const lblColor = b.kind === 'jail' ? '#ffcdd2' : '#ffe082';
       const lbl = this.add
-        .text(b.doorX, b.doorY - 48, b.prompt, {
+        .text(b.doorX, b.doorY - 42, b.prompt, {
           fontSize: b.kind === 'lair' ? '13px' : '11px',
           color: lblColor,
           backgroundColor: '#00000099',
@@ -909,11 +935,17 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const door =
-      this.outdoorDoors[kind] ||
-      (kind === 'hq' ? this.outdoorDoors.security_hq : undefined) ||
-      (kind === 'house' ? this.outdoorDoors.player_house : undefined) ||
-      (kind === 'jail' ? this.outdoorDoors.super_jail : undefined);
+    const doorKey =
+      this.outdoorDoors[kind]
+        ? kind
+        : kind === 'hq'
+          ? 'security_hq'
+          : kind === 'house'
+            ? 'player_house'
+            : kind === 'jail'
+              ? 'super_jail'
+              : kind;
+    const door = this.outdoorDoors[doorKey] || this.outdoorDoors[kind];
     if (!door) {
       enter();
       return;
@@ -926,10 +958,11 @@ export class GameScene extends Phaser.Scene {
     setDomStatus(this.statusLine);
     audio.interact();
 
-    const ox = door.x;
-    const oy = door.y;
-    const sc = door.scaleX;
-    // Hinge on the left edge so it swings open
+    const rest = this.doorRest[doorKey] || this.doorRest[kind] || { x: door.x, y: door.y, scale: door.scaleX, localY: door.y };
+    const ox = rest.x;
+    const oy = rest.y;
+    const sc = rest.scale;
+    // Hinge on the left edge so it swings open (local coords inside facade container)
     door.setOrigin(0.05, 0.5);
     door.setPosition(ox - door.displayWidth * 0.45, oy);
 
@@ -3729,7 +3762,11 @@ export class GameScene extends Phaser.Scene {
       this.vehicle.setVisible(true);
       if (this.raceCar) this.raceCar.setVisible(true);
     }
-    this.player.setPosition(800, 420);
+    const jailDoor = getEnterable('super_jail');
+    this.player.setPosition(
+      jailDoor ? jailDoor.doorX : 800,
+      jailDoor ? jailDoor.doorY + 18 : 420,
+    );
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     if (this.flags.robotActive) {
       this.syncRobotBesidePlayer();
