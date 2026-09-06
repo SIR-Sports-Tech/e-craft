@@ -33,25 +33,23 @@ const tex = await page.evaluate(() => {
   return has;
 });
 
-// Enter house
-await page.click('#btn-house');
-await page.waitForTimeout(400);
+// Enter house (skip door anim for smoke reliability)
+await page.evaluate(() => window.__ecraft.enterBuilding('player_house'));
+await page.waitForTimeout(250);
 let st = await page.evaluate(() => window.__ecraft.getState());
 const inHouse = !!st.flags.inHouse;
 
-// Exit, enter lair via activate
-await page.evaluate(() => window.__ecraft.runAcceptanceStep('exit_house'));
+// Exit, enter lair
+await page.evaluate(() => window.__ecraft.exitIndoor());
 await page.waitForTimeout(150);
-await page.evaluate(() => window.__ecraft.runAcceptanceStep('enter_lair'));
-await page.waitForTimeout(200);
+await page.evaluate(() => window.__ecraft.enterBuilding('security_hq'));
+await page.waitForTimeout(250);
 st = await page.evaluate(() => window.__ecraft.getState());
 const inLair = !!st.flags.inLair;
 
-await page.evaluate(() => window.__ecraft.runAcceptanceStep('exit_lair'));
+await page.evaluate(() => window.__ecraft.exitIndoor());
 await page.waitForTimeout(150);
-await page.evaluate(() => {
-  window.__ecraft.runAcceptanceStep('enter_jail');
-});
+await page.evaluate(() => window.__ecraft.enterBuilding('super_jail'));
 await page.waitForTimeout(250);
 st = await page.evaluate(() => window.__ecraft.getState());
 const inJail = !!st.flags.inJailBuilding;

@@ -32,6 +32,13 @@ import {
   WORLD,
   pointInRect,
 } from '../world/WorldLayout';
+import {
+  CIVIC_INTERIOR,
+  CIVIC_THEMES,
+  getEnterable,
+  listEnterableBuildings,
+  type EnterableBuilding,
+} from '../world/BuildingCatalog';
 
 type TouchVec = { x: number; y: number };
 
@@ -90,6 +97,16 @@ export class GameScene extends Phaser.Scene {
   private lairNodes: Phaser.GameObjects.GameObject[] = [];
   private jailNodes: Phaser.GameObjects.GameObject[] = [];
   private houseNodes: Phaser.GameObjects.GameObject[] = [];
+  private civicNodes: Phaser.GameObjects.GameObject[] = [];
+  /** Non-special building currently entered (clinic/shop/…). */
+  private civicId: string | null = null;
+  private civicTitle?: Phaser.GameObjects.Text;
+  private civicTip?: Phaser.GameObjects.Text;
+  private civicWall?: Phaser.GameObjects.Rectangle;
+  private civicShell?: Phaser.GameObjects.Rectangle;
+  private civicPropA?: Phaser.GameObjects.Text;
+  private civicPropB?: Phaser.GameObjects.Text;
+  private civicPropC?: Phaser.GameObjects.Text;
   private sleeping = false;
   private lyingInBed = false;
   private tvOn = false;
@@ -115,7 +132,7 @@ export class GameScene extends Phaser.Scene {
     offset: number;
   }> = [];
   private trafficTick = 0;
-  private outdoorDoors: Partial<Record<'hq' | 'house' | 'jail', Phaser.GameObjects.Image>> = {};
+  private outdoorDoors: Record<string, Phaser.GameObjects.Image> = {};
   private doorBusy = false;
   private citizens: { x: number; y: number; name: string; line: string }[] = [];
   private construction!: ConstructionSystem;
@@ -162,6 +179,7 @@ export class GameScene extends Phaser.Scene {
     this.buildIndoorLair();
     this.buildIndoorJail();
     this.buildIndoorHouse();
+    this.buildIndoorCivic();
 
     this.trail = new TrailSystem(this, this.trailLayer);
     this.objectiveMarker = new ObjectiveMarker(this);
@@ -393,7 +411,7 @@ export class GameScene extends Phaser.Scene {
       pantherJump: () => {
         this.paused = false;
         this.mapOpen = false;
-        if (this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse) {
+        if (this.isIndoors()) {
           this.statusLine = 'Go outside for the panther!';
           setDomStatus(this.statusLine);
           return;
@@ -407,7 +425,7 @@ export class GameScene extends Phaser.Scene {
       pigDrop: () => {
         this.paused = false;
         this.mapOpen = false;
-        if (this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse) {
+        if (this.isIndoors()) {
           this.statusLine = 'Go outside for the pig drop!';
           setDomStatus(this.statusLine);
           return;
@@ -443,8 +461,17 @@ export class GameScene extends Phaser.Scene {
           this.exitJail();
           return;
         }
+        if (this.civicId) {
+          this.exitCivic();
+          return;
+        }
         this.statusLine = 'Already outside.';
         setDomStatus(this.statusLine);
+      },
+      enterBuilding: (id: string) => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.enterBuilding(id, true);
       },
       runAcceptanceStep: (step: string) => this.runAcceptanceStep(step),
       runFullAcceptance: async () => {
@@ -523,9 +550,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.heldTracker) {
       this.heldTracker = this.add.image(0, 0, 'tracker').setDepth(14).setScale(0.7);
     }
-    this.heldTracker.setVisible(
-      !this.flags.inVehicle && !this.flags.inLair && !this.flags.inJailBuilding && !this.flags.inHouse,
-    );
+    this.heldTracker.setVisible(!this.flags.inVehicle && !this.isIndoors());
 
     if (!this.trackerScanGfx) {
       this.trackerScanGfx = this.add.graphics().setDepth(13);
@@ -576,7 +601,7 @@ export class GameScene extends Phaser.Scene {
       if (this.trackerScanGfx) this.trackerScanGfx.clear();
       return;
     }
-    if (this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse) {
+    if (this.isIndoors()) {
       if (this.heldTracker) this.heldTracker.setVisible(false);
       if (this.trackerArrow) this.trackerArrow.setVisible(false);
       if (this.trackerScanGfx) this.trackerScanGfx.clear();
@@ -843,80 +868,52 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // HQ door
-    const hqFrame = this.add.image(320, 448, 'door_frame').setDepth(4).setScale(1.15);
-    const hqDoor = this.add.image(320, 455, 'door').setDepth(5).setScale(1.15);
-    this.outdoorDoors.hq = hqDoor;
-    this.worldLayer.add(hqFrame);
-    this.worldLayer.add(hqDoor);
-    this.hqDoorLabel = this.add
-      .text(320, 410, '[E] HQ Door → Lair', {
-        fontSize: '13px',
-        color: '#ffe082',
-        backgroundColor: '#00000099',
-        padding: { x: 6, y: 3 },
-      })
-      .setOrigin(0.5)
-      .setDepth(6);
-    this.worldLayer.add(this.hqDoorLabel);
-
-    // House door
-    const house = CITY_ZONES.find((z) => z.id === 'player_house')!;
-    const houseFrame = this.add
-      .image(SPAWN.houseDoor.x, SPAWN.houseDoor.y - 8, 'door_frame')
-      .setDepth(4)
-      .setScale(1.2);
-    const houseDoor = this.add.image(SPAWN.houseDoor.x, SPAWN.houseDoor.y, 'door').setDepth(5).setScale(1.2);
-    this.outdoorDoors.house = houseDoor;
-    this.worldLayer.add(houseFrame);
-    this.worldLayer.add(houseDoor);
-    const houseLbl = this.add
-      .text(SPAWN.houseDoor.x, SPAWN.houseDoor.y - 48, '[E] Front Door', {
-        fontSize: '12px',
-        color: '#ffe082',
-        backgroundColor: '#00000099',
-        padding: { x: 5, y: 2 },
-      })
-      .setOrigin(0.5)
-      .setDepth(6);
-    this.worldLayer.add(houseLbl);
-    void house;
-
-    // Jail door
-    const jail = CITY_ZONES.find((z) => z.id === 'super_jail')!;
-    const jailDoorX = jail.x + jail.w / 2;
-    const jailDoorY = jail.y + jail.h - 8;
-    const jailFrame = this.add.image(jailDoorX, jailDoorY - 8, 'door_frame').setDepth(4).setScale(1.15);
-    const jailDoor = this.add.image(jailDoorX, jailDoorY, 'door').setDepth(5).setScale(1.15);
-    this.outdoorDoors.jail = jailDoor;
-    this.worldLayer.add(jailFrame);
-    this.worldLayer.add(jailDoor);
-    const jailLbl = this.add
-      .text(jailDoorX, jailDoorY - 48, '[E] Jail Door', {
-        fontSize: '12px',
-        color: '#ffcdd2',
-        backgroundColor: '#00000099',
-        padding: { x: 5, y: 2 },
-      })
-      .setOrigin(0.5)
-      .setDepth(6);
-    this.worldLayer.add(jailLbl);
+    // Every enterable building gets a working front door
+    for (const b of listEnterableBuildings()) {
+      const scale = b.kind === 'house' ? 1.2 : b.kind === 'lair' || b.kind === 'jail' ? 1.15 : 1.05;
+      const frame = this.add.image(b.doorX, b.doorY - 8, 'door_frame').setDepth(4).setScale(scale);
+      const door = this.add.image(b.doorX, b.doorY, 'door').setDepth(5).setScale(scale);
+      this.outdoorDoors[b.id] = door;
+      // Alias special doors for legacy openDoorThen keys
+      if (b.kind === 'lair') this.outdoorDoors.hq = door;
+      if (b.kind === 'house') this.outdoorDoors.house = door;
+      if (b.kind === 'jail') this.outdoorDoors.jail = door;
+      this.worldLayer.add(frame);
+      this.worldLayer.add(door);
+      const lblColor = b.kind === 'jail' ? '#ffcdd2' : '#ffe082';
+      const lbl = this.add
+        .text(b.doorX, b.doorY - 48, b.prompt, {
+          fontSize: b.kind === 'lair' ? '13px' : '11px',
+          color: lblColor,
+          backgroundColor: '#00000099',
+          padding: { x: 5, y: 2 },
+        })
+        .setOrigin(0.5)
+        .setDepth(6);
+      this.worldLayer.add(lbl);
+      if (b.kind === 'lair') this.hqDoorLabel = lbl;
+    }
   }
 
   /** Swing the outdoor door open, then enter the building. */
-  private openDoorThen(kind: 'hq' | 'house' | 'jail', enter: () => void): void {
+  private openDoorThen(kind: string, enter: () => void): void {
     if (this.doorBusy) return;
     // Already inside that building — just run enter logic
     if (
-      (kind === 'hq' && this.flags.inLair) ||
-      (kind === 'house' && this.flags.inHouse) ||
-      (kind === 'jail' && this.flags.inJailBuilding)
+      ((kind === 'hq' || kind === 'security_hq') && this.flags.inLair) ||
+      ((kind === 'house' || kind === 'player_house') && this.flags.inHouse) ||
+      ((kind === 'jail' || kind === 'super_jail') && this.flags.inJailBuilding) ||
+      (this.civicId != null && (kind === this.civicId || this.outdoorDoors[kind] === this.outdoorDoors[this.civicId]))
     ) {
       enter();
       return;
     }
 
-    const door = this.outdoorDoors[kind];
+    const door =
+      this.outdoorDoors[kind] ||
+      (kind === 'hq' ? this.outdoorDoors.security_hq : undefined) ||
+      (kind === 'house' ? this.outdoorDoors.player_house : undefined) ||
+      (kind === 'jail' ? this.outdoorDoors.super_jail : undefined);
     if (!door) {
       enter();
       return;
@@ -1571,6 +1568,142 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  /** Shared interior shell for clinic / shop / school / library / etc. */
+  private buildIndoorCivic(): void {
+    this.civicNodes = [];
+    const cx = CIVIC_INTERIOR.x + CIVIC_INTERIOR.w / 2;
+    const cy = CIVIC_INTERIOR.y + CIVIC_INTERIOR.h / 2;
+
+    const shell = this.add
+      .rectangle(cx, cy, CIVIC_INTERIOR.w + 24, CIVIC_INTERIOR.h + 24, 0x263238, 1)
+      .setStrokeStyle(6, 0x90caf9, 0.8)
+      .setVisible(false);
+    this.civicShell = shell;
+    const floor = this.add.tileSprite(cx, cy, CIVIC_INTERIOR.w, CIVIC_INTERIOR.h, 'floor_concrete').setVisible(false);
+    const wall = this.add
+      .rectangle(cx, CIVIC_INTERIOR.y + 55, CIVIC_INTERIOR.w, 110, 0xe3f2fd, 1)
+      .setStrokeStyle(2, 0x90caf9, 0.7)
+      .setVisible(false);
+    this.civicWall = wall;
+    const baseboard = this.add
+      .rectangle(cx, CIVIC_INTERIOR.y + 108, CIVIC_INTERIOR.w, 8, 0x455a64, 1)
+      .setVisible(false);
+
+    const title = this.add
+      .text(cx, CIVIC_INTERIOR.y + 28, 'Building', {
+        fontSize: '18px',
+        color: '#0d47a1',
+        backgroundColor: '#e3f2fdcc',
+        padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    this.civicTitle = title;
+
+    const desk = this.add.image(cx, CIVIC_INTERIOR.y + 240, 'furn_desk').setScale(1.25).setVisible(false);
+    const plant = this.add.image(CIVIC_INTERIOR.x + 120, CIVIC_INTERIOR.y + 220, 'furn_plant').setScale(1.15).setVisible(false);
+    const table = this.add.image(CIVIC_INTERIOR.x + 520, CIVIC_INTERIOR.y + 260, 'furn_table').setScale(1.1).setVisible(false);
+    const picture = this.add.image(cx, CIVIC_INTERIOR.y + 150, 'furn_picture').setScale(1.2).setVisible(false);
+    const consoleDesk = this.add
+      .image(CIVIC_INTERIOR.x + 180, CIVIC_INTERIOR.y + 340, 'furn_console')
+      .setScale(1.05)
+      .setVisible(false);
+
+    const propA = this.add
+      .text(CIVIC_INTERIOR.x + 180, CIVIC_INTERIOR.y + 380, 'Prop A', {
+        fontSize: '12px',
+        color: '#fffde7',
+        backgroundColor: '#1565c0aa',
+        padding: { x: 5, y: 2 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    const propB = this.add
+      .text(cx, CIVIC_INTERIOR.y + 290, 'Prop B', {
+        fontSize: '12px',
+        color: '#fffde7',
+        backgroundColor: '#00695caa',
+        padding: { x: 5, y: 2 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    const propC = this.add
+      .text(CIVIC_INTERIOR.x + 520, CIVIC_INTERIOR.y + 310, 'Prop C', {
+        fontSize: '12px',
+        color: '#fffde7',
+        backgroundColor: '#6a1b9aaa',
+        padding: { x: 5, y: 2 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    this.civicPropA = propA;
+    this.civicPropB = propB;
+    this.civicPropC = propC;
+
+    const doorFrame = this.add
+      .rectangle(CIVIC_INTERIOR.exitX + 30, CIVIC_INTERIOR.exitY + 40, 50, 70, 0x37474f, 0.5)
+      .setStrokeStyle(3, 0xa5d6a7, 0.85)
+      .setVisible(false);
+    const doorImg = this.add
+      .image(CIVIC_INTERIOR.exitX + 30, CIVIC_INTERIOR.exitY + 40, 'door')
+      .setScale(1.1)
+      .setVisible(false);
+    const exit = this.add
+      .text(CIVIC_INTERIOR.exitX, CIVIC_INTERIOR.exitY - 8, '[E] Exit building', {
+        fontSize: '13px',
+        color: '#a5d6a7',
+        backgroundColor: '#00000088',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0, 0)
+      .setVisible(false);
+
+    const tip = this.add
+      .text(cx, CIVIC_INTERIOR.y + CIVIC_INTERIOR.h - 28, 'Look around · EXIT when ready', {
+        fontSize: '12px',
+        color: '#263238',
+        backgroundColor: '#fff9c4aa',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    this.civicTip = tip;
+
+    this.pushIndoor(
+      this.civicNodes,
+      shell,
+      floor,
+      wall,
+      baseboard,
+      title,
+      desk,
+      plant,
+      table,
+      picture,
+      consoleDesk,
+      propA,
+      propB,
+      propC,
+      doorFrame,
+      doorImg,
+      exit,
+      tip,
+    );
+  }
+
+  private applyCivicTheme(themeId: string): void {
+    const theme = CIVIC_THEMES[themeId];
+    if (!theme) return;
+    this.civicTitle?.setText(theme.title);
+    this.civicTitle?.setColor('#1a237e');
+    this.civicWall?.setFillStyle(theme.wall, 1);
+    this.civicShell?.setStrokeStyle(6, theme.accent, 0.85);
+    this.civicPropA?.setText(theme.propA);
+    this.civicPropB?.setText(theme.propB);
+    this.civicPropC?.setText(theme.propC);
+    this.civicTip?.setText(theme.tip);
+  }
+
   // —— Public API for UIScene ——
   getHud() {
     const advanced = [
@@ -1656,6 +1789,12 @@ export class GameScene extends Phaser.Scene {
         index: this.craftBuild?.selectedIndex?.() ?? 0,
         count: this.craftBuild?.count?.() ?? 0,
       },
+      building: {
+        indoors: this.isIndoors(),
+        civicId: this.civicId,
+        doors: Object.keys(this.outdoorDoors).filter((k) => !['hq', 'house', 'jail'].includes(k)).length,
+        enterable: listEnterableBuildings().map((b) => b.id),
+      },
     };
   }
 
@@ -1724,8 +1863,7 @@ export class GameScene extends Phaser.Scene {
         this.updateCitizenSchedules();
       }
       this.dayNight.update(d);
-      const outdoors =
-        !this.flags.inLair && !this.flags.inJailBuilding && !this.flags.inHouse;
+      const outdoors = !this.isIndoors();
       this.dayNight.setOutdoorVisible(outdoors);
       this.patrolCars.setOutdoorVisible(outdoors);
       this.patrolCars.update(d);
@@ -1763,7 +1901,7 @@ export class GameScene extends Phaser.Scene {
       if (now - this.lastHudWrite > 400) {
         this.lastHudWrite = now;
         // Indoors / sleeping: prefer action status so trail prompts don't bury button feedback
-        const indoors = this.flags.inLair || this.flags.inHouse || this.flags.inJailBuilding;
+        const indoors = this.isIndoors();
         const hudLine = this.sleeping
           ? this.statusLine || 'Sleeping…'
           : indoors
@@ -2303,8 +2441,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // In house/jail: robot waits outside (hidden). In lair: stand with you.
-    if (this.flags.inHouse || this.flags.inJailBuilding) {
+    // In house/jail/civic: robot waits outside (hidden). In lair: stand with you.
+    if (this.flags.inHouse || this.flags.inJailBuilding || this.civicId) {
       this.robot.setVisible(false);
       this.robot.setVelocity(0, 0);
       return;
@@ -2441,9 +2579,7 @@ export class GameScene extends Phaser.Scene {
       this.flags.sasquatchCaptured ||
       this.flags.sasquatchJailed ||
       this.flags.sasquatchInVehicle ||
-      this.flags.inLair ||
-      this.flags.inHouse ||
-      this.flags.inJailBuilding
+      this.isIndoors()
     ) {
       if (this.sasquatchSirenMode) this.setSasquatchForm(false);
       return;
@@ -2547,9 +2683,7 @@ export class GameScene extends Phaser.Scene {
       !this.flags.hasTracker ||
       !this.trackerHeld ||
       this.flags.sasquatchCaptured ||
-      this.flags.inLair ||
-      this.flags.inHouse ||
-      this.flags.inJailBuilding ||
+      this.isIndoors() ||
       this.sleeping
     ) {
       this.trail.clearFallback();
@@ -2584,6 +2718,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private describeInteract(): string | null {
+    if (this.civicId) {
+      if (this.craftBuild?.isMode()) {
+        return `[E] Place ${this.craftBuild.selectedName()} · BREAK removes`;
+      }
+      if (this.near(CIVIC_INTERIOR.exitX + 40, CIVIC_INTERIOR.exitY + 40, 110)) return '[E] Exit building';
+      return 'Inside — walk around · EXIT to leave';
+    }
     if (this.flags.inHouse) {
       if (this.lyingInBed) return '[E] Get out of bed';
       if (this.craftBuild?.isMode()) {
@@ -2628,35 +2769,24 @@ export class GameScene extends Phaser.Scene {
     }
 
     const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
-    const jail = CITY_ZONES.find((z) => z.id === 'super_jail')!;
-    const house = CITY_ZONES.find((z) => z.id === 'player_house')!;
     if (this.craftBuild?.isMode()) {
       return `[E] Place ${this.craftBuild.selectedName()} · BREAK removes · BUILD off`;
     }
     const nearCop = this.patrolCars?.nearestCar?.(this.player.x, this.player.y, 100);
     if (nearCop) return '[E] Hop in POLICE CAR';
-    if (pointInRect(this.player.x, this.player.y, house) || this.near(SPAWN.houseDoor.x, SPAWN.houseDoor.y, 70)) {
-      return '[E] Enter Your House (sleep)';
-    }
-    if (pointInRect(this.player.x, this.player.y, jail) || this.near(jail.x + jail.w / 2, jail.y + jail.h, 80)) {
-      return this.flags.sasquatchJailed ? '[E] Visit Sasquatch in jail' : '[E] Enter SUPER JAIL';
-    }
-    if (!this.flags.hasTracker && pointInRect(this.player.x, this.player.y, hq)) {
-      return '[E] Enter underground gadget lair';
-    }
-    if (
-      this.flags.rewardClaimed &&
-      this.jobs.state.unlocked.includes('security_chief') &&
-      pointInRect(this.player.x, this.player.y, hq)
-    ) {
-      return '[E] Order HQ Security Wing upgrade';
-    }
-    if (
-      this.flags.sasquatchCaptured &&
-      !this.flags.sasquatchJailed &&
-      pointInRect(this.player.x, this.player.y, jail)
-    ) {
-      return '[E] Enter SUPER JAIL with Sasquatch';
+    const nearBldg = this.findNearbyEnterable(95);
+    if (nearBldg) {
+      if (nearBldg.id === 'super_jail' && this.flags.sasquatchJailed) return '[E] Visit Sasquatch in jail';
+      if (
+        nearBldg.id === 'security_hq' &&
+        this.flags.rewardClaimed &&
+        this.jobs.state.unlocked.includes('security_chief') &&
+        pointInRect(this.player.x, this.player.y, hq) &&
+        !this.near(nearBldg.doorX, nearBldg.doorY, 70)
+      ) {
+        return '[E] Order HQ Security Wing upgrade';
+      }
+      return nearBldg.prompt;
     }
     const jobBoard = CITY_ZONES.find((z) => z.id === 'job_board');
     if (jobBoard && pointInRect(this.player.x, this.player.y, jobBoard)) {
@@ -2670,8 +2800,7 @@ export class GameScene extends Phaser.Scene {
       this.near(this.vehicle.x, this.vehicle.y, 120) ||
       (!!bay && pointInRect(this.player.x, this.player.y, bay));
     if (!this.flags.inVehicle && nearCar) {
-      if (this.flags.robotActive) return '[E] / CAR — Enter patrol vehicle';
-      return 'Activate robot first (underground lair)';
+      return '[E] / CAR — Enter patrol vehicle';
     }
     if (this.flags.inVehicle) return '[E] Exit vehicle · WASD to drive';
     if (
@@ -2686,6 +2815,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tryInteract(): void {
+    if (this.civicId) {
+      if (this.craftBuild?.isMode()) {
+        this.placeCraftBlock();
+        return;
+      }
+      if (this.near(CIVIC_INTERIOR.exitX + 40, CIVIC_INTERIOR.exitY + 40, 110)) {
+        this.exitCivic();
+        return;
+      }
+      this.statusLine = 'Look around · EXIT to leave';
+      setDomStatus(this.statusLine);
+      return;
+    }
+
     if (this.flags.inHouse) {
       if (this.lyingInBed) {
         this.getOutOfBed();
@@ -2778,33 +2921,23 @@ export class GameScene extends Phaser.Scene {
     }
 
     const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
-    const jail = CITY_ZONES.find((z) => z.id === 'super_jail')!;
-    const house = CITY_ZONES.find((z) => z.id === 'player_house')!;
 
-    if (pointInRect(this.player.x, this.player.y, house) || this.near(SPAWN.houseDoor.x, SPAWN.houseDoor.y, 70)) {
-      this.enterHouse();
-      return;
-    }
-
-    if (!this.flags.hasTracker && pointInRect(this.player.x, this.player.y, hq)) {
-      this.enterLair();
-      return;
-    }
-    if (
-      this.flags.rewardClaimed &&
-      this.jobs.state.unlocked.includes('security_chief') &&
-      pointInRect(this.player.x, this.player.y, hq)
-    ) {
-      this.tryHqUpgrade();
-      return;
-    }
-
-    if (
-      this.flags.sasquatchCaptured &&
-      !this.flags.sasquatchJailed &&
-      pointInRect(this.player.x, this.player.y, jail)
-    ) {
-      this.enterJail();
+    // Any building door / front works — go inside
+    const nearBldg = this.findNearbyEnterable(95);
+    if (nearBldg && !this.flags.inVehicle) {
+      // HQ upgrade when already rewarded + near HQ (not blocking enter)
+      if (
+        nearBldg.id === 'security_hq' &&
+        this.flags.rewardClaimed &&
+        this.flags.hasTracker &&
+        this.jobs.state.unlocked.includes('security_chief') &&
+        pointInRect(this.player.x, this.player.y, hq) &&
+        !this.near(nearBldg.doorX, nearBldg.doorY, 70)
+      ) {
+        this.tryHqUpgrade();
+        return;
+      }
+      this.enterBuilding(nearBldg.id);
       return;
     }
 
@@ -2975,10 +3108,12 @@ export class GameScene extends Phaser.Scene {
     if (this.flags.inHouse) this.exitHouse();
     if (this.flags.inJailBuilding) this.exitJail();
     if (this.flags.inLair) this.exitLair();
+    if (this.civicId) this.exitCivic();
     // If still somehow indoors, force outdoor spawn
     this.flags.inLair = false;
     this.flags.inHouse = false;
     this.flags.inJailBuilding = false;
+    this.civicId = null;
     this.indoorLayer.setVisible(false);
     this.worldLayer.setVisible(true);
     this.trailLayer.setVisible(true);
@@ -3012,6 +3147,7 @@ export class GameScene extends Phaser.Scene {
     if (this.flags.inHouse) this.exitHouse();
     if (this.flags.inLair) this.exitLair();
     if (this.flags.inJailBuilding) this.exitJail();
+    if (this.civicId) this.exitCivic();
   }
 
   /** One-tap car — no robot required. Prefers nearby AI police cruiser if close. */
@@ -3021,6 +3157,7 @@ export class GameScene extends Phaser.Scene {
     this.flags.inHouse = false;
     this.flags.inLair = false;
     this.flags.inJailBuilding = false;
+    this.civicId = null;
 
     // Hop into a nearby city police car if standing close
     if (kind !== 'race_car') {
@@ -3197,7 +3334,7 @@ export class GameScene extends Phaser.Scene {
     this.persistSave();
   }
 
-  private showIndoor(kind: 'lair' | 'jail' | 'house'): void {
+  private showIndoor(kind: 'lair' | 'jail' | 'house' | 'civic'): void {
     this.indoorLayer.setVisible(true);
     this.lairNodes.forEach((n) =>
       (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(kind === 'lair'),
@@ -3208,6 +3345,126 @@ export class GameScene extends Phaser.Scene {
     this.houseNodes.forEach((n) =>
       (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(kind === 'house'),
     );
+    this.civicNodes.forEach((n) =>
+      (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(kind === 'civic'),
+    );
+  }
+
+  private isIndoors(): boolean {
+    return this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse || this.civicId != null;
+  }
+
+  /** Enter any catalog building by id (door anim for first entry). */
+  private enterBuilding(id: string, skipDoorAnim = false): void {
+    const b = getEnterable(id);
+    if (!b) return;
+    if (b.kind === 'lair') {
+      this.enterLair(skipDoorAnim);
+      return;
+    }
+    if (b.kind === 'jail') {
+      this.enterJail(skipDoorAnim);
+      return;
+    }
+    if (b.kind === 'house') {
+      this.enterHouse(skipDoorAnim);
+      return;
+    }
+    this.enterCivic(b, skipDoorAnim);
+  }
+
+  private enterCivic(b: EnterableBuilding, skipDoorAnim = false): void {
+    if (!skipDoorAnim && this.civicId !== b.id) {
+      this.openDoorThen(b.id, () => this.enterCivic(b, true));
+      return;
+    }
+    this.leaveOtherIndoorsExceptCivic();
+    this.civicId = b.id;
+    this.flags.inHouse = false;
+    this.flags.inLair = false;
+    this.flags.inJailBuilding = false;
+    this.flags.inVehicle = false;
+    this.ensurePlayerOnFootSheet();
+    this.updatePlayerAnim(false);
+    this.applyCivicTheme(b.theme || b.id);
+    this.showIndoor('civic');
+    this.worldLayer.setVisible(false);
+    this.trailLayer.setVisible(false);
+    this.vehicle.setVisible(false);
+    if (this.raceCar) this.raceCar.setVisible(false);
+    this.sasquatch.setVisible(false);
+    this.robot.setVisible(false);
+    if (this.heldTracker) this.heldTracker.setVisible(false);
+    this.player.setPosition(CIVIC_INTERIOR.exitX + 100, CIVIC_INTERIOR.exitY + 100);
+    this.cameras.main.stopFollow();
+    this.cameras.main.centerOn(CIVIC_INTERIOR.x + CIVIC_INTERIOR.w / 2, CIVIC_INTERIOR.y + CIVIC_INTERIOR.h / 2);
+    this.statusLine = `Door opened — ${b.label}. Walk around · EXIT to leave.`;
+    setDomStatus(this.statusLine);
+  }
+
+  private leaveOtherIndoorsExceptCivic(): void {
+    if (this.flags.inHouse) {
+      this.flags.inHouse = false;
+      this.houseNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
+    }
+    if (this.flags.inLair) {
+      this.flags.inLair = false;
+      this.lairNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
+    }
+    if (this.flags.inJailBuilding) {
+      this.flags.inJailBuilding = false;
+      this.jailNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
+    }
+  }
+
+  private exitCivic(): void {
+    const id = this.civicId;
+    const b = id ? getEnterable(id) : undefined;
+    this.civicId = null;
+    this.indoorLayer.setVisible(false);
+    this.civicNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
+    this.worldLayer.setVisible(true);
+    this.trailLayer.setVisible(true);
+    if (!this.flags.inVehicle) {
+      this.vehicle.setVisible(true);
+      if (this.raceCar) this.raceCar.setVisible(true);
+    }
+    this.sasquatch.setVisible(!this.flags.sasquatchJailed);
+    if (b) this.player.setPosition(b.doorX, b.doorY + 18);
+    else this.player.setPosition(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    if (this.flags.hasTracker) this.equipTracker(true);
+    if (this.flags.robotActive) {
+      this.syncRobotBesidePlayer();
+      this.robot.setVisible(true);
+    }
+    this.statusLine = b ? `Left ${b.label}.` : 'Back outside.';
+    setDomStatus(this.statusLine);
+  }
+
+  /** Closest enterable door / building front the player can use. */
+  private findNearbyEnterable(maxDist = 90): EnterableBuilding | null {
+    let best: EnterableBuilding | null = null;
+    let bestD = maxDist;
+    for (const b of listEnterableBuildings()) {
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, b.doorX, b.doorY);
+      if (d < bestD) {
+        bestD = d;
+        best = b;
+      }
+      // Standing in the lower half of the building footprint also counts
+      if (
+        pointInRect(this.player.x, this.player.y, b.zone) &&
+        this.player.y >= b.zone.y + b.zone.h * 0.45
+      ) {
+        const footprintBias = d * 0.5;
+        if (!best || footprintBias < bestD) {
+          best = b;
+          bestD = Math.min(bestD, Math.max(40, footprintBias));
+        }
+      }
+    }
+    return best;
   }
 
   private enterLair(skipDoorAnim = false): void {
@@ -3218,6 +3475,7 @@ export class GameScene extends Phaser.Scene {
     this.flags.inLair = true;
     this.flags.inHouse = false;
     this.flags.inJailBuilding = false;
+    this.civicId = null;
     this.showIndoor('lair');
     this.worldLayer.setVisible(false);
     this.trailLayer.setVisible(false);
@@ -3272,6 +3530,7 @@ export class GameScene extends Phaser.Scene {
     this.flags.inJailBuilding = true;
     this.flags.inHouse = false;
     this.flags.inLair = false;
+    this.civicId = null;
     this.flags.inVehicle = false;
     this.ensurePlayerOnFootSheet();
     this.updatePlayerAnim(false);
@@ -3371,6 +3630,7 @@ export class GameScene extends Phaser.Scene {
     this.flags.inHouse = true;
     this.flags.inLair = false;
     this.flags.inJailBuilding = false;
+    this.civicId = null;
     this.flags.inVehicle = false;
     this.ensurePlayerOnFootSheet();
     this.updatePlayerAnim(false);
@@ -3507,7 +3767,7 @@ export class GameScene extends Phaser.Scene {
 
   private syncIndoorVisibility(): void {
     // Keep outdoor entities hidden while indoors
-    if (this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse) {
+    if (this.isIndoors()) {
       this.worldLayer.setVisible(false);
       this.trailLayer.setVisible(false);
     }

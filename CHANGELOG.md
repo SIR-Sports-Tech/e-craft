@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.0 — 2026-09-05 — ALL BUILDING DOORS OPEN
+
+### Added
+- **Every city building door works** — walk up, tap **E**, go inside
+- Enterable: HQ · Jail · House · Clinic · Shop · Police Desk · School · Library · Market · Docks · Airfield · Plaza · Park pavilion
+- Themed civic interiors (desk / props / tip) + EXIT
+- HQ & Jail always enterable for visit/explore (not mission-gated)
+- Door open animation on all fronts
+
 ## 1.9.0 — 2026-09-05 — CRAFT BUILD EXPANDED (MINECRAFT-LIKE)
 
 ### Added
