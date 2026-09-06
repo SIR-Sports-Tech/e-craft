@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { GameScene } from './GameScene';
-import { REWARD_TEXT } from '../data/MissionState';
+
 
 export class UIScene extends Phaser.Scene {
   private gameScene!: GameScene;
@@ -145,29 +145,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   private buildRewardOverlay(): void {
-    this.rewardOverlay = this.add.container(0, 0).setDepth(250).setScrollFactor(0).setVisible(false);
-    const bg = this.add.rectangle(0, 0, 4000, 4000, 0x000000, 0.75).setOrigin(0);
-    const title = this.add
-      .text(this.scale.width / 2, this.scale.height / 2 - 60, 'MISSION COMPLETE!', {
-        fontSize: '36px',
-        color: '#ffe082',
-      })
-      .setOrigin(0.5);
-    const reward = this.add
-      .text(this.scale.width / 2, this.scale.height / 2, REWARD_TEXT, {
-        fontSize: '28px',
-        color: '#69f0ae',
-        backgroundColor: '#004d40',
-        padding: { x: 16, y: 10 },
-      })
-      .setOrigin(0.5);
-    const sub = this.add
-      .text(this.scale.width / 2, this.scale.height / 2 + 70, 'Keep exploring the living city!', {
-        fontSize: '16px',
-        color: '#eee',
-      })
-      .setOrigin(0.5);
-    this.rewardOverlay.add([bg, title, reward, sub]);
+    // Intentionally empty + always hidden — full-screen MISSION COMPLETE blocked play.
+    this.rewardOverlay = this.add.container(0, 0).setDepth(250).setScrollFactor(0).setVisible(false).setActive(false);
   }
 
   private buildTouchControls(): void {
@@ -218,11 +197,9 @@ export class UIScene extends Phaser.Scene {
     this.pauseOverlay.setVisible(hud.paused);
     this.mapOverlay.setVisible(hud.mapOpen);
 
-    if (hud.reward && !this.rewardedShown) {
-      this.rewardedShown = true;
-      this.rewardOverlay.setVisible(true);
-      this.time.delayedCall(3500, () => this.rewardOverlay.setVisible(false));
-    }
+    // Never show the full-screen MISSION COMPLETE sign — it blocks play.
+    // Reward still unlocks quietly in GameScene; keep overlay hidden forever.
+    if (this.rewardOverlay.visible) this.rewardOverlay.setVisible(false);
 
     // Mini-map dots when map open
     if (hud.mapOpen) {

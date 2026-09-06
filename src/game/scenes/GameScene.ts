@@ -3791,10 +3791,11 @@ export class GameScene extends Phaser.Scene {
     this.flags.rewardClaimed = true;
     this.setPhase(MissionPhase.Rewarded);
     audio.success();
-    this.statusLine = `MISSION COMPLETE! Reward: ${REWARD_TEXT}`;
-    this.time.delayedCall(2500, () => {
+    // No full-screen "MISSION COMPLETE" sign — quiet unlock only
+    this.statusLine = 'Reward unlocked — keep exploring the city.';
+    this.time.delayedCall(1200, () => {
       this.setPhase(MissionPhase.FreeExplore);
-      this.statusLine = 'Free explore unlocked. The city remembers your heroics.';
+      this.statusLine = 'Free explore — cars, buildings, and craft anytime.';
     });
   }
 

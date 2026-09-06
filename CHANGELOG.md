@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.12.1 — 2026-09-05 — NO MISSION COMPLETE SIGN
+
+### Fixed
+- Removed full-screen **MISSION COMPLETE!** overlay that blocked the screen
+- Reward unlocks quietly — keep playing without the banner
+
 ## 1.12.0 — 2026-09-05 — FINGER STICK (PHONE + IPAD)
 
 ### Added
