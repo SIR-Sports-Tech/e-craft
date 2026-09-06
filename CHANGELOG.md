@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.15.1 — 2026-09-06 — VULTR LIVE
+
+### Deploy
+- **Production = Vultr only** (`209.222.20.20`) → https://linealgo.com/e-craft/
+- `npm run deploy:vultr` rsyncs dist + nginx `/e-craft/` snippet
+- Removed Vercel as a deploy path for E-CRAFT
+
 ## 1.15.0 — 2026-09-06 — CRAFT HOUSES + SECRET GOLD
 
 ### Added
