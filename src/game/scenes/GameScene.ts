@@ -307,18 +307,20 @@ export class GameScene extends Phaser.Scene {
     // Craft layer stays visible indoors (worldLayer hides) so builds persist on screen
     this.craftLayer = this.add.container(0, 0).setDepth(11);
     this.craftBuild = new CraftBuildSystem(this, this.craftLayer);
-    this.craftBuild.bindMover(this.player);
     this.craftBuild.load();
     this.buildingCollision = new BuildingCollisionSystem(this);
     this.buildingCollision.build();
-    this.buildingCollision.bindMover(this.player);
     this.craftHouses = new CraftHouseSystem(this, this.worldLayer, this.buildingCollision);
     this.craftHouses.load();
-    // Patrol cars bounce off buildings + craft walls (no ghosting through)
-    for (const car of this.patrolCars.getSprites()) {
-      this.buildingCollision.bindMover(car);
-      this.craftBuild.bindMover(car);
-    }
+    // WALL LAW: people, cars, police, animals — nothing ghosts through walls
+    this.bindSolidMover(this.player);
+    this.bindSolidMover(this.sasquatch);
+    this.bindSolidMover(this.vehicle);
+    if (this.raceCar) this.bindSolidMover(this.raceCar);
+    for (const car of this.patrolCars.getSprites()) this.bindSolidMover(car);
+    this.tigers.setOnSpawn((s) => this.bindSolidMover(s));
+    this.panther.setOnSpawn((s) => this.bindSolidMover(s));
+    this.pigDrop.setOnSpawn((s) => this.bindSolidMover(s));
     // Tap/click world to aim + place (Minecraft-style pointer build)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.craftBuild?.isMode() || this.flags.inVehicle || this.paused) return;
@@ -648,6 +650,21 @@ export class GameScene extends Phaser.Scene {
     document.addEventListener('visibilitychange', this.onVisSave);
     window.addEventListener('pagehide', this.onVisSave);
     window.addEventListener('beforeunload', this.onVisSave);
+  }
+
+  /**
+   * WALL LAW — bind any person/car/animal to city buildings + craft solid blocks.
+   * A wall is a wall: nothing ghosts through.
+   */
+  private bindSolidMover(mover: Phaser.GameObjects.GameObject): void {
+    this.buildingCollision?.bindMover(mover);
+    this.craftBuild?.bindMover(mover);
+  }
+
+  /** Push a scripted mover out of solids after setPosition / clamp. */
+  private resolveSolidMover(mover: Phaser.GameObjects.GameObject): void {
+    this.buildingCollision?.resolveNow(mover);
+    this.craftBuild?.resolveNow(mover);
   }
 
   private hardRecover(msg: string): void {
@@ -2946,6 +2963,8 @@ export class GameScene extends Phaser.Scene {
     // Clamp to forest
     this.sasquatch.x = Phaser.Math.Clamp(this.sasquatch.x, forest.x + 40, forest.x + forest.w - 40);
     this.sasquatch.y = Phaser.Math.Clamp(this.sasquatch.y, forest.y + 40, forest.y + forest.h - 40);
+    // WALL LAW — craft walls in forest still stop him after clamp
+    this.resolveSolidMover(this.sasquatch);
 
     this.updateSasquatchAnim();
 
@@ -3593,8 +3612,7 @@ export class GameScene extends Phaser.Scene {
     this.robot.setDepth(9);
     this.robot.play('robot-walk', true);
     this.robot.body!.enable = true;
-    this.buildingCollision?.bindMover(this.robot);
-    this.craftBuild?.bindMover(this.robot);
+    this.bindSolidMover(this.robot);
     this.setPhase(MissionPhase.CanDrive);
     audio.success();
     this.statusLine = '🤖 ROBOT ACTIVATED! It is following you right now.';
@@ -3852,6 +3870,13 @@ export class GameScene extends Phaser.Scene {
     this.sasquatch.x = Phaser.Math.Linear(this.sasquatch.x, tx, 0.28);
     this.sasquatch.y = Phaser.Math.Linear(this.sasquatch.y, ty, 0.28);
     this.sasquatch.setAngle(this.sasquatchDragAngle);
+    // WALL LAW — cannot drag him through buildings / craft walls
+    if (body) {
+      body.enable = true;
+      body.reset(this.sasquatch.x, this.sasquatch.y);
+      this.resolveSolidMover(this.sasquatch);
+      body.enable = false;
+    }
 
     // Neck attachment (head end of prone body)
     const headTowardPlayer = this.sasquatchDragAngle > 0 ? 1 : -1;

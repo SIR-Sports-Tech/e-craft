@@ -48,11 +48,19 @@ export class BuildingCollisionSystem {
     return this.solids;
   }
 
-  /** Collide any mover (player, robot, patrol car) with buildings. */
+  /**
+   * Collide any mover with buildings.
+   * WALL LAW: people, cars, police, animals — nothing ghosts through.
+   */
   bindMover(mover: Phaser.GameObjects.GameObject): void {
     if (this.bound.has(mover)) return;
     this.bound.add(mover);
     this.scene.physics.add.collider(mover, this.solids);
+  }
+
+  /** Immediate resolve after scripted setPosition / tween steps. */
+  resolveNow(mover: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.GameObjects.GameObject): void {
+    this.scene.physics.world.collide(mover, this.solids);
   }
 
   count(): number {

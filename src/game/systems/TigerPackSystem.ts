@@ -28,9 +28,16 @@ export class TigerPackSystem {
   private readonly maxGap = 36000;
   private forest = CITY_ZONES.find((z) => z.id === 'forest')!;
   private lastToast = '';
+  private onSpawn?: (sprite: Phaser.Physics.Arcade.Sprite) => void;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+  }
+
+  /** Bind WALL LAW when each tiger sprite is created. */
+  setOnSpawn(cb: (sprite: Phaser.Physics.Arcade.Sprite) => void): void {
+    this.onSpawn = cb;
+    for (const t of this.pack) cb(t.sprite);
   }
 
   update(
@@ -151,6 +158,11 @@ export class TigerPackSystem {
     return this.pack.filter((t) => t.sprite.visible).length;
   }
 
+  /** All tiger sprites (for WALL LAW solid binding). */
+  getSprites(): Phaser.Physics.Arcade.Sprite[] {
+    return this.pack.map((t) => t.sprite);
+  }
+
   private nearJungle(player: Phaser.Physics.Arcade.Sprite): boolean {
     const edge = this.forest.x;
     const inY =
@@ -164,6 +176,7 @@ export class TigerPackSystem {
     for (let i = this.pack.length; i < this.packSize; i++) {
       const s = this.scene.physics.add.sprite(0, 0, 'tiger_sheet', 0);
       s.setDepth(12).setScale(1.05);
+      s.setImmovable(false);
       s.body!.setSize(42, 24).setOffset(10, 16);
       s.setVisible(false);
       s.setActive(false);
@@ -174,6 +187,7 @@ export class TigerPackSystem {
         offsetX: Phaser.Math.Between(-50, 90),
         offsetY: Phaser.Math.Between(-110, 110),
       });
+      this.onSpawn?.(s);
     }
   }
 

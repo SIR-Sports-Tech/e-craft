@@ -83,10 +83,19 @@ export class CraftBuildSystem {
     return this.solids;
   }
 
+  /**
+   * Collide any mover with craft-built solid blocks.
+   * WALL LAW: player-built walls stop people, cars, police, animals.
+   */
   bindMover(mover: Phaser.GameObjects.GameObject): void {
     if (this.boundMovers.has(mover)) return;
     this.boundMovers.add(mover);
     this.scene.physics.add.collider(mover, this.solids);
+  }
+
+  /** Immediate resolve after scripted setPosition / tween steps. */
+  resolveNow(mover: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.GameObjects.GameObject): void {
+    this.scene.physics.world.collide(mover, this.solids);
   }
 
   bindPlayer(player: Phaser.GameObjects.GameObject): void {

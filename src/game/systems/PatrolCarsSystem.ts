@@ -66,10 +66,12 @@ export class PatrolCarsSystem {
       const start = route[0];
       const sprite = this.scene.physics.add.sprite(start.x, start.y, 'police_car');
       sprite.setDepth(8).setScale(0.95);
-      sprite.setImmovable(true);
-      // Solid vs buildings/craft walls — still scripted along roads, but cannot ghost through
+      // MUST be movable vs static walls — immovable+static skips separation (ghosting)
+      sprite.setImmovable(false);
       sprite.body!.enable = true;
       sprite.body!.setSize(70, 36).setOffset(10, 12);
+      sprite.body!.setBounce(0, 0);
+      sprite.body!.setDrag(0, 0);
       const light = this.scene.add.circle(0, -18, 5, 0x2979ff, 0.9).setDepth(9);
       (sprite as unknown as { light: Phaser.GameObjects.Arc }).light = light;
       this.cars.push({
