@@ -108,7 +108,9 @@ export class GameScene extends Phaser.Scene {
   private patrolCars!: PatrolCarsSystem;
   private jobs = new JobSystem();
   private inventory = new InventorySystem();
-  private facing = 1;
+  private facing = 1; // -1 left, 1 right (for side flip + tracker)
+  /** Exact walk facing — always matches movement direction. */
+  private facingDir: 'left' | 'right' | 'up' | 'down' = 'right';
   private lastToast = '';
   private garageCredited = false;
   private mysteries = new MysterySystem();
@@ -152,9 +154,10 @@ export class GameScene extends Phaser.Scene {
     this.player.setDrag(0);
     this.player.setMaxVelocity(700);
     this.player.body!.setSize(28, 44).setOffset(22, 20);
-    this.player.setFlipX(false); // side-view faces right by default
+    this.player.setFlipX(false);
     this.facing = 1;
-    this.player.play('player-idle');
+    this.facingDir = 'right';
+    this.player.play('player-idle-side');
 
     this.robot = this.physics.add.sprite(SPAWN.playerOutdoor.x - 40, SPAWN.playerOutdoor.y, 'robot_sheet', 0);
     this.robot.setVisible(false).setDepth(9).setScale(0.95);
@@ -1433,9 +1436,15 @@ export class GameScene extends Phaser.Scene {
       trailClues: this.trail.getClues().length,
       tracking: this.trail.isTracking(),
       playerAnim: this.player?.anims?.currentAnim?.key ?? null,
-      onFoot: !this.flags.inVehicle && this.player?.texture?.key === 'player_sheet',
+      onFoot:
+        !this.flags.inVehicle &&
+        (this.player?.texture?.key === 'player_sheet' ||
+          this.player?.texture?.key === 'player_front_sheet' ||
+          this.player?.texture?.key === 'player_back_sheet'),
       facing: this.facing,
+      facingDir: this.facingDir,
       flipX: !!this.player?.flipX,
+      playerSheet: this.player?.texture?.key ?? null,
       pantherActive: this.panther?.isActive?.() ?? false,
       sunVisible: this.dayNight?.phase?.() !== 'night',
       policeCars: this.patrolCars?.count?.() ?? 0,
@@ -1602,16 +1611,16 @@ export class GameScene extends Phaser.Scene {
     }
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * speed, (vy / len) * speed);
-    // Face the direction of travel — side-view sprite points that way
-    if (Math.abs(vx) >= Math.abs(vy) * 0.35 && vx !== 0) {
+
+    // Always face the direction he walks (dominant axis)
+    if (Math.abs(vx) >= Math.abs(vy)) {
+      this.facingDir = vx < 0 ? 'left' : 'right';
       this.facing = vx < 0 ? -1 : 1;
-    } else if (vx !== 0) {
-      this.facing = vx < 0 ? -1 : 1;
+    } else {
+      this.facingDir = vy < 0 ? 'up' : 'down';
+      // keep facing ±1 for tracker hand offset when moving vertically
     }
-    // (pure up/down keeps last facing so the side-view still looks right)
-    if (!this.flags.inVehicle) {
-      this.player.setFlipX(this.facing < 0);
-    }
+
     if (this.dust) {
       this.dust.setPosition(this.player.x, this.player.y + 18);
       this.dust.emitting = !this.flags.inVehicle;
@@ -1628,7 +1637,6 @@ export class GameScene extends Phaser.Scene {
         body.setSize(70, 36).setOffset(10, 12);
       }
     } else {
-      this.ensurePlayerOnFootSheet();
       this.updatePlayerAnim(true);
     }
 
@@ -1972,30 +1980,59 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Put officer back on side-view walk sheet after driving / texture swaps. */
-  private ensurePlayerOnFootSheet(): void {
-    if (this.flags.inVehicle) return;
-    if (this.player.texture.key !== 'player_sheet') {
-      this.player.setTexture('player_sheet', 0);
-      this.player.setScale(1);
-      const body = this.player.body as Phaser.Physics.Arcade.Body;
-      body.setSize(28, 44).setOffset(22, 20);
-    }
-    this.player.setFlipX(this.facing < 0);
-  }
-
-  /** Side-view walk — face points the way you turn; legs stride. */
+  /** Pick the sheet/anim that matches the walk facing. */
   private updatePlayerAnim(moving: boolean): void {
     if (this.flags.inVehicle) {
       this.player.anims.stop();
       return;
     }
-    this.ensurePlayerOnFootSheet();
-    this.player.setFlipX(this.facing < 0);
-    const key = moving ? 'player-walk' : 'player-idle';
+
+    let sheet = 'player_sheet';
+    let walkKey = 'player-walk-side';
+    let idleKey = 'player-idle-side';
+    let flip = false;
+
+    if (this.facingDir === 'left') {
+      sheet = 'player_sheet';
+      walkKey = 'player-walk-side';
+      idleKey = 'player-idle-side';
+      flip = true;
+    } else if (this.facingDir === 'right') {
+      sheet = 'player_sheet';
+      walkKey = 'player-walk-side';
+      idleKey = 'player-idle-side';
+      flip = false;
+    } else if (this.facingDir === 'down') {
+      sheet = 'player_front_sheet';
+      walkKey = 'player-walk-front';
+      idleKey = 'player-idle-front';
+      flip = false;
+    } else {
+      // up — walking away, back of head
+      sheet = 'player_back_sheet';
+      walkKey = 'player-walk-back';
+      idleKey = 'player-idle-back';
+      flip = false;
+    }
+
+    if (this.player.texture.key !== sheet) {
+      this.player.setTexture(sheet, 0);
+      this.player.setScale(1);
+      const body = this.player.body as Phaser.Physics.Arcade.Body;
+      body.setSize(28, 44).setOffset(22, 20);
+    }
+    this.player.setFlipX(flip);
+
+    const key = moving ? walkKey : idleKey;
     if (this.player.anims.currentAnim?.key !== key) {
       this.player.play(key, true);
     }
+  }
+
+  /** Restore on-foot sheet after cars / interiors. */
+  private ensurePlayerOnFootSheet(): void {
+    if (this.flags.inVehicle) return;
+    this.updatePlayerAnim(false);
   }
 
   private pickSasquatchWander(): void {

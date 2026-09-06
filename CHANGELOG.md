@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.4 — 2026-09-05 — FACE THE WAY YOU WALK (4-WAY)
+
+### Fixed
+- Player now faces **exactly** the walk direction:
+  - Right → side face right
+  - Left → side face left
+  - Down → front face toward you
+  - Up → back of head (walking away)
+
+
 ## 1.5.3 — 2026-09-05 — SIDE-VIEW WALK + FACE TURN
 
 ### Fixed / Added

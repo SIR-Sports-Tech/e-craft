@@ -10,41 +10,45 @@ await page.goto(url, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 await page.waitForFunction(() => !!window.__ecraft?.getState);
 
-const idle = await page.evaluate(() => window.__ecraft.getState());
+async function walk(dir) {
+  await page.locator(`#ecraft-pad [data-dir="${dir}"]`).dispatchEvent('pointerdown');
+  await page.waitForTimeout(450);
+  const st = await page.evaluate(() => window.__ecraft.getState());
+  await page.locator(`#ecraft-pad [data-dir="${dir}"]`).dispatchEvent('pointerup');
+  await page.waitForTimeout(80);
+  return st;
+}
 
-// Walk right — face right (flipX false)
-await page.locator('#ecraft-pad [data-dir="right"]').dispatchEvent('pointerdown');
-await page.waitForTimeout(500);
-const right = await page.evaluate(() => window.__ecraft.getState());
-await page.locator('#ecraft-pad [data-dir="right"]').dispatchEvent('pointerup');
-await page.waitForTimeout(150);
-
-// Walk left — face left (flipX true)
-await page.locator('#ecraft-pad [data-dir="left"]').dispatchEvent('pointerdown');
-await page.waitForTimeout(500);
-const left = await page.evaluate(() => window.__ecraft.getState());
-await page.locator('#ecraft-pad [data-dir="left"]').dispatchEvent('pointerup');
+const right = await walk('right');
+const left = await walk('left');
+const up = await walk('up');
+const down = await walk('down');
 await page.waitForTimeout(200);
 const stopped = await page.evaluate(() => window.__ecraft.getState());
 
 const ok =
   errs.length === 0 &&
-  idle.onFoot === true &&
-  right.playerAnim === 'player-walk' &&
-  right.facing === 1 &&
+  right.facingDir === 'right' &&
   right.flipX === false &&
-  left.playerAnim === 'player-walk' &&
-  left.facing === -1 &&
+  right.playerSheet === 'player_sheet' &&
+  String(right.playerAnim).includes('walk') &&
+  left.facingDir === 'left' &&
   left.flipX === true &&
-  stopped.playerAnim === 'player-idle';
+  left.playerSheet === 'player_sheet' &&
+  up.facingDir === 'up' &&
+  up.playerSheet === 'player_back_sheet' &&
+  down.facingDir === 'down' &&
+  down.playerSheet === 'player_front_sheet' &&
+  String(stopped.playerAnim).includes('idle');
 
 console.log(
   JSON.stringify(
     {
       errs: errs.slice(0, 5),
-      idle: idle.playerAnim,
-      right: { anim: right.playerAnim, facing: right.facing, flipX: right.flipX },
-      left: { anim: left.playerAnim, facing: left.facing, flipX: left.flipX },
+      right: { dir: right.facingDir, flip: right.flipX, sheet: right.playerSheet, anim: right.playerAnim },
+      left: { dir: left.facingDir, flip: left.flipX, sheet: left.playerSheet, anim: left.playerAnim },
+      up: { dir: up.facingDir, sheet: up.playerSheet, anim: up.playerAnim },
+      down: { dir: down.facingDir, sheet: down.playerSheet, anim: down.playerAnim },
       stopped: stopped.playerAnim,
       ok,
     },
@@ -54,4 +58,4 @@ console.log(
 );
 await browser.close();
 if (!ok) process.exit(1);
-console.log('SIDE-VIEW WALK + FACING SMOKE PASSED');
+console.log('4-WAY FACING WALK SMOKE PASSED');
