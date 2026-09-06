@@ -65,6 +65,8 @@ type EcraftApi = {
   breakBlock?: () => void;
   placeBlock?: () => void;
   selectBlock?: (i: number) => void;
+  toggleFloorMode?: () => void;
+  getCraftPalette?: () => Array<{ name: string; color: string }>;
   layBed?: () => void;
   pantherJump?: () => void;
   tigerAmbush?: () => void;
@@ -420,6 +422,30 @@ export function installDomOverlay(): void {
     #ecraft-hotbar #ecraft-hotbar-count {
       color: #ffe082; font-size: 10px; font-weight: 800; margin-left: 4px; white-space: nowrap;
     }
+    #ecraft-palette {
+      pointer-events: auto;
+      position: absolute;
+      left: 50%;
+      bottom: max(250px, calc(env(safe-area-inset-bottom) + 240px));
+      transform: translateX(-50%);
+      display: none;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 4px;
+      max-width: min(460px, 94vw);
+      padding: 8px;
+      background: rgba(0,0,0,.85);
+      border: 2px solid #81c784;
+      border-radius: 12px;
+      z-index: 9;
+    }
+    #ecraft-palette.show { display: flex; }
+    #ecraft-palette button {
+      width: 36px; height: 36px; border-radius: 6px;
+      border: 2px solid #546e7a; color: #fff; font-size: 8px; font-weight: 900;
+      padding: 0; touch-action: manipulation;
+    }
+    #ecraft-palette button.sel { border-color: #69f0ae; box-shadow: 0 0 0 2px #69f0ae; }
     #ecraft-actions .exit { background: #006064; color: #e0f7fa; font-size: 10px; }
 
     /* Virtual finger stick — phone + iPad thumb control */
@@ -529,6 +555,7 @@ export function installDomOverlay(): void {
       <button type="button" class="bld" id="btn-block">NEXT</button>
       <button type="button" class="bld" id="btn-place">PLACE</button>
       <button type="button" class="brk" id="btn-break">BREAK</button>
+      <button type="button" class="bld" id="btn-floor">FLOOR/STACK</button>
       <button type="button" class="pan" id="btn-panther">PANTHER!</button>
       <button type="button" class="pan" id="btn-tigers" style="background:#e65100">TIGERS!</button>
       <button type="button" class="pig" id="btn-pig">PIG!</button>
@@ -546,21 +573,11 @@ export function installDomOverlay(): void {
       </div>
     </div>
     <div id="ecraft-hotbar" aria-label="craft block hotbar">
-      <button type="button" data-block="0" title="DIRT" style="background:#8d6e63">1</button>
-      <button type="button" data-block="1" title="GRASS" style="background:#43a047">2</button>
-      <button type="button" data-block="2" title="STONE" style="background:#78909c">3</button>
-      <button type="button" data-block="3" title="WOOD" style="background:#a1887f">4</button>
-      <button type="button" data-block="4" title="BRICK" style="background:#c62828">5</button>
-      <button type="button" data-block="5" title="GOLD" style="background:#ffd54f;color:#111">6</button>
-      <button type="button" data-block="6" title="WATER" style="background:#29b6f6">7</button>
-      <button type="button" data-block="7" title="SAND" style="background:#fdd835;color:#111">8</button>
-      <button type="button" data-block="8" title="LEAF" style="background:#66bb6a">9</button>
-      <button type="button" data-block="9" title="GLASS" style="background:#b3e5fc;color:#111">0</button>
-      <button type="button" data-block="10" title="IRON" style="background:#90a4ae">-</button>
-      <button type="button" data-block="11" title="WOOL" style="background:#f5f5f5;color:#111">=</button>
+      <!-- slots filled by JS from Craft palette -->
       <button type="button" id="ecraft-hotbar-place">PLACE</button>
       <span id="ecraft-hotbar-count">0 blocks</span>
     </div>
+    <div id="ecraft-palette" aria-label="craft creative inventory"></div>
     <div id="ecraft-stick" aria-label="finger move stick" role="application">
       <div id="ecraft-stick-base">
         <div id="ecraft-stick-knob"></div>
@@ -719,15 +736,71 @@ export function installDomOverlay(): void {
   bindAction('btn-block', 'cycleBlock', 'Next block');
   bindAction('btn-place', 'placeBlock', 'Placed block');
   bindAction('btn-break', 'breakBlock', 'Broke block');
-  document.querySelectorAll<HTMLButtonElement>('#ecraft-hotbar [data-block]').forEach((btn) => {
-    btn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const i = Number(btn.dataset.block);
-      api()?.selectBlock?.(i);
-      flash(btn);
+  bindAction('btn-floor', 'toggleFloorMode', 'Floor/Stack');
+
+  const fillCraftUi = () => {
+    const palette = api()?.getCraftPalette?.() || [];
+    const hotbar = document.getElementById('ecraft-hotbar');
+    const grid = document.getElementById('ecraft-palette');
+    if (!hotbar || !grid) return;
+    // Clear old slot buttons
+    hotbar.querySelectorAll('[data-block]').forEach((n) => n.remove());
+    grid.innerHTML = '';
+    const placeBtn = document.getElementById('ecraft-hotbar-place');
+    const count = document.getElementById('ecraft-hotbar-count');
+    palette.forEach((b, i) => {
+      const mk = (parent: HTMLElement, label: string) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.block = String(i);
+        btn.title = b.name;
+        btn.textContent = label;
+        btn.style.background = b.color;
+        if (/#(f|e|d|c|b|a|9)/i.test(b.color)) btn.style.color = '#111';
+        btn.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          api()?.selectBlock?.(i);
+          flash(btn);
+          parent.querySelectorAll('button').forEach((x) => x.classList.remove('sel'));
+          btn.classList.add('sel');
+        });
+        parent.insertBefore(btn, placeBtn || null);
+      };
+      // Hotbar shows first 12; full palette shows all
+      if (i < 12) mk(hotbar, String((i + 1) % 10));
+      const pbtn = document.createElement('button');
+      pbtn.type = 'button';
+      pbtn.dataset.block = String(i);
+      pbtn.title = b.name;
+      pbtn.textContent = b.name.slice(0, 3);
+      pbtn.style.background = b.color;
+      if (/#(f|e|d|c|b|a|9)/i.test(b.color)) pbtn.style.color = '#111';
+      pbtn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        api()?.selectBlock?.(i);
+        flash(pbtn);
+        grid.querySelectorAll('button').forEach((x) => x.classList.remove('sel'));
+        pbtn.classList.add('sel');
+      });
+      grid.appendChild(pbtn);
     });
-  });
+    if (count && placeBtn) {
+      hotbar.appendChild(placeBtn);
+      hotbar.appendChild(count);
+    }
+  };
+  // Retry until GameScene exposes palette
+  let tries = 0;
+  const waitPal = window.setInterval(() => {
+    tries++;
+    if (api()?.getCraftPalette || tries > 40) {
+      window.clearInterval(waitPal);
+      fillCraftUi();
+    }
+  }, 200);
+
   document.getElementById('ecraft-hotbar-place')?.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -755,6 +828,7 @@ export function installDomOverlay(): void {
     try {
       localStorage.removeItem('ecraft_save_v02');
       localStorage.removeItem('ecraft_craft_blocks_v1');
+      localStorage.removeItem('ecraft_craft_blocks_v2');
     } catch {
       /* ignore */
     }

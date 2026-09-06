@@ -18,6 +18,7 @@ import { TigerPackSystem } from '../systems/TigerPackSystem';
 import { PigDropSystem } from '../systems/PigDropSystem';
 import { PatrolCarsSystem } from '../systems/PatrolCarsSystem';
 import { CraftBuildSystem } from '../systems/CraftBuildSystem';
+import { BuildingCollisionSystem } from '../systems/BuildingCollisionSystem';
 import { audio } from '../systems/AudioSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
@@ -115,6 +116,8 @@ export class GameScene extends Phaser.Scene {
   private lyingInBed = false;
   private tvOn = false;
   private craftBuild!: CraftBuildSystem;
+  private buildingCollision!: BuildingCollisionSystem;
+  private craftLayer!: Phaser.GameObjects.Container;
   private houseTv?: Phaser.GameObjects.Image;
   private houseTvScreen?: Phaser.GameObjects.Image;
   private houseKitchen?: Phaser.GameObjects.Image;
@@ -280,9 +283,19 @@ export class GameScene extends Phaser.Scene {
     this.pigDrop = new PigDropSystem(this);
     this.patrolCars = new PatrolCarsSystem(this);
     this.patrolCars.spawn();
-    this.craftBuild = new CraftBuildSystem(this, this.worldLayer);
-    this.craftBuild.bindPlayer(this.player);
+    // Craft layer stays visible indoors (worldLayer hides) so builds persist on screen
+    this.craftLayer = this.add.container(0, 0).setDepth(11);
+    this.craftBuild = new CraftBuildSystem(this, this.craftLayer);
+    this.craftBuild.bindMover(this.player);
     this.craftBuild.load();
+    this.buildingCollision = new BuildingCollisionSystem(this);
+    this.buildingCollision.build();
+    this.buildingCollision.bindMover(this.player);
+    // Patrol cars bounce off buildings + craft walls (no ghosting through)
+    for (const car of this.patrolCars.getSprites()) {
+      this.buildingCollision.bindMover(car);
+      this.craftBuild.bindMover(car);
+    }
     // Tap/click world to aim + place (Minecraft-style pointer build)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.craftBuild?.isMode() || this.flags.inVehicle || this.paused) return;
@@ -401,12 +414,23 @@ export class GameScene extends Phaser.Scene {
         this.refreshBuildHotbar();
         this.placeCraftBlock();
       },
+      toggleFloorMode: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        const floor = this.craftBuild.toggleFloorMode();
+        this.statusLine = floor
+          ? 'Craft FLOOR mode — replace ground cell'
+          : 'Craft STACK mode — build upward';
+        setDomStatus(this.statusLine);
+      },
+      getCraftPalette: () =>
+        this.craftBuild.allBlocks().map((b) => ({ name: b.name, color: b.color })),
       selectBlock: (i: number) => {
         this.paused = false;
         this.mapOpen = false;
         this.craftBuild.select(i);
         this.craftBuild.setMode(true);
-        this.statusLine = `Block: ${this.craftBuild.selectedName()} — PLACE / E / tap world · BREAK removes`;
+        this.statusLine = `Block: ${this.craftBuild.selectedName()} — PLACE / E / tap · BREAK digs`;
         setDomStatus(this.statusLine);
         this.refreshBuildHotbar();
       },
@@ -1841,17 +1865,20 @@ export class GameScene extends Phaser.Scene {
         lyingInBed: this.lyingInBed,
         cookedMeal: this.cookedMeal,
       },
-      craft: {
-        mode: this.craftBuild?.isMode?.() ?? false,
-        block: this.craftBuild?.selectedName?.() ?? null,
-        index: this.craftBuild?.selectedIndex?.() ?? 0,
-        count: this.craftBuild?.count?.() ?? 0,
-      },
       building: {
         indoors: this.isIndoors(),
         civicId: this.civicId,
         doors: Object.keys(this.outdoorDoors).filter((k) => !['hq', 'house', 'jail'].includes(k)).length,
         enterable: listEnterableBuildings().map((b) => b.id),
+        solidCount: this.buildingCollision?.count?.() ?? 0,
+      },
+      craft: {
+        mode: this.craftBuild?.isMode?.() ?? false,
+        block: this.craftBuild?.selectedName?.() ?? null,
+        index: this.craftBuild?.selectedIndex?.() ?? 0,
+        count: this.craftBuild?.count?.() ?? 0,
+        types: this.craftBuild?.blockCount?.() ?? 0,
+        floor: this.craftBuild?.isFloorMode?.() ?? false,
       },
     };
   }
@@ -2179,14 +2206,19 @@ export class GameScene extends Phaser.Scene {
 
   private refreshBuildHotbar(): void {
     const bar = document.getElementById('ecraft-hotbar');
+    const pal = document.getElementById('ecraft-palette');
     if (!bar) return;
-    bar.classList.toggle('show', this.craftBuild.isMode());
-    bar.querySelectorAll<HTMLButtonElement>('[data-block]').forEach((btn) => {
-      const i = Number(btn.dataset.block);
-      btn.classList.toggle('sel', i === this.craftBuild.selectedIndex());
+    const on = this.craftBuild.isMode();
+    bar.classList.toggle('show', on);
+    pal?.classList.toggle('show', on);
+    const sel = this.craftBuild.selectedIndex();
+    document.querySelectorAll<HTMLButtonElement>('#ecraft-hotbar [data-block], #ecraft-palette [data-block]').forEach((btn) => {
+      btn.classList.toggle('sel', Number(btn.dataset.block) === sel);
     });
     const count = document.getElementById('ecraft-hotbar-count');
-    if (count) count.textContent = `${this.craftBuild.count()} blocks`;
+    if (count) {
+      count.textContent = `${this.craftBuild.count()} blocks · ${this.craftBuild.isFloorMode() ? 'FLOOR' : 'STACK'}`;
+    }
   }
 
   private handleMovement(): void {
@@ -3187,6 +3219,9 @@ export class GameScene extends Phaser.Scene {
     this.robot.setVisible(true);
     this.robot.setDepth(9);
     this.robot.play('robot-walk', true);
+    this.robot.body!.enable = true;
+    this.buildingCollision?.bindMover(this.robot);
+    this.craftBuild?.bindMover(this.robot);
     this.setPhase(MissionPhase.CanDrive);
     audio.success();
     this.statusLine = '🤖 ROBOT ACTIVATED! It is following you right now.';

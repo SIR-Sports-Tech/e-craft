@@ -739,15 +739,25 @@ export class BootScene extends Phaser.Scene {
     mkBlock('block_dirt', 0x8d6e63, 0xa1887f);
     mkBlock('block_grass', 0x6d4c41, 0x43a047);
     mkBlock('block_stone', 0x78909c, 0x90a4ae);
+    mkBlock('block_cobble', 0x546e7a, 0x78909c);
     mkBlock('block_wood', 0x8d6e63, 0xbcaaa4);
+    mkBlock('block_plank', 0xbcaaa4, 0xd7ccc8);
     mkBlock('block_brick', 0xb71c1c, 0xc62828);
-    mkBlock('block_gold', 0xf9a825, 0xffd54f);
-    mkBlock('block_water', 0x0288d1, 0x4fc3f7, 0.75);
+    mkBlock('block_clay', 0xa1887f, 0xbcaaa4);
     mkBlock('block_sand', 0xfbc02d, 0xffee58);
-    mkBlock('block_leaf', 0x2e7d32, 0x66bb6a, 0.85);
-    mkBlock('block_glass', 0x81d4fa, 0xe1f5fe, 0.55);
+    mkBlock('block_snow', 0xcfd8dc, 0xfafafa);
     mkBlock('block_iron', 0x607d8b, 0xb0bec5);
+    mkBlock('block_gold', 0xf9a825, 0xffd54f);
+    mkBlock('block_glass', 0x81d4fa, 0xe1f5fe, 0.55);
     mkBlock('block_wool', 0xe0e0e0, 0xfafafa);
+    mkBlock('block_leaf', 0x2e7d32, 0x66bb6a, 0.85);
+    mkBlock('block_water', 0x0288d1, 0x4fc3f7, 0.75);
+    mkBlock('block_fence', 0x5d4037, 0x8d6e63);
+    mkBlock('block_torch', 0xff6f00, 0xffe082, 0.9);
+    mkBlock('block_ladder', 0x6d4c41, 0xa1887f);
+    mkBlock('block_chest', 0xef6c00, 0xffb74d);
+    mkBlock('block_magma', 0xbf360c, 0xff5722);
+    mkBlock('block_obsidian', 0x1a237e, 0x311b92);
   }
 
   /** Professional civic building plaque (used under labels). */
@@ -895,33 +905,46 @@ export class BootScene extends Phaser.Scene {
 
   private makeTree(): void {
     const g = this.g();
-    g.fillStyle(0x000000, 0.2);
-    g.fillEllipse(28, 60, 22, 8);
-    g.fillStyle(0x6d4c41, 1);
-    g.fillRect(24, 40, 8, 22);
+    // Hi-res-ish layered canopy
+    g.fillStyle(0x000000, 0.28);
+    g.fillEllipse(48, 108, 44, 14);
+    g.fillStyle(0x5d4037, 1);
+    g.fillRoundedRect(40, 58, 16, 48, 4);
+    g.fillStyle(0x4e342e, 1);
+    g.fillRect(44, 70, 4, 30);
     g.fillStyle(0x1b5e20, 1);
-    g.fillCircle(28, 32, 18);
+    g.fillCircle(48, 48, 34);
     g.fillStyle(0x2e7d32, 1);
-    g.fillCircle(18, 26, 13);
-    g.fillCircle(38, 26, 13);
+    g.fillCircle(28, 42, 24);
+    g.fillCircle(68, 42, 24);
     g.fillStyle(0x43a047, 1);
-    g.fillCircle(28, 16, 12);
-    g.generateTexture('tree', 56, 64);
+    g.fillCircle(48, 24, 22);
+    g.fillStyle(0x66bb6a, 0.7);
+    g.fillCircle(38, 30, 12);
+    g.fillCircle(58, 28, 10);
+    g.generateTexture('tree', 96, 120);
     g.destroy();
   }
 
   private makeCitizen(): void {
     const g = this.g();
-    g.fillStyle(0x000000, 0.2);
-    g.fillEllipse(20, 50, 16, 6);
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(28, 70, 24, 8);
     g.fillStyle(0xffcc80, 1);
-    g.fillCircle(20, 12, 9);
-    g.fillStyle(0x8d6e63, 1);
-    g.fillRoundedRect(11, 20, 18, 22, 4);
+    g.fillCircle(28, 16, 12);
     g.fillStyle(0x5d4037, 1);
-    g.fillRect(13, 40, 5, 12);
-    g.fillRect(22, 40, 5, 12);
-    g.generateTexture('citizen', 40, 54);
+    g.fillEllipse(28, 10, 20, 8); // hair
+    g.fillStyle(0x1565c0, 1);
+    g.fillRoundedRect(16, 28, 24, 28, 5); // shirt
+    g.fillStyle(0xfff176, 1);
+    g.fillRect(20, 40, 16, 6); // belt accent
+    g.fillStyle(0x37474f, 1);
+    g.fillRect(18, 54, 8, 16);
+    g.fillRect(30, 54, 8, 16);
+    g.fillStyle(0x212121, 1);
+    g.fillEllipse(22, 70, 10, 4);
+    g.fillEllipse(34, 70, 10, 4);
+    g.generateTexture('citizen', 56, 76);
     g.destroy();
   }
 

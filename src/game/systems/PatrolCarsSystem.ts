@@ -67,7 +67,9 @@ export class PatrolCarsSystem {
       const sprite = this.scene.physics.add.sprite(start.x, start.y, 'police_car');
       sprite.setDepth(8).setScale(0.95);
       sprite.setImmovable(true);
-      sprite.body!.enable = false; // visual traffic only — no blocking player
+      // Solid vs buildings/craft walls — still scripted along roads, but cannot ghost through
+      sprite.body!.enable = true;
+      sprite.body!.setSize(70, 36).setOffset(10, 12);
       const light = this.scene.add.circle(0, -18, 5, 0x2979ff, 0.9).setDepth(9);
       (sprite as unknown as { light: Phaser.GameObjects.Arc }).light = light;
       this.cars.push({
@@ -89,6 +91,10 @@ export class PatrolCarsSystem {
     }
   }
 
+  getSprites(): Phaser.Physics.Arcade.Sprite[] {
+    return this.cars.map((c) => c.sprite);
+  }
+
   update(delta: number): void {
     if (!this.outdoor) return;
     const dt = delta / 1000;
@@ -102,8 +108,11 @@ export class PatrolCarsSystem {
         continue;
       }
       const step = Math.min(c.speed * dt, dist);
-      c.sprite.x += (dx / dist) * step;
-      c.sprite.y += (dy / dist) * step;
+      // Use velocity so Arcade colliders with buildings/craft walls apply
+      c.sprite.setVelocity((dx / dist) * c.speed, (dy / dist) * c.speed);
+      if (dist < step + 2) {
+        c.sprite.setVelocity(0, 0);
+      }
       // Face travel direction (cars are side-view-ish / top-down oval)
       if (Math.abs(dx) > Math.abs(dy)) {
         c.sprite.setFlipX(dx < 0);

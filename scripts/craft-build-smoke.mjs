@@ -58,18 +58,33 @@ const tex = await page.evaluate(() => {
     'block_dirt',
     'block_grass',
     'block_stone',
+    'block_cobble',
+    'block_plank',
     'block_water',
     'block_sand',
     'block_leaf',
     'block_glass',
     'block_iron',
     'block_wool',
+    'block_obsidian',
+    'block_fence',
+    'block_torch',
   ].every((k) => t.exists(k));
 });
 
-const slots = await page.evaluate(() => document.querySelectorAll('#ecraft-hotbar [data-block]').length);
+const slots = await page.evaluate(() => document.querySelectorAll('#ecraft-palette [data-block]').length);
+const types = await page.evaluate(() => window.__ecraft.getState().craft?.types ?? 0);
 
-const ok = errs.length === 0 && modeOn && hotbar && placeBtn && placed && afterBreak < 4 && tex && slots >= 12;
+const ok =
+  errs.length === 0 &&
+  modeOn &&
+  hotbar &&
+  placeBtn &&
+  placed &&
+  afterBreak < 4 &&
+  tex &&
+  slots >= 20 &&
+  types >= 20;
 console.log(
   JSON.stringify(
     { errs: errs.slice(0, 5), modeOn, hotbar, placeBtn, placed, afterBreak, tex, slots, craft: st.craft, ok },

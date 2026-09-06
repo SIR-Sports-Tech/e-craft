@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.14.0 — 2026-09-05 — SOLID WALLS + CRAFT BUILDER EXPANSION
+
+### Added
+- **Building collision** — people and cars cannot walk/drive through city buildings
+- Patrol cars collide with buildings + Craft walls (no ghosting)
+- **Craft Builder expansion** (Minecraft-like Creative, original Craft Blocks):
+  - 22 block types (cobble, plank, fence, torch, ladder, chest, magma, obsidian, …)
+  - Creative palette inventory + hotbar
+  - FLOOR/STACK place modes · reach limit · dig returns selection
+  - Dedicated craft layer (builds stay visible)
+  - Save `ecraft_craft_blocks_v2`
+- Design polish: richer trees + citizens
+
+### Fixed
+- Cars and walkers no longer phase through HQ / Jail / House / civic buildings
+
 ## 1.13.0 — 2026-09-05 — JUNGLE TIGER PACK
 
 ### Added
