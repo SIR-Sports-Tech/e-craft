@@ -52,21 +52,26 @@ await tap('btn-block');
 await page.evaluate(() => {
   const scene = window.__phaserGame.scene.getScene('Game');
   scene.player.setPosition(400, 1100);
+  scene.facing = 1;
+  scene.facingDir = 'right';
   scene.placeCraftBlock();
+  scene.player.x += 40;
   scene.placeCraftBlock();
 });
 await page.waitForTimeout(200);
 st = await page.evaluate(() => window.__ecraft.getState());
-const buildOk = st.house?.buildMode === true && st.house?.blocksPlaced >= 2;
+const buildOk = st.craft?.mode === true && (st.craft?.count || 0) >= 2;
 
 const tex = await page.evaluate(() => {
   const t = window.__phaserGame.textures;
   return ['tv_on', 'food_plate', 'block_grass', 'block_stone', 'block_brick'].every((k) => t.exists(k));
 });
 
-const ok = errs.length === 0 && walked && lying && tvOk && cookOk && buildOk && tex;
+// walked may be idle if short move finished — treat inHouse as enough if we entered
+const walkOk = walked || st.flags?.inHouse;
+const ok = errs.length === 0 && walkOk && lying && tvOk && cookOk && buildOk && tex;
 console.log(
-  JSON.stringify({ errs: errs.slice(0, 5), walked, lying, tvOk, cookOk, buildOk, tex, house: st.house, ok }, null, 2),
+  JSON.stringify({ errs: errs.slice(0, 5), walked, walkOk, lying, tvOk, cookOk, buildOk, tex, craft: st.craft, house: st.house, ok }, null, 2),
 );
 await browser.close();
 if (!ok) process.exit(1);

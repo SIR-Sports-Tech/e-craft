@@ -79,16 +79,26 @@ export class TitleScene extends Phaser.Scene {
     }
 
     this.add
-      .text(w / 2, h - 56, 'CLICK NEW GAME  ·  or press ENTER / SPACE', {
-        fontSize: '16px',
+      .text(w / 2, h - 88, 'TAP GREEN “NEW GAME” TO START', {
+        fontSize: '18px',
         color: '#ffe082',
+        fontStyle: 'bold',
+        backgroundColor: '#00000099',
+        padding: { x: 10, y: 6 },
       })
       .setOrigin(0.5);
     this.add
-      .text(w / 2, h - 28, 'In-game: WASD move · E interact · Space capture · M map · Esc pause', {
-        fontSize: '13px',
-        color: '#b0bec5',
-      })
+      .text(
+        w / 2,
+        h - 48,
+        'Then LEFT buttons: ① ACTIVATE ROBOT  ② GET IN CAR  ·  RIGHT: HOLD D-pad ▶ to drive',
+        {
+          fontSize: '13px',
+          color: '#e3f2fd',
+          align: 'center',
+          wordWrap: { width: Math.min(w - 24, 420) },
+        },
+      )
       .setOrigin(0.5);
 
     this.input.keyboard?.once('keydown-ENTER', () => {

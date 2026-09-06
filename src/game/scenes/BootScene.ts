@@ -740,6 +740,8 @@ export class BootScene extends Phaser.Scene {
     mkBlock('block_wood', 0xa1887f);
     mkBlock('block_brick', 0xc62828);
     mkBlock('block_gold', 0xffd54f);
+    mkBlock('block_water', 0x29b6f6);
+    mkBlock('block_sand', 0xfdd835);
   }
 
   /** Professional civic building plaque (used under labels). */

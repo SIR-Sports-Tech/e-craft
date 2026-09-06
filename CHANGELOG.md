@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.8.0 — 2026-09-05 — CRAFT BUILD (MINECRAFT-LIKE)
+
+### Added
+- Full **Craft Build** mode outdoors + indoors (original cubes — not Minecraft IP)
+- Grid snap · stack upward · ghost preview
+- Hotbar slots 1–8 (dirt/grass/stone/wood/brick/gold/water/sand)
+- **E** place · **BREAK** / Q remove · blocks save to localStorage
+
+
 ## 1.7.2 — 2026-09-05 — RESTART Y/N
 
 ### Added

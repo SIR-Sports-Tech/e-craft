@@ -43,6 +43,8 @@ type EcraftApi = {
   visitJail?: () => void;
   toggleBuild?: () => void;
   cycleBlock?: () => void;
+  breakBlock?: () => void;
+  selectBlock?: (i: number) => void;
   layBed?: () => void;
   pantherJump?: () => void;
   pigDrop?: () => void;
@@ -94,7 +96,10 @@ function updateCoachFromState(): void {
   mark('drive', false, inCar);
   const tip = document.getElementById('ecraft-coach-tip');
   if (tip) {
-    if (inCar) {
+    if (!api()) {
+      tip.textContent =
+        'FIRST: tap green NEW GAME in the middle of the screen (or tap ACTIVATE ROBOT — it will start for you).';
+    } else if (inCar) {
       tip.textContent = 'You are in a car — HOLD ▶ / ▲ / ◀ / ▼ on the D-pad to drive. EXIT / E to leave.';
     } else if (robotOn) {
       tip.textContent = 'Robot is with you! Tap GET IN CAR or RACE, then HOLD the D-pad.';
@@ -114,11 +119,64 @@ function startCoachLoop(): void {
   coachTimer = window.setInterval(updateCoachFromState, 700);
 }
 
+type PendingAction = { fnName: keyof EcraftApi; label: string };
+let pendingAction: PendingAction | null = null;
+let pendingWatch: number | null = null;
+
+function startMissionFromTitle(): void {
+  const game = (window as unknown as {
+    __phaserGame?: {
+      scene?: {
+        getScene?: (key: string) => { registry: { set: (k: string, v: unknown) => void }; scene: { isActive?: () => boolean; start: (k: string) => void } } | undefined;
+        start?: (key: string) => void;
+      };
+    };
+  }).__phaserGame;
+  try {
+    // Prefer Phaser scene hop so we don't full-reload
+    const title = game?.scene?.getScene?.('Title');
+    if (title?.scene?.isActive?.()) {
+      title.registry.set('loadSave', false);
+      title.scene.start('Game');
+      showToast('Starting mission… then your button will fire');
+      return;
+    }
+    // Already past title / boot — soft jump
+    game?.scene?.start?.('Game');
+  } catch {
+    const url = new URL(location.href);
+    url.searchParams.set('skiptitle', '1');
+    url.searchParams.set('new', '1');
+    location.href = url.toString();
+  }
+}
+
+function flushPendingWhenReady(): void {
+  if (!pendingAction) return;
+  if (pendingWatch != null) return;
+  pendingWatch = window.setInterval(() => {
+    const queued = pendingAction;
+    if (!queued) return;
+    const a = api();
+    if (!a || typeof a[queued.fnName] !== 'function') return;
+    if (pendingWatch != null) {
+      window.clearInterval(pendingWatch);
+      pendingWatch = null;
+    }
+    pendingAction = null;
+    window.setTimeout(() => callApi(queued.fnName, queued.label), 250);
+  }, 200);
+}
+
 /** Call game API — never silent-fail if game is still booting. */
 function callApi(fnName: keyof EcraftApi, fallbackToast: string): void {
   const a = api();
   if (!a) {
-    showToast('Game loading… tap again');
+    // On title screen / boot: start mission, then replay this action
+    pendingAction = { fnName, label: fallbackToast };
+    showToast('Start mission first — launching NEW GAME…');
+    startMissionFromTitle();
+    flushPendingWhenReady();
     return;
   }
   const fn = a[fnName];
@@ -133,6 +191,7 @@ function callApi(fnName: keyof EcraftApi, fallbackToast: string): void {
     const st = a.getState?.();
     const live = st?.status || st?.prompt;
     showToast(live || fallbackToast);
+    updateCoachFromState();
   } catch (err) {
     showToast('Control error — try again');
     console.error('[E-CRAFT] button', fnName, err);
@@ -301,7 +360,38 @@ export function installDomOverlay(): void {
     #ecraft-actions .pig { background: #ad1457; color: #fce4ec; font-size: 10px; }
     #ecraft-actions .jail { background: #4a148c; color: #e1bee7; font-size: 10px; }
     #ecraft-actions .bld { background: #2e7d32; color: #e8f5e9; font-size: 10px; }
+    #ecraft-actions .brk { background: #bf360c; color: #fff; font-size: 10px; }
     #ecraft-actions .bed { background: #1565c0; color: #e3f2fd; font-size: 10px; }
+
+    /* Craft Build hotbar (Minecraft-style, original blocks) */
+    #ecraft-hotbar {
+      pointer-events: auto;
+      position: absolute;
+      left: 50%;
+      bottom: max(178px, calc(env(safe-area-inset-bottom) + 170px));
+      transform: translateX(-50%);
+      display: none;
+      gap: 4px;
+      padding: 6px 8px;
+      background: rgba(0,0,0,.75);
+      border: 2px solid #ffd54f;
+      border-radius: 12px;
+      z-index: 8;
+      align-items: center;
+    }
+    #ecraft-hotbar.show { display: flex; }
+    #ecraft-hotbar button {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      border: 2px solid #546e7a;
+      font-size: 9px; font-weight: 900;
+      color: #fff; padding: 0;
+      touch-action: manipulation;
+    }
+    #ecraft-hotbar button.sel { border-color: #ffd54f; box-shadow: 0 0 0 2px #ffd54f; }
+    #ecraft-hotbar #ecraft-hotbar-count {
+      color: #ffe082; font-size: 10px; font-weight: 800; margin-left: 4px; white-space: nowrap;
+    }
     #ecraft-actions .exit { background: #006064; color: #e0f7fa; font-size: 10px; }
 
     #ecraft-pad {
@@ -369,7 +459,8 @@ export function installDomOverlay(): void {
       <button type="button" class="bed" id="btn-bed">LAY BED</button>
       <button type="button" class="sleep" id="btn-sleep">SLEEP</button>
       <button type="button" class="bld" id="btn-build">BUILD</button>
-      <button type="button" class="bld" id="btn-block">BLOCK</button>
+      <button type="button" class="bld" id="btn-block">NEXT</button>
+      <button type="button" class="brk" id="btn-break">BREAK</button>
       <button type="button" class="pan" id="btn-panther">PANTHER!</button>
       <button type="button" class="pig" id="btn-pig">PIG!</button>
       <button type="button" class="rec wide" id="btn-recover">UNFREEZE / SAVE</button>
@@ -384,6 +475,17 @@ export function installDomOverlay(): void {
           <button type="button" id="btn-no">N — NO</button>
         </div>
       </div>
+    </div>
+    <div id="ecraft-hotbar" aria-label="craft block hotbar">
+      <button type="button" data-block="0" style="background:#8d6e63">1</button>
+      <button type="button" data-block="1" style="background:#43a047">2</button>
+      <button type="button" data-block="2" style="background:#78909c">3</button>
+      <button type="button" data-block="3" style="background:#a1887f">4</button>
+      <button type="button" data-block="4" style="background:#c62828">5</button>
+      <button type="button" data-block="5" style="background:#ffd54f;color:#111">6</button>
+      <button type="button" data-block="6" style="background:#29b6f6">7</button>
+      <button type="button" data-block="7" style="background:#fdd835;color:#111">8</button>
+      <span id="ecraft-hotbar-count">0 blocks</span>
     </div>
     <div id="ecraft-pad" aria-label="movement pad">
       <span class="pad-dead"></span>
@@ -471,6 +573,16 @@ export function installDomOverlay(): void {
   bindAction('btn-sleep', 'sleep', 'Sleeping…');
   bindAction('btn-build', 'toggleBuild', 'Build mode');
   bindAction('btn-block', 'cycleBlock', 'Next block');
+  bindAction('btn-break', 'breakBlock', 'Broke block');
+  document.querySelectorAll<HTMLButtonElement>('#ecraft-hotbar [data-block]').forEach((btn) => {
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const i = Number(btn.dataset.block);
+      api()?.selectBlock?.(i);
+      flash(btn);
+    });
+  });
   bindAction('btn-panther', 'pantherJump', 'Panther!');
   bindAction('btn-pig', 'pigDrop', 'Oink!');
   bindAction('btn-car', 'enterCar', 'Patrol Car');
@@ -550,12 +662,17 @@ export function installDomOverlay(): void {
       }
       if (e.code === 'KeyC') callApi('enterCar', 'Patrol Car');
       if (e.code === 'KeyF') callApi('activateRobot', 'Robot ON');
-      if (e.code === 'KeyB') callApi('activateRobot', 'Robot ON');
       if (e.code === 'KeyT') callApi('holdTracker', 'Holding Tracker');
       if (e.code === 'KeyH') callApi('enterHouse', 'Welcome home');
       if (e.code === 'KeyZ') callApi('sleep', 'Sleeping…');
       if (e.code === 'KeyX') callApi('exitIndoor', 'Exited');
       if (e.code === 'KeyP') callApi('pigDrop', 'Oink!');
+      if (e.code === 'KeyG') callApi('toggleBuild', 'Build mode');
+      if (e.code === 'KeyQ') callApi('breakBlock', 'Broke block');
+      if (e.code.startsWith('Digit')) {
+        const n = Number(e.code.replace('Digit', ''));
+        if (n >= 1 && n <= 8) api()?.selectBlock?.(n - 1);
+      }
     },
     { passive: false },
   );

@@ -16,6 +16,7 @@ import { PoliceSystem } from '../systems/PoliceSystem';
 import { PantherSystem } from '../systems/PantherSystem';
 import { PigDropSystem } from '../systems/PigDropSystem';
 import { PatrolCarsSystem } from '../systems/PatrolCarsSystem';
+import { CraftBuildSystem } from '../systems/CraftBuildSystem';
 import { audio } from '../systems/AudioSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
@@ -92,10 +93,7 @@ export class GameScene extends Phaser.Scene {
   private sleeping = false;
   private lyingInBed = false;
   private tvOn = false;
-  private buildMode = false;
-  private buildBlockType: 'block_dirt' | 'block_grass' | 'block_stone' | 'block_wood' | 'block_brick' | 'block_gold' =
-    'block_grass';
-  private placedBlocks: Phaser.GameObjects.Image[] = [];
+  private craftBuild!: CraftBuildSystem;
   private houseTv?: Phaser.GameObjects.Image;
   private houseTvScreen?: Phaser.GameObjects.Image;
   private houseKitchen?: Phaser.GameObjects.Image;
@@ -255,6 +253,8 @@ export class GameScene extends Phaser.Scene {
     this.pigDrop = new PigDropSystem(this);
     this.patrolCars = new PatrolCarsSystem(this);
     this.patrolCars.spawn();
+    this.craftBuild = new CraftBuildSystem(this, this.worldLayer);
+    this.craftBuild.load();
     // Soft dust when moving (visual juice)
     const gfx = this.make.graphics({ x: 0, y: 0 });
     gfx.fillStyle(0xd7ccc8, 0.7);
@@ -349,6 +349,20 @@ export class GameScene extends Phaser.Scene {
         this.paused = false;
         this.mapOpen = false;
         this.cycleBuildBlock();
+      },
+      breakBlock: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.breakCraftBlock();
+      },
+      selectBlock: (i: number) => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.craftBuild.select(i);
+        this.craftBuild.setMode(true);
+        this.statusLine = `Block: ${this.craftBuild.selectedName()} — E place · BREAK removes`;
+        setDomStatus(this.statusLine);
+        this.refreshBuildHotbar();
       },
       layBed: () => {
         this.paused = false;
@@ -1615,10 +1629,13 @@ export class GameScene extends Phaser.Scene {
       house: {
         tvOn: this.tvOn,
         lyingInBed: this.lyingInBed,
-        buildMode: this.buildMode,
-        blockType: this.buildBlockType,
-        blocksPlaced: this.placedBlocks.length,
         cookedMeal: this.cookedMeal,
+      },
+      craft: {
+        mode: this.craftBuild?.isMode?.() ?? false,
+        block: this.craftBuild?.selectedName?.() ?? null,
+        index: this.craftBuild?.selectedIndex?.() ?? 0,
+        count: this.craftBuild?.count?.() ?? 0,
       },
     };
   }
@@ -1672,6 +1689,9 @@ export class GameScene extends Phaser.Scene {
       this.updateSasquatchHorrorForm();
       this.updateTrailHelp(d);
       this.updateHeldTracker(d);
+      if (this.craftBuild?.isMode()) {
+        this.craftBuild.updateGhost(this.player.x, this.player.y, this.facing, this.facingDir);
+      }
       this.updateInteractPrompt();
       this.consumeTouchActions();
       this.syncIndoorVisibility();
@@ -1832,7 +1852,8 @@ export class GameScene extends Phaser.Scene {
 
   private layInBed(): void {
     this.lyingInBed = true;
-    this.buildMode = false;
+    this.craftBuild.setMode(false);
+    this.refreshBuildHotbar();
     this.player.setVelocity(0, 0);
     this.player.setPosition(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY - 4);
     this.player.anims.stop();
@@ -1897,56 +1918,50 @@ export class GameScene extends Phaser.Scene {
   }
 
   private toggleBuildMode(): void {
-    if (!this.flags.inHouse) {
-      this.statusLine = 'Go inside your house to build with Craft Blocks!';
-      setDomStatus(this.statusLine);
-      return;
-    }
     if (this.lyingInBed) this.getOutOfBed();
-    this.buildMode = !this.buildMode;
-    this.statusLine = this.buildMode
-      ? `🧱 BUILD MODE ON — ${this.buildBlockType.replace('block_', '')} · E places · BUILD cycles`
-      : 'Build mode off.';
+    const on = this.craftBuild.toggleMode();
+    this.refreshBuildHotbar();
+    this.statusLine = on
+      ? `🧱 CRAFT BUILD ON — ${this.craftBuild.selectedName()} · E=place · BREAK=remove · hotbar 1-8`
+      : 'Craft Build off.';
     setDomStatus(this.statusLine);
   }
 
   private cycleBuildBlock(): void {
-    const types: Array<typeof this.buildBlockType> = [
-      'block_dirt',
-      'block_grass',
-      'block_stone',
-      'block_wood',
-      'block_brick',
-      'block_gold',
-    ];
-    const i = types.indexOf(this.buildBlockType);
-    this.buildBlockType = types[(i + 1) % types.length];
-    this.buildMode = true;
-    this.statusLine = `Block: ${this.buildBlockType.replace('block_', '').toUpperCase()} — tap E to place`;
+    this.craftBuild.setMode(true);
+    this.craftBuild.cycle(1);
+    this.refreshBuildHotbar();
+    this.statusLine = `Block: ${this.craftBuild.selectedName()} — E place · BREAK remove`;
     setDomStatus(this.statusLine);
   }
 
   private placeCraftBlock(): void {
-    if (!this.flags.inHouse) return;
-    // Place in front of player inside house
-    const bx = Phaser.Math.Clamp(
-      this.player.x + this.facing * 28,
-      HOUSE_INTERIOR.x + 40,
-      HOUSE_INTERIOR.x + HOUSE_INTERIOR.w - 40,
-    );
-    const by = Phaser.Math.Clamp(
-      this.player.y,
-      HOUSE_INTERIOR.y + 120,
-      HOUSE_INTERIOR.y + HOUSE_INTERIOR.h - 40,
-    );
-    const block = this.add.image(bx, by, this.buildBlockType).setDepth(12).setScale(0.85);
-    this.indoorLayer.add(block);
-    this.houseNodes.push(block);
-    this.placedBlocks.push(block);
-    block.setVisible(true);
-    this.statusLine = `Placed ${this.buildBlockType.replace('block_', '')} block! (${this.placedBlocks.length} built)`;
+    const msg = this.craftBuild.place(this.player.x, this.player.y, this.facing, this.facingDir);
+    this.statusLine = msg;
     setDomStatus(this.statusLine);
     audio.interact();
+    this.refreshBuildHotbar();
+  }
+
+  private breakCraftBlock(): void {
+    this.craftBuild.setMode(true);
+    const msg = this.craftBuild.breakAt(this.player.x, this.player.y, this.facing, this.facingDir);
+    this.statusLine = msg;
+    setDomStatus(this.statusLine);
+    audio.interact();
+    this.refreshBuildHotbar();
+  }
+
+  private refreshBuildHotbar(): void {
+    const bar = document.getElementById('ecraft-hotbar');
+    if (!bar) return;
+    bar.classList.toggle('show', this.craftBuild.isMode());
+    bar.querySelectorAll<HTMLButtonElement>('[data-block]').forEach((btn) => {
+      const i = Number(btn.dataset.block);
+      btn.classList.toggle('sel', i === this.craftBuild.selectedIndex());
+    });
+    const count = document.getElementById('ecraft-hotbar-count');
+    if (count) count.textContent = `${this.craftBuild.count()} blocks`;
   }
 
   private handleMovement(): void {
@@ -2547,7 +2562,9 @@ export class GameScene extends Phaser.Scene {
   private describeInteract(): string | null {
     if (this.flags.inHouse) {
       if (this.lyingInBed) return '[E] Get out of bed';
-      if (this.buildMode) return `[E] Place ${this.buildBlockType.replace('block_', '').toUpperCase()} block · BUILD to toggle`;
+      if (this.craftBuild?.isMode()) {
+        return `[E] Place ${this.craftBuild.selectedName()} · BREAK removes`;
+      }
       if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 100)) return '[E] Lay down in bed';
       if (this.houseTv && this.near(this.houseTv.x, this.houseTv.y, 70)) {
         return this.tvOn ? '[E] Turn TV off' : '[E] Turn TV on';
@@ -2589,6 +2606,9 @@ export class GameScene extends Phaser.Scene {
     const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
     const jail = CITY_ZONES.find((z) => z.id === 'super_jail')!;
     const house = CITY_ZONES.find((z) => z.id === 'player_house')!;
+    if (this.craftBuild?.isMode()) {
+      return `[E] Place ${this.craftBuild.selectedName()} · BREAK removes · BUILD off`;
+    }
     const nearCop = this.patrolCars?.nearestCar?.(this.player.x, this.player.y, 100);
     if (nearCop) return '[E] Hop in POLICE CAR';
     if (pointInRect(this.player.x, this.player.y, house) || this.near(SPAWN.houseDoor.x, SPAWN.houseDoor.y, 70)) {
@@ -2647,7 +2667,7 @@ export class GameScene extends Phaser.Scene {
         this.getOutOfBed();
         return;
       }
-      if (this.buildMode) {
+      if (this.craftBuild?.isMode()) {
         this.placeCraftBlock();
         return;
       }
@@ -2724,6 +2744,12 @@ export class GameScene extends Phaser.Scene {
         this.exitJail();
         return;
       }
+      return;
+    }
+
+    // Craft Build works outdoors too (Minecraft-style place)
+    if (this.craftBuild?.isMode() && !this.flags.inVehicle) {
+      this.placeCraftBlock();
       return;
     }
 
@@ -3341,7 +3367,6 @@ export class GameScene extends Phaser.Scene {
 
   private exitHouse(): void {
     if (this.lyingInBed) this.getOutOfBed();
-    this.buildMode = false;
     this.flags.inHouse = false;
     this.indoorLayer.setVisible(false);
     this.houseNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
