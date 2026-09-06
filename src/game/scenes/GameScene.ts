@@ -90,6 +90,8 @@ export class GameScene extends Phaser.Scene {
   private jailNodes: Phaser.GameObjects.GameObject[] = [];
   private houseNodes: Phaser.GameObjects.GameObject[] = [];
   private sleeping = false;
+  /** Close to Sasquatch → Siren Head horror form. */
+  private sasquatchSirenMode = false;
   /** Flattened by a police car — can't move until recovered. */
   private flattened = false;
   private flattenInvuln = 0;
@@ -683,17 +685,37 @@ export class GameScene extends Phaser.Scene {
         this.worldLayer.add(bay);
       }
 
-      const label = this.add
-        .text(z.x + z.w / 2, z.y + 10, z.label, {
-          fontSize: '15px',
-          color: '#ffffff',
-          backgroundColor: '#00000099',
-          padding: { x: 8, y: 4 },
+      // Professional civic plaque + clean typography
+      const signY = z.y + 14;
+      const plaque = this.add
+        .image(z.x + z.w / 2, signY + 12, 'bldg_sign')
+        .setDepth(6)
+        .setScale(Math.min(1.15, Math.max(0.75, z.w / 220)));
+      const title = this.add
+        .text(z.x + z.w / 2, signY + 4, z.label.toUpperCase(), {
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontSize: z.w > 300 ? '13px' : '11px',
+          fontStyle: 'bold',
+          color: '#fffde7',
+          stroke: '#0d47a1',
+          strokeThickness: 2,
+          align: 'center',
         })
         .setOrigin(0.5, 0)
-        .setDepth(6);
-      this.worldLayer.add(label);
-      this.labels.push(label);
+        .setDepth(7);
+      const sub = this.add
+        .text(z.x + z.w / 2, signY + 20, this.buildingSubtitle(z.id), {
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontSize: '9px',
+          color: '#90caf9',
+          align: 'center',
+        })
+        .setOrigin(0.5, 0)
+        .setDepth(7);
+      this.worldLayer.add(plaque);
+      this.worldLayer.add(title);
+      this.worldLayer.add(sub);
+      this.labels.push(title);
     }
 
     // Trees in forest
@@ -881,6 +903,29 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Realistic asphalt streets with sidewalks, lamps, and traffic signals. */
+  private buildingSubtitle(id: string): string {
+    const map: Record<string, string> = {
+      security_hq: 'CITY SECURITY · HQ',
+      super_jail: 'MAXIMUM SECURITY',
+      city_plaza: 'PUBLIC SQUARE',
+      clinic: 'HEALTH SERVICES',
+      airfield: 'SKY PATROL',
+      shop: 'GEAR & SUPPLY',
+      job_board: 'OPEN CONTRACTS',
+      park: 'RECREATION',
+      police_desk: 'DISPATCH',
+      school: 'EDUCATION',
+      library: 'ARCHIVES',
+      market_row: 'RETAIL DISTRICT',
+      docks: 'WATERFRONT',
+      forest: 'RESTRICTED WOODS',
+      vehicle_bay: 'FLEET PARKING',
+      race_bay: 'HIGH-SPEED UNIT',
+      player_house: 'PRIVATE RESIDENCE',
+    };
+    return map[id] || 'MUNICIPAL';
+  }
+
   private buildLifelikeStreets(): void {
     this.trafficSignals = [];
     const sidewalkW = 28;
@@ -1489,6 +1534,8 @@ export class GameScene extends Phaser.Scene {
       trafficSignals: this.trafficSignals.length,
       pigActive: this.pigDrop?.isActive?.() ?? false,
       flattened: this.flattened,
+      sirenMode: this.sasquatchSirenMode,
+      buildingSigns: true,
     };
   }
 
@@ -1538,6 +1585,7 @@ export class GameScene extends Phaser.Scene {
       this.handleHotkeys();
       this.updateRobotFollow();
       this.updateSasquatch(d);
+      this.updateSasquatchHorrorForm();
       this.updateTrailHelp(d);
       this.updateHeldTracker(d);
       this.updateInteractPrompt();
@@ -2111,6 +2159,13 @@ export class GameScene extends Phaser.Scene {
 
 
   private updateSasquatchAnim(): void {
+    // Siren-Head close form handled separately
+    if (this.sasquatchSirenMode) {
+      if (this.sasquatch.anims.currentAnim?.key !== 'sirenhead-lunge') {
+        this.sasquatch.play('sirenhead-lunge', true);
+      }
+      return;
+    }
     const body = this.sasquatch.body as Phaser.Physics.Arcade.Body;
     const speed = body ? Math.hypot(body.velocity.x, body.velocity.y) : 0;
     if (speed > 12) {
@@ -2120,6 +2175,50 @@ export class GameScene extends Phaser.Scene {
       if (body.velocity.x < -8) this.sasquatch.setFlipX(true);
       else if (body.velocity.x > 8) this.sasquatch.setFlipX(false);
     } else if (this.sasquatch.anims.currentAnim?.key !== 'sasquatch-idle') {
+      this.sasquatch.play('sasquatch-idle', true);
+    }
+  }
+
+  /** When close: morph into towering Siren-Head nightmare. Far: classic Bigfoot. */
+  private updateSasquatchHorrorForm(): void {
+    if (
+      this.flags.sasquatchCaptured ||
+      this.flags.sasquatchJailed ||
+      this.flags.sasquatchInVehicle ||
+      this.flags.inLair ||
+      this.flags.inHouse ||
+      this.flags.inJailBuilding
+    ) {
+      if (this.sasquatchSirenMode) this.setSasquatchForm(false);
+      return;
+    }
+    const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y);
+    const close = d < 220;
+    if (close && !this.sasquatchSirenMode) this.setSasquatchForm(true);
+    else if (!close && this.sasquatchSirenMode) this.setSasquatchForm(false);
+  }
+
+  private setSasquatchForm(siren: boolean): void {
+    this.sasquatchSirenMode = siren;
+    if (siren) {
+      this.sasquatch.setTexture('sirenhead_sheet', 0);
+      this.sasquatch.setScale(2.35);
+      this.sasquatch.setTint(0xffcdd2);
+      this.sasquatch.setDepth(18);
+      const body = this.sasquatch.body as Phaser.Physics.Arcade.Body;
+      body.setSize(40, 120).setOffset(28, 30);
+      this.sasquatch.play('sirenhead-lunge', true);
+      this.cameras.main.shake(220, 0.01);
+      this.statusLine = '⚠ SIREN HEAD!!! The forest monster towers over you!';
+      setDomStatus(this.statusLine);
+      audio.talk();
+    } else {
+      this.sasquatch.setTexture('sasquatch_sheet', 0);
+      this.sasquatch.setScale(0.92);
+      this.sasquatch.clearTint();
+      this.sasquatch.setDepth(9);
+      const body = this.sasquatch.body as Phaser.Physics.Arcade.Body;
+      body.setSize(36, 56).setOffset(18, 22);
       this.sasquatch.play('sasquatch-idle', true);
     }
   }
@@ -2729,6 +2828,7 @@ export class GameScene extends Phaser.Scene {
   /** Capture success: Sasquatch collapses to the ground. */
   private knockDownSasquatch(): void {
     this.flags.sasquatchCaptured = true;
+    if (this.sasquatchSirenMode) this.setSasquatchForm(false);
     this.sasquatch.setVelocity(0, 0);
     const body = this.sasquatch.body as Phaser.Physics.Arcade.Body | undefined;
     if (body) body.enable = false;
@@ -2736,7 +2836,8 @@ export class GameScene extends Phaser.Scene {
     // Stop walk, fall over
     try {
       this.sasquatch.anims.stop();
-      this.sasquatch.setFrame(0);
+      this.sasquatch.setTexture('sasquatch_sheet', 0);
+      this.sasquatch.setScale(0.92);
     } catch { /* ignore */ }
 
     const fallAngle = this.sasquatch.flipX ? -90 : 90;

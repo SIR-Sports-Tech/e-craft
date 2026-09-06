@@ -15,6 +15,8 @@ export class BootScene extends Phaser.Scene {
     this.makePlayer();
     this.makeRobot();
     this.makeSasquatch();
+    this.makeSirenHead();
+    this.makeBuildingSign();
     this.makeVehicle();
     this.makePoliceCar();
     this.makeRaceCar();
@@ -592,6 +594,112 @@ export class BootScene extends Phaser.Scene {
       frameRate: 5,
       repeat: -1,
     });
+  }
+
+  /** Tall Siren-Head horror form — used when player gets close to Sasquatch. */
+  private makeSirenHead(): void {
+    const fw = 96;
+    const fh = 160;
+    const frames = 4;
+    const sheet = this.make.graphics({ x: 0, y: 0 });
+
+    const draw = (g: Phaser.GameObjects.Graphics, ox: number, frame: number) => {
+      const sway = Math.sin((frame / frames) * Math.PI * 2) * 3;
+      const sirenPulse = frame % 2 === 0;
+
+      // shadow
+      g.fillStyle(0x000000, 0.4);
+      g.fillEllipse(ox + 48, fh - 4, 40, 10);
+
+      // stick legs
+      g.fillStyle(0x1a1a1a, 1);
+      g.fillRect(ox + 38 + sway * 0.2, 110, 6, 42);
+      g.fillRect(ox + 52 - sway * 0.2, 110, 6, 42);
+      // feet claws
+      g.fillStyle(0x0d0d0d, 1);
+      g.fillTriangle(ox + 36, 152, ox + 30, 158, ox + 44, 152);
+      g.fillTriangle(ox + 50, 152, ox + 58, 158, ox + 56, 152);
+
+      // impossibly tall thin torso pole
+      g.fillStyle(0x111111, 1);
+      g.fillRect(ox + 44 + sway * 0.3, 48, 8, 70);
+      // ribs / vertebrae marks
+      g.fillStyle(0x2a2a2a, 1);
+      for (let i = 0; i < 6; i++) g.fillRect(ox + 42 + sway * 0.3, 55 + i * 10, 12, 3);
+
+      // long skeletal arms
+      g.fillStyle(0x1a1a1a, 1);
+      g.fillRect(ox + 8 + sway, 60, 38, 5);
+      g.fillRect(ox + 50 + sway, 68, 38, 5);
+      g.fillCircle(ox + 8 + sway, 62, 6);
+      g.fillCircle(ox + 88 + sway, 70, 6);
+      // claws
+      g.fillStyle(0x330000, 1);
+      g.fillTriangle(ox + 2, 58, ox + 2, 68, ox - 6, 72);
+      g.fillTriangle(ox + 94, 66, ox + 94, 76, ox + 102, 80);
+
+      // dual SIREN heads on a crossbar
+      g.fillStyle(0x222222, 1);
+      g.fillRect(ox + 22 + sway, 28, 52, 6);
+      // left siren
+      g.fillStyle(0x333333, 1);
+      g.fillEllipse(ox + 30 + sway, 22, 22, 28);
+      g.fillStyle(sirenPulse ? 0xff1744 : 0xb71c1c, 1);
+      g.fillCircle(ox + 30 + sway, 18, 7);
+      g.fillStyle(0xff8a80, sirenPulse ? 0.9 : 0.4);
+      g.fillCircle(ox + 30 + sway, 18, 3);
+      // right siren
+      g.fillStyle(0x333333, 1);
+      g.fillEllipse(ox + 66 + sway, 22, 22, 28);
+      g.fillStyle(sirenPulse ? 0xffea00 : 0xff6f00, 1);
+      g.fillCircle(ox + 66 + sway, 18, 7);
+      g.fillStyle(0xffffff, sirenPulse ? 0.85 : 0.35);
+      g.fillCircle(ox + 66 + sway, 18, 3);
+      // glowing aura
+      g.fillStyle(0xff1744, 0.2);
+      g.fillCircle(ox + 48 + sway, 24, 36);
+    };
+
+    for (let i = 0; i < frames; i++) draw(sheet, i * fw, i);
+    sheet.generateTexture('sirenhead_sheet_img', fw * frames, fh);
+    sheet.destroy();
+    const srcImg = this.textures.get('sirenhead_sheet_img').getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    if (this.textures.exists('sirenhead_sheet')) this.textures.remove('sirenhead_sheet');
+    this.textures.addSpriteSheet('sirenhead_sheet', srcImg as HTMLImageElement, {
+      frameWidth: fw,
+      frameHeight: fh,
+    });
+    if (this.anims.exists('sirenhead-idle')) this.anims.remove('sirenhead-idle');
+    if (this.anims.exists('sirenhead-lunge')) this.anims.remove('sirenhead-lunge');
+    this.anims.create({
+      key: 'sirenhead-idle',
+      frames: this.anims.generateFrameNumbers('sirenhead_sheet', { start: 0, end: frames - 1 }),
+      frameRate: 6,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'sirenhead-lunge',
+      frames: this.anims.generateFrameNumbers('sirenhead_sheet', { start: 0, end: frames - 1 }),
+      frameRate: 12,
+      repeat: -1,
+    });
+  }
+
+  /** Professional civic building plaque (used under labels). */
+  private makeBuildingSign(): void {
+    const g = this.g();
+    // metal plate
+    g.fillStyle(0x1a237e, 1);
+    g.fillRoundedRect(2, 2, 188, 36, 4);
+    g.lineStyle(2, 0xffd54f, 1);
+    g.strokeRoundedRect(2, 2, 188, 36, 4);
+    g.lineStyle(1, 0x90caf9, 0.7);
+    g.strokeRoundedRect(6, 6, 180, 28, 2);
+    // left accent bar
+    g.fillStyle(0xffd54f, 1);
+    g.fillRect(2, 2, 6, 36);
+    g.generateTexture('bldg_sign', 192, 40);
+    g.destroy();
   }
 
   private makeVehicle(): void {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.0 — 2026-09-05 — PRO SIGNS + SIREN HEAD
+
+### Added
+- **Professional building plaques** (navy/gold civic signs + subtitles)
+- When you get close, Sasquatch morphs into a towering **Siren Head** horror form
+- Screen shake + warning toast; reverts to Bigfoot when you back away
+
+
 ## 1.5.6 — 2026-09-05 — GET IN CARS + VISIT JAIL
 
 ### Fixed / Added
