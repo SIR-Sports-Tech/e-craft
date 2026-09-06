@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.7.2 — 2026-09-05 — RESTART Y/N
+
+### Added
+- **RESTART** button
+- Confirm: **Are you sure? Y / N**
+- Yes clears save + fresh start; No cancels (also keyboard Y/N)
+
+
+## 1.7.1 — 2026-09-05 — ACTIVATE + DRIVE (CLEAR ON SCREEN)
+
+### Fixed
+- **E near bay no longer blocks cars** waiting for robot — free entry like GET IN CAR
+- **ACTIVATE ROBOT / GET IN CAR / RACE** moved to the **top** of the left button stack (were buried under many buttons)
+
+### Added
+- Big yellow **HOW TO PLAY** coach banner with numbered steps
+- Live status strip + interact prompt back on screen
+- Clearer phase hints: Activate → Get in car → Hold D-pad ▶
+
+
 ## 1.7.0 — 2026-09-05 — HOUSE LIFE (BED · TV · COOK · BUILD)
 
 ### Added

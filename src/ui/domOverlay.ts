@@ -75,6 +75,45 @@ function showToast(msg: string): void {
   window.setTimeout(() => el.classList.remove('show'), 2500);
 }
 
+function updateCoachFromState(): void {
+  const coach = document.getElementById('ecraft-coach');
+  if (!coach) return;
+  const st = api()?.getState?.();
+  const flags = st?.flags || {};
+  const robotOn = !!flags.robotActive;
+  const inCar = !!flags.inVehicle;
+  const mark = (key: string, done: boolean, next: boolean) => {
+    const el = coach.querySelector(`[data-coach="${key}"]`);
+    if (!el) return;
+    el.classList.toggle('done', done);
+    el.classList.toggle('next', next && !done);
+  };
+  // Highlight BOTH early steps until done — cars do not require robot
+  mark('robot', robotOn, !robotOn);
+  mark('car', inCar, !inCar);
+  mark('drive', false, inCar);
+  const tip = document.getElementById('ecraft-coach-tip');
+  if (tip) {
+    if (inCar) {
+      tip.textContent = 'You are in a car — HOLD ▶ / ▲ / ◀ / ▼ on the D-pad to drive. EXIT / E to leave.';
+    } else if (robotOn) {
+      tip.textContent = 'Robot is with you! Tap GET IN CAR or RACE, then HOLD the D-pad.';
+    } else {
+      tip.textContent =
+        'Purple ACTIVATE ROBOT is at the TOP LEFT. Cars also work without the robot — tap GET IN CAR anytime.';
+    }
+    // Also surface live game status under tip when available
+    if (st?.status) tip.textContent = `${tip.textContent} · ${st.status}`;
+  }
+}
+
+let coachTimer: number | null = null;
+function startCoachLoop(): void {
+  if (coachTimer != null) window.clearInterval(coachTimer);
+  updateCoachFromState();
+  coachTimer = window.setInterval(updateCoachFromState, 700);
+}
+
 /** Call game API — never silent-fail if game is still booting. */
 function callApi(fnName: keyof EcraftApi, fallbackToast: string): void {
   const a = api();
@@ -199,6 +238,62 @@ export function installDomOverlay(): void {
     #ecraft-actions .bot { background: #00838f; color: #e0f7fa; font-size: 10px; }
     #ecraft-actions .race { background: #d50000; color: #fff; }
     #ecraft-actions .rec { background: #455a64; color: #fff; font-size: 10px; height: 34px; }
+    #ecraft-actions .rst { background: #b71c1c; color: #fff; font-size: 11px; height: 36px; }
+
+    /* Restart confirm modal */
+    #ecraft-confirm {
+      pointer-events: auto;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 16px;
+    }
+    #ecraft-confirm.show { display: flex; }
+    #ecraft-confirm .box {
+      background: #0d1b2a;
+      border: 3px solid #ffd54f;
+      border-radius: 16px;
+      padding: 18px 16px;
+      width: min(92vw, 340px);
+      text-align: center;
+      box-shadow: 0 12px 40px rgba(0,0,0,.55);
+    }
+    #ecraft-confirm h2 {
+      margin: 0 0 8px;
+      color: #fffde7;
+      font-size: 18px;
+    }
+    #ecraft-confirm p {
+      margin: 0 0 16px;
+      color: #b0bec5;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    #ecraft-confirm .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    #ecraft-confirm button {
+      height: 48px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,.35);
+      font-weight: 900;
+      font-size: 16px;
+      touch-action: manipulation;
+    }
+    #ecraft-confirm #btn-yes {
+      background: #c62828;
+      color: #fff;
+    }
+    #ecraft-confirm #btn-no {
+      background: #37474f;
+      color: #fff;
+    }
     #ecraft-actions .trk { background: #00695c; color: #b9f6ca; font-size: 10px; }
     #ecraft-actions .home { background: #ad1457; color: #fff; font-size: 10px; }
     #ecraft-actions .sleep { background: #283593; color: #e8eaf6; font-size: 10px; }
@@ -252,13 +347,22 @@ export function installDomOverlay(): void {
   const root = document.createElement('div');
   root.id = 'ecraft-dom-root';
   root.innerHTML = `
-    <div id="ecraft-toast">All buttons live — LEFT actions · RIGHT D-pad</div>
+    <div id="ecraft-toast">① ACTIVATE ROBOT · ② GET IN CAR · ③ HOLD ▶</div>
+    <div id="ecraft-coach" aria-live="polite">
+      <div class="title">How to play — do these in order</div>
+      <div class="step next" data-coach="robot">① Tap purple <b>ACTIVATE ROBOT</b></div>
+      <div class="step" data-coach="car">② Tap orange <b>GET IN CAR</b> (or red RACE)</div>
+      <div class="step" data-coach="drive">③ HOLD right D-pad <b>▶</b> to drive (don’t just tap)</div>
+      <div class="tip" id="ecraft-coach-tip">Cars work without the robot — drive anytime.</div>
+    </div>
     <div id="ecraft-actions" aria-label="action buttons">
+      <button type="button" class="actv wide" id="btn-activate">① ACTIVATE ROBOT</button>
+      <button type="button" class="car" id="btn-car">② GET IN CAR</button>
+      <button type="button" class="race" id="btn-race">② RACE</button>
       <button type="button" class="act" id="btn-e">E</button>
       <button type="button" class="cap" id="btn-cap">CAPTURE</button>
       <button type="button" class="trk" id="btn-tracker">TRACKER</button>
       <button type="button" class="bot" id="btn-robot">ROBOT</button>
-      <button type="button" class="actv wide" id="btn-activate">ACTIVATE ROBOT</button>
       <button type="button" class="exit wide" id="btn-exit">EXIT</button>
       <button type="button" class="home" id="btn-house">GO HOME</button>
       <button type="button" class="jail" id="btn-jail">VISIT JAIL</button>
@@ -266,11 +370,20 @@ export function installDomOverlay(): void {
       <button type="button" class="sleep" id="btn-sleep">SLEEP</button>
       <button type="button" class="bld" id="btn-build">BUILD</button>
       <button type="button" class="bld" id="btn-block">BLOCK</button>
-      <button type="button" class="car" id="btn-car">GET IN CAR</button>
-      <button type="button" class="race" id="btn-race">RACE</button>
       <button type="button" class="pan" id="btn-panther">PANTHER!</button>
       <button type="button" class="pig" id="btn-pig">PIG!</button>
       <button type="button" class="rec wide" id="btn-recover">UNFREEZE / SAVE</button>
+      <button type="button" class="rst wide" id="btn-restart">RESTART</button>
+    </div>
+    <div id="ecraft-confirm" role="dialog" aria-modal="true" aria-labelledby="ecraft-confirm-title">
+      <div class="box">
+        <h2 id="ecraft-confirm-title">Restart game?</h2>
+        <p>Are you sure?<br/>This erases your save and starts over.<br/><b>Y</b> = Yes · <b>N</b> = No</p>
+        <div class="row">
+          <button type="button" id="btn-yes">Y — YES</button>
+          <button type="button" id="btn-no">N — NO</button>
+        </div>
+      </div>
     </div>
     <div id="ecraft-pad" aria-label="movement pad">
       <span class="pad-dead"></span>
@@ -287,7 +400,8 @@ export function installDomOverlay(): void {
   document.body.appendChild(root);
 
   (window as unknown as { __ecraftToast: (m: string) => void }).__ecraftToast = showToast;
-  showToast('Controls ready — every button works');
+  showToast('① ACTIVATE ROBOT · ② GET IN CAR · ③ HOLD ▶ to drive');
+  startCoachLoop();
 
   // D-pad
   root.querySelectorAll<HTMLButtonElement>('#ecraft-pad [data-dir]').forEach((btn) => {
@@ -363,9 +477,69 @@ export function installDomOverlay(): void {
   bindAction('btn-race', 'enterRaceCar', 'Race Car');
   bindAction('btn-recover', 'recover', 'Recovered');
 
+  // Restart with Are you sure? Y/N
+  const confirmEl = document.getElementById('ecraft-confirm');
+  const openRestartConfirm = () => {
+    confirmEl?.classList.add('show');
+    showToast('Are you sure? Y / N');
+  };
+  const closeRestartConfirm = () => {
+    confirmEl?.classList.remove('show');
+  };
+  const doRestart = () => {
+    closeRestartConfirm();
+    showToast('Restarting…');
+    try {
+      localStorage.removeItem('ecraft_save_v02');
+    } catch {
+      /* ignore */
+    }
+    // Soft reload fresh game
+    const url = new URL(location.href);
+    url.searchParams.set('skiptitle', '1');
+    url.searchParams.set('new', '1');
+    url.searchParams.delete('continue');
+    location.href = url.toString();
+  };
+  document.getElementById('btn-restart')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openRestartConfirm();
+  });
+  document.getElementById('btn-yes')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    doRestart();
+  });
+  document.getElementById('btn-no')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeRestartConfirm();
+    showToast('Restart cancelled');
+  });
+  (window as unknown as { __ecraftRestartConfirm: { open: () => void; close: () => void; yes: () => void } }).__ecraftRestartConfirm = {
+    open: openRestartConfirm,
+    close: closeRestartConfirm,
+    yes: doRestart,
+  };
+
   window.addEventListener(
     'keydown',
     (e) => {
+      // Confirm dialog captures Y/N first
+      if (confirmEl?.classList.contains('show')) {
+        if (e.code === 'KeyY' || e.code === 'Enter') {
+          e.preventDefault();
+          doRestart();
+          return;
+        }
+        if (e.code === 'KeyN' || e.code === 'Escape') {
+          e.preventDefault();
+          closeRestartConfirm();
+          showToast('Restart cancelled');
+          return;
+        }
+      }
       pressed.add(e.code);
       recomputeMove();
       api()?.unpause?.();
@@ -411,6 +585,7 @@ export function pollDomInput(): DomInputState {
 export function setDomStatus(text: string): void {
   const toast = (window as unknown as { __ecraftToast?: (m: string) => void }).__ecraftToast;
   if (toast && text) toast(text);
+  updateCoachFromState();
 }
 
 export function setDomMeta(_inv: string, _job: string): void {

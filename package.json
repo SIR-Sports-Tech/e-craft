@@ -1,7 +1,7 @@
 {
   "name": "e-craft",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.7.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,5 +20,5 @@
   "dependencies": {
     "phaser": "^3.87.0"
   },
-  "description": "E-CRAFT v0.1 — Sasquatch Security Mission"
+  "description": "E-CRAFT v0.1 \u2014 Sasquatch Security Mission"
 }

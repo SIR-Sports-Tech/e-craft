@@ -40,21 +40,41 @@ export class UIScene extends Phaser.Scene {
 
     this.phaseText = this.add.text(0, 0, '').setVisible(false);
 
+    // Hint sits under the DOM coach banner
     this.hintText = this.add
-      .text(12, 36, '', {
-        fontSize: '12px',
+      .text(12, 118, '', {
+        fontSize: '13px',
         color: '#fff9c4',
-        backgroundColor: '#00000066',
-        padding: { x: 6, y: 3 },
-        wordWrap: { width: Math.min(360, w - 24) },
+        backgroundColor: '#00000099',
+        padding: { x: 8, y: 5 },
+        wordWrap: { width: Math.min(420, w - 24) },
       })
       .setScrollFactor(0)
       .setDepth(100)
-      .setAlpha(0.85);
+      .setAlpha(0.95);
 
-    this.statusText = this.add.text(0, 0, '').setVisible(false);
+    // Live status strip — always visible so players know what to do next
+    this.statusText = this.add
+      .text(12, h - 78, '', {
+        fontSize: '12px',
+        color: '#e3f2fd',
+        backgroundColor: '#0d47a1cc',
+        padding: { x: 8, y: 4 },
+        wordWrap: { width: Math.min(340, w - 180) },
+      })
+      .setScrollFactor(0)
+      .setDepth(100);
 
-    this.promptText = this.add.text(0, 0, '').setVisible(false);
+    this.promptText = this.add
+      .text(w / 2, h - 108, '', {
+        fontSize: '14px',
+        color: '#ffecb3',
+        backgroundColor: '#e65100dd',
+        padding: { x: 10, y: 5 },
+      })
+      .setOrigin(0.5, 1)
+      .setScrollFactor(0)
+      .setDepth(100);
 
     this.checklistText = this.add.text(0, 0, '').setVisible(false);
 
@@ -177,8 +197,11 @@ export class UIScene extends Phaser.Scene {
     if (key !== this.lastHudKey) {
       this.lastHudKey = key;
       this.phaseText.setText(`E-CRAFT v1 · ${hud.phase}`);
-      this.hintText.setText(hud.hint);
-      this.statusText.setText(hud.status);
+      this.hintText.setText(hud.hint || '');
+      this.statusText.setText(hud.status ? `NOW: ${hud.status}` : '');
+      this.promptText.setText(hud.prompt ? hud.prompt : '');
+      this.promptText.setVisible(!!hud.prompt);
+      this.statusText.setVisible(!!hud.status);
       if (hud.checklist) {
         const police = (hud.policeLines || []).join('\n');
         this.checklistText.setText(
