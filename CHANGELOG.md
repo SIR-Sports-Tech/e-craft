@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.12.0 — 2026-09-05 — FINGER STICK (PHONE + IPAD)
+
+### Added
+- **Virtual finger stick** (bottom-right) — drag with your thumb to walk/drive
+- Larger stick on **iPad / tablet** breakpoints
+- Analog movement with dead-zone; releases cleanly when finger lifts
+- Fixed doubled DOM movement input
+
+### Changed
+- Coach tips say **DRAG the stick** instead of D-pad taps
+
 ## 1.11.0 — 2026-09-05 — HI-RES BUILDING DESIGN
 
 ### Added

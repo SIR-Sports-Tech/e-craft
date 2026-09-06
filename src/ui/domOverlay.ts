@@ -16,9 +16,16 @@ export type DomInputState = {
 
 const pressed = new Set<string>();
 const move = { x: 0, y: 0 };
+/** Finger virtual stick — wins over keyboard while active. */
+const stick = { active: false, x: 0, y: 0, pointerId: null as number | null };
 (window as unknown as { __ecraftMove: { x: number; y: number } }).__ecraftMove = move;
 
 function recomputeMove(): void {
+  if (stick.active) {
+    move.x = stick.x;
+    move.y = stick.y;
+    return;
+  }
   let x = 0;
   let y = 0;
   if (pressed.has('KeyA') || pressed.has('ArrowLeft')) x -= 1;
@@ -27,6 +34,18 @@ function recomputeMove(): void {
   if (pressed.has('KeyS') || pressed.has('ArrowDown')) y += 1;
   move.x = x;
   move.y = y;
+}
+
+function clearStick(): void {
+  stick.active = false;
+  stick.pointerId = null;
+  stick.x = 0;
+  stick.y = 0;
+  recomputeMove();
+  const knob = document.getElementById('ecraft-stick-knob');
+  if (knob) knob.style.transform = 'translate(-50%, -50%)';
+  const base = document.getElementById('ecraft-stick');
+  base?.classList.remove('active');
 }
 
 type EcraftApi = {
@@ -101,12 +120,12 @@ function updateCoachFromState(): void {
       tip.textContent =
         'FIRST: tap green NEW GAME in the middle of the screen (or tap ACTIVATE ROBOT — it will start for you).';
     } else if (inCar) {
-      tip.textContent = 'You are in a car — HOLD ▶ / ▲ / ◀ / ▼ on the D-pad to drive. EXIT / E to leave.';
+      tip.textContent = 'You are in a car — DRAG the right stick with your finger to drive. EXIT / E to leave.';
     } else if (robotOn) {
-      tip.textContent = 'Robot is with you! Tap GET IN CAR or RACE, then HOLD the D-pad.';
+      tip.textContent = 'Robot is with you! Tap GET IN CAR or RACE, then DRAG the stick to drive.';
     } else {
       tip.textContent =
-        'Purple ACTIVATE ROBOT is at the TOP LEFT. Cars also work without the robot — tap GET IN CAR anytime.';
+        'DRAG the big stick (bottom-right) with your finger to walk. Purple ACTIVATE ROBOT is top-left.';
     }
     // Also surface live game status under tip when available
     if (st?.status) tip.textContent = `${tip.textContent} · ${st.status}`;
@@ -402,42 +421,81 @@ export function installDomOverlay(): void {
     }
     #ecraft-actions .exit { background: #006064; color: #e0f7fa; font-size: 10px; }
 
-    #ecraft-pad {
+    /* Virtual finger stick — phone + iPad thumb control */
+    #ecraft-stick {
       pointer-events: auto;
       position: absolute;
-      right: max(6px, env(safe-area-inset-right));
-      bottom: max(6px, env(safe-area-inset-bottom));
-      width: min(160px, 40vw);
-      height: min(160px, 40vw);
+      right: max(10px, env(safe-area-inset-right));
+      bottom: max(10px, env(safe-area-inset-bottom));
+      width: min(168px, 42vw);
+      height: min(168px, 42vw);
+      touch-action: none;
+      -webkit-user-select: none; user-select: none;
+      z-index: 8;
+    }
+    #ecraft-stick-base {
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, rgba(66,165,245,.55), rgba(13,71,161,.92) 70%);
+      border: 3px solid rgba(255,255,255,.55);
+      box-shadow: 0 10px 24px rgba(0,0,0,.45), inset 0 0 24px rgba(0,0,0,.25);
+      touch-action: none;
+    }
+    #ecraft-stick.active #ecraft-stick-base {
+      border-color: #ffd54f;
+      box-shadow: 0 0 0 3px rgba(255,213,79,.35), 0 10px 24px rgba(0,0,0,.5);
+    }
+    #ecraft-stick-knob {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 42%; height: 42%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #e3f2fd, #1565c0 65%, #0d47a1);
+      border: 3px solid #fff;
+      box-shadow: 0 6px 14px rgba(0,0,0,.45);
+      pointer-events: none;
+      transition: none;
+    }
+    #ecraft-stick-hint {
+      position: absolute;
+      left: 50%; bottom: -22px;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: 10px; font-weight: 900;
+      color: #ffe082;
+      text-shadow: 0 1px 3px #000;
+      pointer-events: none;
+    }
+    /* Keep tiny D-pad hits for smoke / accessibility (under stick, same zone) */
+    #ecraft-pad-legacy {
+      position: absolute; inset: 0;
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       grid-template-rows: 1fr 1fr 1fr;
-      gap: 5px;
-      touch-action: none;
-      z-index: 3;
+      opacity: 0;
+      pointer-events: none;
     }
-    #ecraft-pad button {
-      width: 100%; height: 100%; min-width: 0; min-height: 0;
-      border-radius: 50%;
-      border: 2px solid rgba(255,255,255,.45);
-      background: rgba(13,71,161,.95); color: #fff;
-      font-weight: 900; font-size: clamp(14px, 4.2vw, 18px);
-      box-shadow: 0 6px 14px rgba(0,0,0,.4);
-      -webkit-user-select: none; user-select: none;
-      touch-action: none;
-      padding: 0;
-    }
-    #ecraft-pad .pad-dead { pointer-events: none; visibility: hidden; }
 
     @media (max-width: 400px) {
       #ecraft-actions { width: min(148px, 39vw); gap: 4px; }
       #ecraft-actions button { height: 36px; font-size: 10px; }
       #ecraft-actions .rec { height: 30px; }
-      #ecraft-pad { width: min(136px, 36vw); height: min(136px, 36vw); }
+      #ecraft-stick { width: min(152px, 44vw); height: min(152px, 44vw); }
     }
     @media (max-width: 340px) {
       #ecraft-actions { width: min(124px, 38vw); }
-      #ecraft-pad { width: min(118px, 36vw); height: min(118px, 36vw); }
+      #ecraft-stick { width: min(136px, 46vw); height: min(136px, 46vw); }
+    }
+    /* iPad / tablet — bigger thumb stick */
+    @media (min-width: 768px) {
+      #ecraft-stick {
+        width: min(220px, 28vw);
+        height: min(220px, 28vw);
+        right: max(18px, env(safe-area-inset-right));
+        bottom: max(18px, env(safe-area-inset-bottom));
+      }
+      #ecraft-stick-hint { font-size: 12px; bottom: -26px; }
     }
   `;
   document.head.appendChild(style);
@@ -450,7 +508,7 @@ export function installDomOverlay(): void {
       <div class="title">How to play — do these in order</div>
       <div class="step next" data-coach="robot">① Tap purple <b>ACTIVATE ROBOT</b></div>
       <div class="step" data-coach="car">② Tap orange <b>GET IN CAR</b> (or red RACE)</div>
-      <div class="step" data-coach="drive">③ HOLD right D-pad <b>▶</b> to drive (don’t just tap)</div>
+      <div class="step" data-coach="drive">③ <b>DRAG</b> the right stick with your finger to walk/drive</div>
       <div class="tip" id="ecraft-coach-tip">Cars work without the robot — drive anytime.</div>
     </div>
     <div id="ecraft-actions" aria-label="action buttons">
@@ -501,62 +559,132 @@ export function installDomOverlay(): void {
       <button type="button" id="ecraft-hotbar-place">PLACE</button>
       <span id="ecraft-hotbar-count">0 blocks</span>
     </div>
-    <div id="ecraft-pad" aria-label="movement pad">
-      <span class="pad-dead"></span>
-      <button type="button" data-dir="up">▲</button>
-      <span class="pad-dead"></span>
-      <button type="button" data-dir="left">◀</button>
-      <span class="pad-dead"></span>
-      <button type="button" data-dir="right">▶</button>
-      <span class="pad-dead"></span>
-      <button type="button" data-dir="down">▼</button>
-      <span class="pad-dead"></span>
+    <div id="ecraft-stick" aria-label="finger move stick" role="application">
+      <div id="ecraft-stick-base">
+        <div id="ecraft-stick-knob"></div>
+        <div id="ecraft-pad-legacy" aria-hidden="true">
+          <span></span><button type="button" data-dir="up" tabindex="-1"></button><span></span>
+          <button type="button" data-dir="left" tabindex="-1"></button><span></span>
+          <button type="button" data-dir="right" tabindex="-1"></button>
+          <span></span><button type="button" data-dir="down" tabindex="-1"></button><span></span>
+        </div>
+      </div>
+      <div id="ecraft-stick-hint">DRAG TO MOVE</div>
     </div>
   `;
   document.body.appendChild(root);
 
   (window as unknown as { __ecraftToast: (m: string) => void }).__ecraftToast = showToast;
-  showToast('① ACTIVATE ROBOT · ② GET IN CAR · ③ HOLD ▶ to drive');
+  showToast('DRAG the blue stick (bottom-right) with your finger to move');
   startCoachLoop();
 
-  // D-pad
-  root.querySelectorAll<HTMLButtonElement>('#ecraft-pad [data-dir]').forEach((btn) => {
+  // —— Virtual finger stick (phone + iPad) ——
+  const stickEl = document.getElementById('ecraft-stick')!;
+  const stickBase = document.getElementById('ecraft-stick-base')!;
+  const stickKnob = document.getElementById('ecraft-stick-knob')!;
+
+  const updateStickFromEvent = (e: PointerEvent) => {
+    const rect = stickBase.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const maxR = Math.min(rect.width, rect.height) * 0.36;
+    let dx = e.clientX - cx;
+    let dy = e.clientY - cy;
+    const dist = Math.hypot(dx, dy) || 1;
+    if (dist > maxR) {
+      dx = (dx / dist) * maxR;
+      dy = (dy / dist) * maxR;
+    }
+    const nx = dx / maxR;
+    const ny = dy / maxR;
+    // Dead zone so resting finger doesn't drift
+    const dead = 0.12;
+    stick.x = Math.abs(nx) < dead ? 0 : nx;
+    stick.y = Math.abs(ny) < dead ? 0 : ny;
+    stickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    recomputeMove();
+  };
+
+  const onStickDown = (e: PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    api()?.unpause?.();
+    stick.active = true;
+    stick.pointerId = e.pointerId;
+    stickEl.classList.add('active');
+    try {
+      stickBase.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    updateStickFromEvent(e);
+  };
+  const onStickMove = (e: PointerEvent) => {
+    if (!stick.active || stick.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    updateStickFromEvent(e);
+  };
+  const onStickUp = (e: PointerEvent) => {
+    if (stick.pointerId != null && e.pointerId !== stick.pointerId) return;
+    e.preventDefault();
+    try {
+      stickBase.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    clearStick();
+  };
+
+  stickBase.addEventListener('pointerdown', onStickDown);
+  stickBase.addEventListener('pointermove', onStickMove);
+  stickBase.addEventListener('pointerup', onStickUp);
+  stickBase.addEventListener('pointercancel', onStickUp);
+  stickBase.addEventListener('lostpointercapture', () => clearStick());
+  // iOS Safari: also block native gestures on the stick
+  stickEl.addEventListener(
+    'touchstart',
+    (e) => {
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+
+  // Legacy D-pad API for smokes / programmatic nudges (sets stick axis)
+  root.querySelectorAll<HTMLButtonElement>('#ecraft-pad-legacy [data-dir]').forEach((btn) => {
     const dir = btn.dataset.dir!;
-    const map: Record<string, string> = {
-      up: 'ArrowUp',
-      down: 'ArrowDown',
-      left: 'ArrowLeft',
-      right: 'ArrowRight',
-    };
-    const code = map[dir];
-    const down = (e: PointerEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      api()?.unpause?.();
-      try {
-        btn.setPointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
+    const apply = (on: boolean) => {
+      if (dir === 'left') stick.x = on ? -1 : stick.x < 0 ? 0 : stick.x;
+      if (dir === 'right') stick.x = on ? 1 : stick.x > 0 ? 0 : stick.x;
+      if (dir === 'up') stick.y = on ? -1 : stick.y < 0 ? 0 : stick.y;
+      if (dir === 'down') stick.y = on ? 1 : stick.y > 0 ? 0 : stick.y;
+      stick.active = on || Math.abs(stick.x) > 0.01 || Math.abs(stick.y) > 0.01;
+      if (!stick.active) {
+        stick.x = 0;
+        stick.y = 0;
       }
-      pressed.add(code);
       recomputeMove();
-      flash(btn);
     };
-    const up = (e: PointerEvent) => {
+    btn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      e.stopPropagation();
-      pressed.delete(code);
-      recomputeMove();
-      try {
-        btn.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-    };
-    btn.addEventListener('pointerdown', down);
-    btn.addEventListener('pointerup', up);
-    btn.addEventListener('pointercancel', up);
+      apply(true);
+    });
+    btn.addEventListener('pointerup', (e) => {
+      e.preventDefault();
+      apply(false);
+    });
   });
+
+  (window as unknown as { __ecraftSetStick?: (x: number, y: number) => void }).__ecraftSetStick = (
+    x: number,
+    y: number,
+  ) => {
+    stick.active = Math.abs(x) > 0.01 || Math.abs(y) > 0.01;
+    stick.x = Math.max(-1, Math.min(1, x));
+    stick.y = Math.max(-1, Math.min(1, y));
+    const maxR = (stickBase.getBoundingClientRect().width || 160) * 0.36;
+    stickKnob.style.transform = `translate(calc(-50% + ${stick.x * maxR}px), calc(-50% + ${stick.y * maxR}px))`;
+    recomputeMove();
+  };
 
   const bindAction = (id: string, fnName: keyof EcraftApi, label: string) => {
     const btn = document.getElementById(id);
@@ -707,7 +835,7 @@ export function installDomOverlay(): void {
   });
   window.addEventListener('blur', () => {
     pressed.clear();
-    recomputeMove();
+    clearStick();
   });
 }
 

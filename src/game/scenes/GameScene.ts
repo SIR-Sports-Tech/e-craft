@@ -2182,16 +2182,11 @@ export class GameScene extends Phaser.Scene {
     if (right) vx += 1;
     if (up) vy -= 1;
     if (down) vy += 1;
-    // Chrome-proof DOM keyboard / on-screen pad
+    // Finger stick + DOM keyboard share __ecraftMove (single source — no double-add)
     const dom = pollDomInput();
     vx += dom.x;
     vy += dom.y;
-    const mv = (window as unknown as { __ecraftMove?: { x: number; y: number } }).__ecraftMove;
-    if (mv) {
-      vx += mv.x;
-      vy += mv.y;
-    }
-    // Phaser touch stick (mobile)
+    // Legacy Phaser touchVec (unused UI stick kept for API compat)
     if (Math.abs(this.touchVec.x) > 0.15 || Math.abs(this.touchVec.y) > 0.15) {
       vx += this.touchVec.x;
       vy += this.touchVec.y;

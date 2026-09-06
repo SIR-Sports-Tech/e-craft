@@ -21,11 +21,11 @@ await page.waitForTimeout(300);
 st = await page.evaluate(() => window.__ecraft.getState());
 const inCar = st.flags.inVehicle === true;
 
-// Drive with pad
+// Drive with finger stick API
 const x0 = st.player.x;
-await page.locator('#ecraft-pad [data-dir="right"]').dispatchEvent('pointerdown');
+await page.evaluate(() => window.__ecraftSetStick?.(1, 0));
 await page.waitForTimeout(700);
-await page.locator('#ecraft-pad [data-dir="right"]').dispatchEvent('pointerup');
+await page.evaluate(() => window.__ecraftSetStick?.(0, 0));
 st = await page.evaluate(() => window.__ecraft.getState());
 const drove = Math.abs(st.player.x - x0) > 25;
 
