@@ -17,6 +17,7 @@ export class BootScene extends Phaser.Scene {
     this.makeSasquatch();
     this.makeSirenHead();
     this.makeBuildingSign();
+    this.makeHouseExtras();
     this.makeVehicle();
     this.makePoliceCar();
     this.makeRaceCar();
@@ -683,6 +684,62 @@ export class BootScene extends Phaser.Scene {
       frameRate: 12,
       repeat: -1,
     });
+  }
+
+  /** TV-on screen, food plate, craft block — original house props (no Minecraft IP). */
+  private makeHouseExtras(): void {
+    // TV screen "ON" (color bars / show)
+    const tv = this.g();
+    tv.fillStyle(0x111111, 1);
+    tv.fillRoundedRect(0, 0, 72, 48, 3);
+    tv.fillStyle(0x29b6f6, 1);
+    tv.fillRect(6, 6, 28, 36);
+    tv.fillStyle(0x66bb6a, 1);
+    tv.fillRect(34, 6, 16, 36);
+    tv.fillStyle(0xffee58, 1);
+    tv.fillRect(50, 6, 8, 36);
+    tv.fillStyle(0xef5350, 1);
+    tv.fillRect(58, 6, 8, 36);
+    tv.fillStyle(0xffffff, 0.85);
+    tv.fillCircle(22, 20, 6);
+    tv.generateTexture('tv_on', 72, 48);
+    tv.destroy();
+
+    // Cooked meal plate
+    const food = this.g();
+    food.fillStyle(0xeceff1, 1);
+    food.fillCircle(24, 24, 22);
+    food.fillStyle(0xff7043, 1);
+    food.fillEllipse(24, 22, 20, 14);
+    food.fillStyle(0x66bb6a, 1);
+    food.fillCircle(16, 18, 5);
+    food.fillCircle(30, 26, 4);
+    food.fillStyle(0xffee58, 1);
+    food.fillRect(18, 28, 12, 4);
+    food.generateTexture('food_plate', 48, 48);
+    food.destroy();
+
+    // Original craft blocks (NOT Minecraft) — solid colored cubes
+    const mkBlock = (key: string, color: number) => {
+      const b = this.g();
+      b.fillStyle(color, 1);
+      b.fillRoundedRect(4, 8, 40, 40, 3);
+      b.fillStyle(0xffffff, 0.25);
+      b.fillRect(6, 10, 36, 8);
+      b.lineStyle(2, 0x000000, 0.35);
+      b.strokeRoundedRect(4, 8, 40, 40, 3);
+      // top face hint
+      b.fillStyle(color, 0.85);
+      b.fillTriangle(4, 8, 24, 0, 44, 8);
+      b.generateTexture(key, 48, 48);
+      b.destroy();
+    };
+    mkBlock('block_dirt', 0x8d6e63);
+    mkBlock('block_grass', 0x43a047);
+    mkBlock('block_stone', 0x78909c);
+    mkBlock('block_wood', 0xa1887f);
+    mkBlock('block_brick', 0xc62828);
+    mkBlock('block_gold', 0xffd54f);
   }
 
   /** Professional civic building plaque (used under labels). */

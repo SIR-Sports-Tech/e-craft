@@ -19,19 +19,24 @@ export enum MissionPhase {
 export const REWARD_TEXT = '$10,000 TRILLION BILLION';
 
 export const PHASE_HINTS: Record<MissionPhase, string> = {
-  [MissionPhase.AtSecurityHQ]: 'Enter Security HQ, then go underground to the gadget lair. (E)',
-  [MissionPhase.InUndergroundLair]: 'Pick up the Sasquatch Tracker, then activate your robot partner. (E)',
-  [MissionPhase.HasTracker]: 'Activate your friendly robot partner. (E)',
-  [MissionPhase.RobotActive]: 'Exit the lair and enter the security vehicle. (E)',
-  [MissionPhase.CanDrive]: 'Drive to the forest and find the Sasquatch trail.',
-  [MissionPhase.Tracking]: 'Follow the trail. Your robot will help if you lose it.',
-  [MissionPhase.FoundSasquatch]: 'Capture Sasquatch! (Space near Sasquatch)',
-  [MissionPhase.Captured]: 'Get Sasquatch into the security vehicle. (E)',
-  [MissionPhase.Transporting]: 'Drive Sasquatch back to Security HQ / Super Jail.',
-  [MissionPhase.AtSuperJail]: 'Enter Super Jail and lock Sasquatch in a cell. (E)',
-  [MissionPhase.Jailed]: 'Mission almost complete…',
-  [MissionPhase.Rewarded]: 'You earned the reward! Keep exploring.',
-  [MissionPhase.FreeExplore]: 'Free explore mode. The city remembers your mission.',
+  [MissionPhase.AtSecurityHQ]:
+    '① Tap purple ACTIVATE ROBOT (or enter HQ → lair with E) ② Tap orange GET IN CAR ③ Hold D-pad ▶ to drive',
+  [MissionPhase.InUndergroundLair]:
+    'In the lair: pick up the Tracker (E), then tap purple ACTIVATE ROBOT — or EXIT and tap it outside.',
+  [MissionPhase.HasTracker]:
+    'Tap purple ACTIVATE ROBOT now — the robot appears beside you. Then tap orange GET IN CAR.',
+  [MissionPhase.RobotActive]:
+    'Robot is ON! Tap orange GET IN CAR (or RACE), then HOLD the right D-pad ▶ to drive east to the forest.',
+  [MissionPhase.CanDrive]:
+    'You can drive! Tap GET IN CAR / RACE, then HOLD ▶ on the D-pad. Go east into the forest for the trail.',
+  [MissionPhase.Tracking]: 'Follow the gold trail / arrow. HOLD TRACKER helps. Robot radios tips if you get lost.',
+  [MissionPhase.FoundSasquatch]: 'Near Sasquatch: tap CAPTURE (or Space). When he is DOWN, tap GET IN CAR to load him.',
+  [MissionPhase.Captured]: 'Sasquatch is down — tap GET IN CAR to load him, then drive to SUPER JAIL.',
+  [MissionPhase.Transporting]: 'Drive to SUPER JAIL (follow the map). Hold D-pad to steer.',
+  [MissionPhase.AtSuperJail]: 'Walk to SUPER JAIL door and tap E — lock Sasquatch in the cell.',
+  [MissionPhase.Jailed]: 'Mission almost complete… visit jail anytime with VISIT JAIL.',
+  [MissionPhase.Rewarded]: 'You earned the reward! Keep exploring — cars still work anytime.',
+  [MissionPhase.FreeExplore]: 'Free explore. ACTIVATE ROBOT · GET IN CAR · hold D-pad anytime.',
 };
 
 export type TrailKind = 'footprint' | 'branch' | 'fur' | 'mud' | 'scratch';

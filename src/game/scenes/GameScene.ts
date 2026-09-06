@@ -90,6 +90,18 @@ export class GameScene extends Phaser.Scene {
   private jailNodes: Phaser.GameObjects.GameObject[] = [];
   private houseNodes: Phaser.GameObjects.GameObject[] = [];
   private sleeping = false;
+  private lyingInBed = false;
+  private tvOn = false;
+  private buildMode = false;
+  private buildBlockType: 'block_dirt' | 'block_grass' | 'block_stone' | 'block_wood' | 'block_brick' | 'block_gold' =
+    'block_grass';
+  private placedBlocks: Phaser.GameObjects.Image[] = [];
+  private houseTv?: Phaser.GameObjects.Image;
+  private houseTvScreen?: Phaser.GameObjects.Image;
+  private houseKitchen?: Phaser.GameObjects.Image;
+  private houseBed?: Phaser.GameObjects.Image;
+  private houseFood?: Phaser.GameObjects.Image;
+  private cookedMeal = false;
   /** Close to Sasquatch → Siren Head horror form. */
   private sasquatchSirenMode = false;
   /** Flattened by a police car — can't move until recovered. */
@@ -327,6 +339,23 @@ export class GameScene extends Phaser.Scene {
         this.paused = false;
         this.mapOpen = false;
         this.doVisitJail();
+      },
+      toggleBuild: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.toggleBuildMode();
+      },
+      cycleBlock: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.cycleBuildBlock();
+      },
+      layBed: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        if (!this.flags.inHouse) this.enterHouse(true);
+        if (this.lyingInBed) this.getOutOfBed();
+        else this.layInBed();
       },
       pantherJump: () => {
         this.paused = false;
@@ -1370,6 +1399,22 @@ export class GameScene extends Phaser.Scene {
     const couch = this.add.image(HOUSE_INTERIOR.x + 220, HOUSE_INTERIOR.y + 220, 'furn_couch').setScale(1.2).setVisible(false);
     const table = this.add.image(HOUSE_INTERIOR.x + 220, HOUSE_INTERIOR.y + 290, 'furn_table').setScale(1.05).setVisible(false);
     const tv = this.add.image(HOUSE_INTERIOR.x + 220, HOUSE_INTERIOR.y + 150, 'furn_tv').setScale(1.1).setVisible(false);
+    this.houseTv = tv;
+    const tvScreen = this.add
+      .image(HOUSE_INTERIOR.x + 220, HOUSE_INTERIOR.y + 142, 'tv_on')
+      .setScale(0.95)
+      .setVisible(false)
+      .setAlpha(0);
+    this.houseTvScreen = tvScreen;
+    const tvLbl = this.add
+      .text(HOUSE_INTERIOR.x + 220, HOUSE_INTERIOR.y + 175, 'TV [E]', {
+        fontSize: '11px',
+        color: '#e3f2fd',
+        backgroundColor: '#0d47a1aa',
+        padding: { x: 4, y: 2 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
     const plant = this.add.image(HOUSE_INTERIOR.x + 110, HOUSE_INTERIOR.y + 200, 'furn_plant').setScale(1.1).setVisible(false);
     const picture = this.add.image(HOUSE_INTERIOR.x + 340, HOUSE_INTERIOR.y + 140, 'furn_picture').setScale(1.2).setVisible(false);
     const rug = this.add
@@ -1378,20 +1423,46 @@ export class GameScene extends Phaser.Scene {
 
     // Kitchen
     const kitchen = this.add.image(HOUSE_INTERIOR.x + 480, HOUSE_INTERIOR.y + 200, 'furn_kitchen').setScale(1.15).setVisible(false);
+    this.houseKitchen = kitchen;
+    const kitchenLbl = this.add
+      .text(HOUSE_INTERIOR.x + 480, HOUSE_INTERIOR.y + 240, 'COOK [E]', {
+        fontSize: '11px',
+        color: '#fff3e0',
+        backgroundColor: '#e65100aa',
+        padding: { x: 4, y: 2 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    const food = this.add
+      .image(HOUSE_INTERIOR.x + 480, HOUSE_INTERIOR.y + 270, 'food_plate')
+      .setScale(0.9)
+      .setVisible(false)
+      .setAlpha(0);
+    this.houseFood = food;
 
     // Bedroom / sleep area
     const bed = this.add.image(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 'bed').setScale(1.4).setVisible(false);
+    this.houseBed = bed;
     const nightstand = this.add
       .rectangle(HOUSE_INTERIOR.bedX - 70, HOUSE_INTERIOR.bedY + 10, 28, 24, 0x6d4c41, 1)
       .setVisible(false);
     const lamp = this.add.circle(HOUSE_INTERIOR.bedX - 70, HOUSE_INTERIOR.bedY - 10, 9, 0xffe082, 0.95).setVisible(false);
     const lampGlow = this.add.circle(HOUSE_INTERIOR.bedX - 70, HOUSE_INTERIOR.bedY - 10, 22, 0xfff59d, 0.2).setVisible(false);
     const bedLbl = this.add
-      .text(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY + 48, 'BED — Sleep [E] / SLEEP', {
-        fontSize: '13px',
+      .text(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY + 48, 'BED — Lay down [E] · SLEEP overnight', {
+        fontSize: '12px',
         color: '#fffde7',
         backgroundColor: '#1565c0cc',
         padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    const buildLbl = this.add
+      .text(cx, HOUSE_INTERIOR.y + HOUSE_INTERIOR.h - 56, 'BUILD MODE: place Craft Blocks (original cubes)', {
+        fontSize: '11px',
+        color: '#1b5e20',
+        backgroundColor: '#c8e6c9cc',
+        padding: { x: 6, y: 2 },
       })
       .setOrigin(0.5, 0)
       .setVisible(false);
@@ -1424,7 +1495,7 @@ export class GameScene extends Phaser.Scene {
       .setVisible(false);
 
     const tip = this.add
-      .text(cx, HOUSE_INTERIOR.y + HOUSE_INTERIOR.h - 28, 'Living room · kitchen · bedroom — sleep in the bed!', {
+      .text(cx, HOUSE_INTERIOR.y + HOUSE_INTERIOR.h - 28, 'Walk around · TV · Cook · Bed · Build Blocks', {
         fontSize: '12px',
         color: '#5d4037',
         backgroundColor: '#ffe08299',
@@ -1444,14 +1515,19 @@ export class GameScene extends Phaser.Scene {
       couch,
       table,
       tv,
+      tvScreen,
+      tvLbl,
       plant,
       picture,
       kitchen,
+      kitchenLbl,
+      food,
       bed,
       nightstand,
       lampGlow,
       lamp,
       bedLbl,
+      buildLbl,
       window,
       curtainL,
       curtainR,
@@ -1478,7 +1554,7 @@ export class GameScene extends Phaser.Scene {
       { id: 'lair', label: 'Enter underground lair', done: this.flags.hasTracker || this.flags.inLair || this.phase !== MissionPhase.AtSecurityHQ },
       { id: 'tracker', label: 'Get Sasquatch Tracker', done: this.flags.hasTracker },
       { id: 'robot', label: 'Activate robot', done: this.flags.robotActive },
-      { id: 'vehicle', label: 'Drive security vehicle', done: this.flags.robotActive && (this.flags.inVehicle || this.flags.sasquatchCaptured || advanced) },
+      { id: 'vehicle', label: 'Drive a car (GET IN CAR)', done: this.flags.inVehicle || this.flags.sasquatchCaptured || advanced },
       { id: 'trail', label: 'Follow Sasquatch trail', done: this.flags.sasquatchCaptured || this.phase === MissionPhase.FoundSasquatch || this.phase === MissionPhase.Tracking },
       { id: 'capture', label: 'Capture Sasquatch', done: this.flags.sasquatchCaptured },
       { id: 'transport', label: 'Transport in vehicle', done: this.flags.sasquatchInVehicle || this.flags.sasquatchJailed },
@@ -1536,6 +1612,14 @@ export class GameScene extends Phaser.Scene {
       flattened: this.flattened,
       sirenMode: this.sasquatchSirenMode,
       buildingSigns: true,
+      house: {
+        tvOn: this.tvOn,
+        lyingInBed: this.lyingInBed,
+        buildMode: this.buildMode,
+        blockType: this.buildBlockType,
+        blocksPlaced: this.placedBlocks.length,
+        cookedMeal: this.cookedMeal,
+      },
     };
   }
 
@@ -1746,8 +1830,127 @@ export class GameScene extends Phaser.Scene {
     setDomStatus(this.statusLine);
   }
 
+  private layInBed(): void {
+    this.lyingInBed = true;
+    this.buildMode = false;
+    this.player.setVelocity(0, 0);
+    this.player.setPosition(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY - 4);
+    this.player.anims.stop();
+    this.player.setAngle(90);
+    this.player.setScale(1, 0.85);
+    this.statusLine = 'Lying in bed… Tap E to get up · SLEEP for overnight.';
+    setDomStatus(this.statusLine);
+    audio.interact();
+  }
+
+  private getOutOfBed(): void {
+    this.lyingInBed = false;
+    this.player.setAngle(0);
+    this.player.setScale(1);
+    this.player.setPosition(HOUSE_INTERIOR.bedX - 40, HOUSE_INTERIOR.bedY + 20);
+    this.updatePlayerAnim(false);
+    this.statusLine = 'Out of bed. Walk around the house!';
+    setDomStatus(this.statusLine);
+  }
+
+  private toggleTv(): void {
+    this.tvOn = !this.tvOn;
+    if (this.houseTvScreen) {
+      this.houseTvScreen.setVisible(true);
+      this.tweens.add({
+        targets: this.houseTvScreen,
+        alpha: this.tvOn ? 1 : 0,
+        duration: 250,
+      });
+    }
+    this.statusLine = this.tvOn ? '📺 TV ON — cartoon color bars!' : 'TV off.';
+    setDomStatus(this.statusLine);
+    audio.interact();
+  }
+
+  private cookOrEat(): void {
+    if (!this.cookedMeal) {
+      this.cookedMeal = true;
+      if (this.houseFood) {
+        this.houseFood.setVisible(true);
+        this.houseFood.setAlpha(0);
+        this.tweens.add({ targets: this.houseFood, alpha: 1, y: this.houseFood.y - 8, duration: 400, yoyo: false });
+      }
+      this.inventory.add('cooked_meal');
+      this.statusLine = '🍳 Cooking… Meal ready! Tap E again to eat.';
+      setDomStatus(this.statusLine);
+      audio.success();
+      return;
+    }
+    this.cookedMeal = false;
+    if (this.houseFood) {
+      this.tweens.add({
+        targets: this.houseFood,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => this.houseFood?.setVisible(false),
+      });
+    }
+    this.statusLine = '😋 Yum! You ate a home-cooked meal.';
+    setDomStatus(this.statusLine);
+    audio.pickup();
+  }
+
+  private toggleBuildMode(): void {
+    if (!this.flags.inHouse) {
+      this.statusLine = 'Go inside your house to build with Craft Blocks!';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    if (this.lyingInBed) this.getOutOfBed();
+    this.buildMode = !this.buildMode;
+    this.statusLine = this.buildMode
+      ? `🧱 BUILD MODE ON — ${this.buildBlockType.replace('block_', '')} · E places · BUILD cycles`
+      : 'Build mode off.';
+    setDomStatus(this.statusLine);
+  }
+
+  private cycleBuildBlock(): void {
+    const types: Array<typeof this.buildBlockType> = [
+      'block_dirt',
+      'block_grass',
+      'block_stone',
+      'block_wood',
+      'block_brick',
+      'block_gold',
+    ];
+    const i = types.indexOf(this.buildBlockType);
+    this.buildBlockType = types[(i + 1) % types.length];
+    this.buildMode = true;
+    this.statusLine = `Block: ${this.buildBlockType.replace('block_', '').toUpperCase()} — tap E to place`;
+    setDomStatus(this.statusLine);
+  }
+
+  private placeCraftBlock(): void {
+    if (!this.flags.inHouse) return;
+    // Place in front of player inside house
+    const bx = Phaser.Math.Clamp(
+      this.player.x + this.facing * 28,
+      HOUSE_INTERIOR.x + 40,
+      HOUSE_INTERIOR.x + HOUSE_INTERIOR.w - 40,
+    );
+    const by = Phaser.Math.Clamp(
+      this.player.y,
+      HOUSE_INTERIOR.y + 120,
+      HOUSE_INTERIOR.y + HOUSE_INTERIOR.h - 40,
+    );
+    const block = this.add.image(bx, by, this.buildBlockType).setDepth(12).setScale(0.85);
+    this.indoorLayer.add(block);
+    this.houseNodes.push(block);
+    this.placedBlocks.push(block);
+    block.setVisible(true);
+    this.statusLine = `Placed ${this.buildBlockType.replace('block_', '')} block! (${this.placedBlocks.length} built)`;
+    setDomStatus(this.statusLine);
+    audio.interact();
+  }
+
   private handleMovement(): void {
-    if (this.flattened) {
+    if (this.flattened || this.lyingInBed || this.sleeping) {
       this.player.setVelocity(0, 0);
       return;
     }
@@ -1790,6 +1993,20 @@ export class GameScene extends Phaser.Scene {
     }
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * speed, (vy / len) * speed);
+
+    // Clamp walking inside the house so you can stroll the rooms
+    if (this.flags.inHouse) {
+      this.player.x = Phaser.Math.Clamp(
+        this.player.x,
+        HOUSE_INTERIOR.x + 50,
+        HOUSE_INTERIOR.x + HOUSE_INTERIOR.w - 50,
+      );
+      this.player.y = Phaser.Math.Clamp(
+        this.player.y,
+        HOUSE_INTERIOR.y + 130,
+        HOUSE_INTERIOR.y + HOUSE_INTERIOR.h - 50,
+      );
+    }
 
     // Always face the direction he walks (dominant axis)
     if (Math.abs(vx) >= Math.abs(vy)) {
@@ -2329,9 +2546,17 @@ export class GameScene extends Phaser.Scene {
 
   private describeInteract(): string | null {
     if (this.flags.inHouse) {
-      if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 100)) return '[E] Sleep in bed → morning';
+      if (this.lyingInBed) return '[E] Get out of bed';
+      if (this.buildMode) return `[E] Place ${this.buildBlockType.replace('block_', '').toUpperCase()} block · BUILD to toggle`;
+      if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 100)) return '[E] Lay down in bed';
+      if (this.houseTv && this.near(this.houseTv.x, this.houseTv.y, 70)) {
+        return this.tvOn ? '[E] Turn TV off' : '[E] Turn TV on';
+      }
+      if (this.houseKitchen && this.near(this.houseKitchen.x, this.houseKitchen.y, 70)) {
+        return this.cookedMeal ? '[E] Eat meal' : '[E] Cook food';
+      }
       if (this.near(HOUSE_INTERIOR.exitX + 40, HOUSE_INTERIOR.exitY + 40, 110)) return '[E] Exit house';
-      return '[E] near bed to sleep · EXIT to leave';
+      return 'Walk around · TV · Cook · Bed · BUILD blocks';
     }
     if (this.flags.inLair) {
       if (!this.flags.hasTracker && this.near(LAIR.trackerX, LAIR.trackerY, 80)) {
@@ -2418,15 +2643,31 @@ export class GameScene extends Phaser.Scene {
 
   private tryInteract(): void {
     if (this.flags.inHouse) {
+      if (this.lyingInBed) {
+        this.getOutOfBed();
+        return;
+      }
+      if (this.buildMode) {
+        this.placeCraftBlock();
+        return;
+      }
       if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 100)) {
-        this.doSleep();
+        this.layInBed();
+        return;
+      }
+      if (this.houseTv && this.near(this.houseTv.x, this.houseTv.y, 70)) {
+        this.toggleTv();
+        return;
+      }
+      if (this.houseKitchen && this.near(this.houseKitchen.x, this.houseKitchen.y, 70)) {
+        this.cookOrEat();
         return;
       }
       if (this.near(HOUSE_INTERIOR.exitX + 40, HOUSE_INTERIOR.exitY + 40, 110)) {
         this.exitHouse();
         return;
       }
-      this.statusLine = 'Tap SLEEP for bed, or EXIT to leave the house.';
+      this.statusLine = 'TV · Cook · Bed · BUILD · EXIT';
       setDomStatus(this.statusLine);
       return;
     }
@@ -2555,11 +2796,10 @@ export class GameScene extends Phaser.Scene {
           h: bay.h + 40,
         }));
       if (!this.flags.inVehicle && nearCar) {
-        if (!this.flags.robotActive) {
-          this.statusLine = 'Activate your robot partner first (underground lair)!';
-          return;
-        }
+        // Free entry — robot is optional (GET IN CAR / E both work without it)
         this.enterVehicle(true);
+        this.statusLine = 'Security car — hold D-pad ▶ to drive!';
+        setDomStatus(this.statusLine);
         return;
       }
     }
@@ -3100,6 +3340,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private exitHouse(): void {
+    if (this.lyingInBed) this.getOutOfBed();
+    this.buildMode = false;
     this.flags.inHouse = false;
     this.indoorLayer.setVisible(false);
     this.houseNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));

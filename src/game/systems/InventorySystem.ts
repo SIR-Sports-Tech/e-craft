@@ -1,6 +1,6 @@
 /** Simple gadget inventory for E-CRAFT. */
 
-export type ItemId = 'tracker' | 'radio' | 'badge' | 'keycard';
+export type ItemId = 'tracker' | 'radio' | 'badge' | 'keycard' | 'cooked_meal';
 
 export interface ItemDef {
   id: ItemId;
@@ -13,6 +13,7 @@ const DEFS: Record<ItemId, ItemDef> = {
   radio: { id: 'radio', name: 'Security Radio', icon: '📻' },
   badge: { id: 'badge', name: 'HQ Badge', icon: '🏅' },
   keycard: { id: 'keycard', name: 'Jail Keycard', icon: '🔑' },
+  cooked_meal: { id: 'cooked_meal', name: 'Home Meal', icon: '🍲' },
 };
 
 export class InventorySystem {

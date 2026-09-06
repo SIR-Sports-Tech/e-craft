@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0 — 2026-09-05 — HOUSE LIFE (BED · TV · COOK · BUILD)
+
+### Added
+- Walk around inside your house with full walk anims
+- **Lay down** in bed (LAY BED / E) — separate from overnight SLEEP
+- **TV on/off** with color-bar screen
+- **Cook & eat** at the kitchen
+- **Craft Blocks** build mode — original colored cubes (not Minecraft IP)
+
+
 ## 1.6.0 — 2026-09-05 — PRO SIGNS + SIREN HEAD
 
 ### Added

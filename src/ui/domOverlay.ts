@@ -41,6 +41,9 @@ type EcraftApi = {
   sleep?: () => void;
   enterHouse?: () => void;
   visitJail?: () => void;
+  toggleBuild?: () => void;
+  cycleBlock?: () => void;
+  layBed?: () => void;
   pantherJump?: () => void;
   pigDrop?: () => void;
   exitIndoor?: () => void;
@@ -120,7 +123,44 @@ export function installDomOverlay(): void {
     }
     #ecraft-toast.show { opacity: 1; }
 
-    /* Compact LEFT grid — all buttons visible without scroll on phones */
+    /* Persistent how-to coach — always readable on phone */
+    #ecraft-coach {
+      pointer-events: none;
+      position: absolute;
+      left: 50%;
+      top: max(42px, calc(env(safe-area-inset-top) + 36px));
+      transform: translateX(-50%);
+      width: min(94vw, 440px);
+      background: rgba(0, 20, 40, .88);
+      border: 2px solid #ffd54f;
+      border-radius: 12px;
+      padding: 8px 10px;
+      color: #fffde7;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.35;
+      text-align: left;
+      z-index: 6;
+      box-shadow: 0 8px 20px rgba(0,0,0,.45);
+    }
+    #ecraft-coach .title {
+      color: #ffd54f;
+      font-size: 11px;
+      letter-spacing: .04em;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    #ecraft-coach .step { margin: 2px 0; }
+    #ecraft-coach .step.done { color: #69f0ae; text-decoration: line-through; opacity: .85; }
+    #ecraft-coach .step.next { color: #fff59d; }
+    #ecraft-coach .tip {
+      margin-top: 5px;
+      color: #90caf9;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    /* Compact LEFT grid — priority actions FIRST so Activate/Car never hide */
     #ecraft-actions {
       pointer-events: auto;
       position: absolute;
@@ -129,8 +169,8 @@ export function installDomOverlay(): void {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 5px;
-      width: min(158px, 40vw);
-      max-height: min(62vh, 460px);
+      width: min(168px, 42vw);
+      max-height: min(58vh, 440px);
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
@@ -165,6 +205,8 @@ export function installDomOverlay(): void {
     #ecraft-actions .pan { background: #212121; color: #ffeb3b; font-size: 10px; }
     #ecraft-actions .pig { background: #ad1457; color: #fce4ec; font-size: 10px; }
     #ecraft-actions .jail { background: #4a148c; color: #e1bee7; font-size: 10px; }
+    #ecraft-actions .bld { background: #2e7d32; color: #e8f5e9; font-size: 10px; }
+    #ecraft-actions .bed { background: #1565c0; color: #e3f2fd; font-size: 10px; }
     #ecraft-actions .exit { background: #006064; color: #e0f7fa; font-size: 10px; }
 
     #ecraft-pad {
@@ -220,7 +262,10 @@ export function installDomOverlay(): void {
       <button type="button" class="exit wide" id="btn-exit">EXIT</button>
       <button type="button" class="home" id="btn-house">GO HOME</button>
       <button type="button" class="jail" id="btn-jail">VISIT JAIL</button>
+      <button type="button" class="bed" id="btn-bed">LAY BED</button>
       <button type="button" class="sleep" id="btn-sleep">SLEEP</button>
+      <button type="button" class="bld" id="btn-build">BUILD</button>
+      <button type="button" class="bld" id="btn-block">BLOCK</button>
       <button type="button" class="car" id="btn-car">GET IN CAR</button>
       <button type="button" class="race" id="btn-race">RACE</button>
       <button type="button" class="pan" id="btn-panther">PANTHER!</button>
@@ -308,7 +353,10 @@ export function installDomOverlay(): void {
   bindAction('btn-exit', 'exitIndoor', 'Exited');
   bindAction('btn-house', 'enterHouse', 'Welcome home');
   bindAction('btn-jail', 'visitJail', 'Visiting jail');
+  bindAction('btn-bed', 'layBed', 'Bed');
   bindAction('btn-sleep', 'sleep', 'Sleeping…');
+  bindAction('btn-build', 'toggleBuild', 'Build mode');
+  bindAction('btn-block', 'cycleBlock', 'Next block');
   bindAction('btn-panther', 'pantherJump', 'Panther!');
   bindAction('btn-pig', 'pigDrop', 'Oink!');
   bindAction('btn-car', 'enterCar', 'Patrol Car');
