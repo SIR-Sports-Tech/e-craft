@@ -12,8 +12,14 @@ await page.waitForFunction(
   () => !!window.__ecraft?.toggleBuild && !!window.__ecraft?.breakBlock && !!window.__ecraft?.placeBlock,
 );
 
-// Clear any prior craft save
-await page.evaluate(() => localStorage.removeItem('ecraft_craft_blocks_v1'));
+// Clear any prior craft save (all versions)
+await page.evaluate(() => {
+  localStorage.removeItem('ecraft_craft_blocks_v1');
+  localStorage.removeItem('ecraft_craft_blocks_v2');
+  localStorage.removeItem('ecraft_craft_blocks_v3');
+  const s = window.__phaserGame.scene.getScene('Game');
+  s.craftBuild?.clearAll?.();
+});
 
 await page.locator('#btn-build').dispatchEvent('pointerdown');
 await page.waitForTimeout(200);
@@ -23,28 +29,27 @@ const hotbar = await page.evaluate(() => document.getElementById('ecraft-hotbar'
 const placeBtn = await page.evaluate(() => !!document.getElementById('btn-place'));
 
 // Select stone (index 2)
-await page.locator('#ecraft-hotbar [data-block="2"]').dispatchEvent('pointerdown');
+await page.evaluate(() => window.__ecraft.selectBlock(2));
 await page.waitForTimeout(100);
 
-// Place a few blocks outdoors via PLACE API + stacking
+// Place a few blocks outdoors via direct craft API (stack height)
 await page.evaluate(() => {
-  const a = window.__ecraft;
-  a.selectBlock(2);
   const scene = window.__phaserGame.scene.getScene('Game');
   scene.player.setPosition(900, 760);
   scene.facing = 1;
   scene.facingDir = 'right';
-  a.placeBlock();
-  scene.player.x += 40;
-  a.placeBlock();
-  scene.player.x += 40;
-  a.placeBlock();
+  scene.craftBuild.clearPointerAim();
+  scene.craftBuild.place(900, 760, 1, 'right');
+  scene.craftBuild.place(940, 760, 1, 'right');
+  scene.craftBuild.place(980, 760, 1, 'right');
   // stack on same cell
-  a.placeBlock();
+  scene.craftBuild.place(980, 760, 1, 'right');
+  scene.craftBuild.place(980, 760, 1, 'right');
 });
 await page.waitForTimeout(200);
 st = await page.evaluate(() => window.__ecraft.getState());
-const placed = (st.craft?.count || 0) >= 4;
+const placed = (st.craft?.count || 0) >= 5;
+const beforeBreak = st.craft?.count || 0;
 
 // Break one
 await page.locator('#btn-break').dispatchEvent('pointerdown');
@@ -81,13 +86,25 @@ const ok =
   hotbar &&
   placeBtn &&
   placed &&
-  afterBreak < 4 &&
+  afterBreak < beforeBreak &&
   tex &&
   slots >= 20 &&
   types >= 20;
 console.log(
   JSON.stringify(
-    { errs: errs.slice(0, 5), modeOn, hotbar, placeBtn, placed, afterBreak, tex, slots, craft: st.craft, ok },
+    {
+      errs: errs.slice(0, 5),
+      modeOn,
+      hotbar,
+      placeBtn,
+      placed,
+      beforeBreak,
+      afterBreak,
+      tex,
+      slots,
+      craft: st.craft,
+      ok,
+    },
     null,
     2,
   ),

@@ -66,6 +66,7 @@ type EcraftApi = {
   placeBlock?: () => void;
   selectBlock?: (i: number) => void;
   toggleFloorMode?: () => void;
+  cycleCraftView?: () => void;
   placeHouse?: () => void;
   getCraftPalette?: () => Array<{ name: string; color: string }>;
   layBed?: () => void;
@@ -557,6 +558,7 @@ export function installDomOverlay(): void {
       <button type="button" class="bld" id="btn-place">PLACE</button>
       <button type="button" class="brk" id="btn-break">BREAK</button>
       <button type="button" class="bld" id="btn-floor">FLOOR/STACK</button>
+      <button type="button" class="bld" id="btn-craft-view" style="background:#00695c">VIEW 3D</button>
       <button type="button" class="bld" id="btn-house-build" style="background:#6a1b9a">BUILD HOUSE</button>
       <button type="button" class="pan" id="btn-panther">PANTHER!</button>
       <button type="button" class="pan" id="btn-tigers" style="background:#e65100">TIGERS!</button>
@@ -739,6 +741,7 @@ export function installDomOverlay(): void {
   bindAction('btn-place', 'placeBlock', 'Placed block');
   bindAction('btn-break', 'breakBlock', 'Broke block');
   bindAction('btn-floor', 'toggleFloorMode', 'Floor/Stack');
+  bindAction('btn-craft-view', 'cycleCraftView', 'Craft view');
   bindAction('btn-house-build', 'placeHouse', 'Craft house built');
 
   const fillCraftUi = () => {
@@ -832,6 +835,7 @@ export function installDomOverlay(): void {
       localStorage.removeItem('ecraft_save_v02');
       localStorage.removeItem('ecraft_craft_blocks_v1');
       localStorage.removeItem('ecraft_craft_blocks_v2');
+      localStorage.removeItem('ecraft_craft_blocks_v3');
       localStorage.removeItem('ecraft_craft_houses_v1');
     } catch {
       /* ignore */

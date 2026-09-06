@@ -434,7 +434,21 @@ export class GameScene extends Phaser.Scene {
         const floor = this.craftBuild.toggleFloorMode();
         this.statusLine = floor
           ? 'Craft FLOOR mode — replace ground cell'
-          : 'Craft STACK mode — build upward';
+          : 'Craft STACK mode — build UP on top (Minecraft-like)';
+        setDomStatus(this.statusLine);
+      },
+      cycleCraftView: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.craftBuild.setMode(true);
+        const v = this.craftBuild.cycleView();
+        this.refreshBuildHotbar();
+        this.statusLine =
+          v === 'top'
+            ? 'Craft view: TOP-DOWN'
+            : v === 'iso'
+              ? 'Craft view: ISO ¾ (stack height visible)'
+              : 'Craft view: ISO rotated';
         setDomStatus(this.statusLine);
       },
       getCraftPalette: () =>
@@ -2017,6 +2031,7 @@ export class GameScene extends Phaser.Scene {
         count: this.craftBuild?.count?.() ?? 0,
         types: this.craftBuild?.blockCount?.() ?? 0,
         floor: this.craftBuild?.isFloorMode?.() ?? false,
+        view: this.craftBuild?.getViewMode?.() ?? 'iso',
         houses: this.craftHouses?.count?.() ?? 0,
         gold: this.craftHouses?.getGoldTotal?.() ?? 0,
         inCraftHouse: this.inCraftHouse,
@@ -2330,6 +2345,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private placeCraftBlock(): void {
+    // Prefer column in front of player (ignore stale pointer aim height)
+    this.craftBuild.clearPointerAim();
     const msg = this.craftBuild.place(this.player.x, this.player.y, this.facing, this.facingDir);
     this.statusLine = msg;
     setDomStatus(this.statusLine);
@@ -2359,7 +2376,8 @@ export class GameScene extends Phaser.Scene {
     });
     const count = document.getElementById('ecraft-hotbar-count');
     if (count) {
-      count.textContent = `${this.craftBuild.count()} blocks · ${this.craftBuild.isFloorMode() ? 'FLOOR' : 'STACK'}`;
+      const v = this.craftBuild.getViewMode().toUpperCase();
+      count.textContent = `${this.craftBuild.count()} · ${this.craftBuild.isFloorMode() ? 'FLOOR' : 'STACK↑'} · ${v}`;
     }
   }
 
@@ -2403,19 +2421,8 @@ export class GameScene extends Phaser.Scene {
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * speed, (vy / len) * speed);
 
-    // Clamp walking inside the house so you can stroll the rooms
-    if (this.flags.inHouse) {
-      this.player.x = Phaser.Math.Clamp(
-        this.player.x,
-        HOUSE_INTERIOR.x + 50,
-        HOUSE_INTERIOR.x + HOUSE_INTERIOR.w - 50,
-      );
-      this.player.y = Phaser.Math.Clamp(
-        this.player.y,
-        HOUSE_INTERIOR.y + 130,
-        HOUSE_INTERIOR.y + HOUSE_INTERIOR.h - 50,
-      );
-    }
+    // Keep the guy walking inside whatever room he's in
+    if (this.isIndoors()) this.clampIndoorWalk();
 
     // Always face the direction he walks (dominant axis)
     if (Math.abs(vx) >= Math.abs(vy)) {
@@ -3646,6 +3653,69 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  /**
+   * Put the player INSIDE the room: above furniture, camera follows, outdoor
+   * colliders off so he can walk and use E on fridge/rug/gold/etc.
+   */
+  private beginIndoorPresence(
+    spawnX: number,
+    spawnY: number,
+    bounds: { x: number; y: number; w: number; h: number },
+  ): void {
+    this.ensurePlayerOnFootSheet();
+    this.flags.inVehicle = false;
+    this.player.setVisible(true);
+    this.player.setActive(true);
+    this.player.setAlpha(1);
+    this.player.clearTint();
+    this.player.setDepth(55); // indoorLayer is depth 20 — must be ABOVE floor/furniture
+    this.player.setPosition(spawnX, spawnY);
+    const body = this.player.body as Phaser.Physics.Arcade.Body | undefined;
+    if (body) {
+      body.enable = true;
+      body.setVelocity(0, 0);
+      body.setAllowGravity(false);
+    }
+    // Pause outdoor building/craft solids so they don't block indoor walking
+    this.setOutdoorSolidsActive(false);
+    this.cameras.main.startFollow(this.player, true, 0.18, 0.18);
+    this.cameras.main.setBounds(bounds.x - 40, bounds.y - 40, bounds.w + 80, bounds.h + 80);
+    this.cameras.main.centerOn(spawnX, spawnY);
+  }
+
+  private endIndoorPresence(outdoorX: number, outdoorY: number): void {
+    this.player.setDepth(10);
+    this.player.setPosition(outdoorX, outdoorY);
+    this.setOutdoorSolidsActive(true);
+    this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+  }
+
+  private setOutdoorSolidsActive(active: boolean): void {
+    const toggle = (group?: Phaser.Physics.Arcade.StaticGroup) => {
+      if (!group) return;
+      for (const child of group.getChildren()) {
+        const img = child as Phaser.Physics.Arcade.Image;
+        const b = img.body as Phaser.Physics.Arcade.StaticBody | undefined;
+        if (b) b.enable = active;
+      }
+    };
+    toggle(this.buildingCollision?.getSolids?.());
+    toggle(this.craftBuild?.getSolids?.());
+  }
+
+  private clampIndoorWalk(): void {
+    let box: { x: number; y: number; w: number; h: number } | null = null;
+    if (this.flags.inHouse) box = HOUSE_INTERIOR;
+    else if (this.flags.inLair) box = LAIR;
+    else if (this.flags.inJailBuilding) box = JAIL_INTERIOR;
+    else if (this.civicId) box = CIVIC_INTERIOR;
+    else if (this.inCraftHouse) box = CRAFT_HOUSE_INTERIOR;
+    if (!box) return;
+    this.player.x = Phaser.Math.Clamp(this.player.x, box.x + 50, box.x + box.w - 50);
+    this.player.y = Phaser.Math.Clamp(this.player.y, box.y + 120, box.y + box.h - 50);
+  }
+
   /** Enter any catalog building by id (door anim for first entry). */
   private enterBuilding(id: string, skipDoorAnim = false): void {
     const b = getEnterable(id);
@@ -3689,10 +3759,8 @@ export class GameScene extends Phaser.Scene {
     this.sasquatch.setVisible(false);
     this.robot.setVisible(false);
     if (this.heldTracker) this.heldTracker.setVisible(false);
-    this.player.setPosition(CIVIC_INTERIOR.exitX + 100, CIVIC_INTERIOR.exitY + 100);
-    this.cameras.main.stopFollow();
-    this.cameras.main.centerOn(CIVIC_INTERIOR.x + CIVIC_INTERIOR.w / 2, CIVIC_INTERIOR.y + CIVIC_INTERIOR.h / 2);
-    this.statusLine = `Door opened — ${b.label}. Walk around · EXIT to leave.`;
+    this.beginIndoorPresence(CIVIC_INTERIOR.exitX + 120, CIVIC_INTERIOR.exitY + 120, CIVIC_INTERIOR);
+    this.statusLine = `You're inside ${b.label}. Walk around · E to use things · EXIT to leave.`;
     setDomStatus(this.statusLine);
   }
 
@@ -3727,13 +3795,12 @@ export class GameScene extends Phaser.Scene {
     this.sasquatch.setVisible(false);
     this.robot.setVisible(false);
     if (this.heldTracker) this.heldTracker.setVisible(false);
-    this.player.setPosition(CRAFT_HOUSE_INTERIOR.exitX + 100, CRAFT_HOUSE_INTERIOR.exitY + 100);
-    this.cameras.main.stopFollow();
-    this.cameras.main.centerOn(
-      CRAFT_HOUSE_INTERIOR.x + CRAFT_HOUSE_INTERIOR.w / 2,
-      CRAFT_HOUSE_INTERIOR.y + CRAFT_HOUSE_INTERIOR.h / 2,
+    this.beginIndoorPresence(
+      CRAFT_HOUSE_INTERIOR.exitX + 120,
+      CRAFT_HOUSE_INTERIOR.exitY + 120,
+      CRAFT_HOUSE_INTERIOR,
     );
-    this.statusLine = `${rec.name} — search rugs, cabinets, pictures, tables, fridges for secret gold!`;
+    this.statusLine = `${rec.name}: YOU are inside — walk to rug/cabinet/picture/table/fridge · E to search.`;
     setDomStatus(this.statusLine);
   }
 
@@ -3776,9 +3843,10 @@ export class GameScene extends Phaser.Scene {
       if (this.raceCar) this.raceCar.setVisible(true);
     }
     this.sasquatch.setVisible(!this.flags.sasquatchJailed);
-    if (rec) this.player.setPosition(rec.doorX, rec.doorY + 18);
-    else this.player.setPosition(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y);
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.endIndoorPresence(
+      rec ? rec.doorX : SPAWN.playerOutdoor.x,
+      rec ? rec.doorY + 18 : SPAWN.playerOutdoor.y,
+    );
     if (this.flags.hasTracker) this.equipTracker(true);
     if (this.flags.robotActive) {
       this.syncRobotBesidePlayer();
@@ -3864,9 +3932,10 @@ export class GameScene extends Phaser.Scene {
       if (this.raceCar) this.raceCar.setVisible(true);
     }
     this.sasquatch.setVisible(!this.flags.sasquatchJailed);
-    if (b) this.player.setPosition(b.doorX, b.doorY + 18);
-    else this.player.setPosition(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y);
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.endIndoorPresence(
+      b ? b.doorX : SPAWN.playerOutdoor.x,
+      b ? b.doorY + 18 : SPAWN.playerOutdoor.y,
+    );
     if (this.flags.hasTracker) this.equipTracker(true);
     if (this.flags.robotActive) {
       this.syncRobotBesidePlayer();
@@ -3920,11 +3989,9 @@ export class GameScene extends Phaser.Scene {
     this.sasquatch.setVisible(false);
     this.robot.setVisible(false);
     if (this.heldTracker) this.heldTracker.setVisible(false);
-    this.player.setPosition(LAIR.exitX + 80, LAIR.exitY + 80);
-    this.cameras.main.stopFollow();
-    this.cameras.main.centerOn(LAIR.x + LAIR.w / 2, LAIR.y + LAIR.h / 2);
+    this.beginIndoorPresence(LAIR.exitX + 100, LAIR.exitY + 100, LAIR);
     this.setPhase(MissionPhase.InUndergroundLair);
-    this.statusLine = 'Door opened — secret gadget lair. Grab the tracker!';
+    this.statusLine = "You're inside the lair — walk to the tracker · E to grab it!";
     setDomStatus(this.statusLine);
   }
 
@@ -3941,8 +4008,7 @@ export class GameScene extends Phaser.Scene {
       if (this.raceCar) this.raceCar.setVisible(true);
     }
     this.sasquatch.setVisible(!this.flags.sasquatchJailed);
-    this.player.setPosition(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y);
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.endIndoorPresence(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y);
     if (this.flags.hasTracker) this.equipTracker(true);
     if (this.flags.robotActive) {
       this.syncRobotBesidePlayer();
@@ -3979,9 +4045,7 @@ export class GameScene extends Phaser.Scene {
     if (this.raceCar) this.raceCar.setVisible(false);
     this.robot.setVisible(false);
     if (this.heldTracker) this.heldTracker.setVisible(false);
-    this.player.setPosition(JAIL_INTERIOR.exitX + 100, JAIL_INTERIOR.exitY + 100);
-    this.cameras.main.stopFollow();
-    this.cameras.main.centerOn(JAIL_INTERIOR.x + JAIL_INTERIOR.w / 2, JAIL_INTERIOR.y + JAIL_INTERIOR.h / 2);
+    this.beginIndoorPresence(JAIL_INTERIOR.exitX + 120, JAIL_INTERIOR.exitY + 120, JAIL_INTERIOR);
 
     // Visiting jailed Sasquatch — show him in the cell
     if (this.flags.sasquatchJailed) {
@@ -4082,10 +4146,8 @@ export class GameScene extends Phaser.Scene {
     this.sasquatch.setVisible(false);
     this.robot.setVisible(false);
     if (this.heldTracker) this.heldTracker.setVisible(false);
-    this.player.setPosition(HOUSE_INTERIOR.exitX + 100, HOUSE_INTERIOR.exitY + 100);
-    this.cameras.main.stopFollow();
-    this.cameras.main.centerOn(HOUSE_INTERIOR.x + HOUSE_INTERIOR.w / 2, HOUSE_INTERIOR.y + HOUSE_INTERIOR.h / 2);
-    this.statusLine = 'Door opened — welcome home! Walk to the bed and SLEEP.';
+    this.beginIndoorPresence(HOUSE_INTERIOR.exitX + 120, HOUSE_INTERIOR.exitY + 120, HOUSE_INTERIOR);
+    this.statusLine = "You're INSIDE your house — walk around · E at TV/kitchen/bed · SLEEP · EXIT.";
     setDomStatus(this.statusLine);
   }
 
@@ -4101,8 +4163,7 @@ export class GameScene extends Phaser.Scene {
       if (this.raceCar) this.raceCar.setVisible(true);
     }
     this.sasquatch.setVisible(!this.flags.sasquatchJailed);
-    this.player.setPosition(SPAWN.houseDoor.x, SPAWN.houseDoor.y);
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.endIndoorPresence(SPAWN.houseDoor.x, SPAWN.houseDoor.y);
     if (this.flags.hasTracker) this.equipTracker(true);
     if (this.flags.robotActive) {
       this.syncRobotBesidePlayer();
@@ -4170,11 +4231,10 @@ export class GameScene extends Phaser.Scene {
       if (this.raceCar) this.raceCar.setVisible(true);
     }
     const jailDoor = getEnterable('super_jail');
-    this.player.setPosition(
+    this.endIndoorPresence(
       jailDoor ? jailDoor.doorX : 800,
       jailDoor ? jailDoor.doorY + 18 : 420,
     );
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     if (this.flags.robotActive) {
       this.syncRobotBesidePlayer();
       this.robot.setVisible(true);

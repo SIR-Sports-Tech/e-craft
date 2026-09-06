@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.16.0 — 2026-09-06 — INSIDE BUILDINGS + HEIGHT STACK CRAFT
+
+### Fixed
+- **You are actually inside** houses / jail / HQ / civic / craft houses
+- Player drawn **above** furniture (was hidden under the floor)
+- Camera **follows** you indoors · outdoor wall colliders pause while inside
+- Walk + **E** on fridge / rug / cabinet / picture / table / gold works
+
+### Added
+- Craft Blocks **stack on top of each other** (height levels, support rule)
+- **VIEW 3D** cycles TOP / ISO / ISO-rotated (Minecraft-like viewing angles)
+- Column collapse when you dig the block underneath
+- Save `ecraft_craft_blocks_v3` with height
+
 ## 1.15.1 — 2026-09-06 — VULTR LIVE
 
 ### Deploy
