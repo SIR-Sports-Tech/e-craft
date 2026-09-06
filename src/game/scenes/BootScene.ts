@@ -1495,6 +1495,62 @@ export class BootScene extends Phaser.Scene {
       g.generateTexture('furn_kitchen', 108, 68);
       g.destroy();
     }
+    // Rug
+    {
+      const g = this.g();
+      g.fillStyle(0xb71c1c, 1);
+      g.fillRoundedRect(4, 8, 88, 52, 6);
+      g.fillStyle(0xffd54f, 1);
+      g.fillRoundedRect(14, 16, 68, 36, 4);
+      g.fillStyle(0xb71c1c, 1);
+      g.fillCircle(48, 34, 10);
+      g.generateTexture('furn_rug', 96, 68);
+      g.destroy();
+    }
+    // Cabinet
+    {
+      const g = this.g();
+      g.fillStyle(0x5d4037, 1);
+      g.fillRoundedRect(4, 4, 64, 80, 4);
+      g.fillStyle(0x8d6e63, 1);
+      g.fillRect(8, 10, 26, 68);
+      g.fillRect(38, 10, 26, 68);
+      g.fillStyle(0xffe082, 1);
+      g.fillCircle(30, 44, 3);
+      g.fillCircle(42, 44, 3);
+      g.generateTexture('furn_cabinet', 72, 88);
+      g.destroy();
+    }
+    // Refrigerator
+    {
+      const g = this.g();
+      g.fillStyle(0xeceff1, 1);
+      g.fillRoundedRect(4, 2, 52, 90, 5);
+      g.fillStyle(0xb0bec5, 1);
+      g.fillRect(8, 8, 44, 28);
+      g.fillRect(8, 42, 44, 44);
+      g.fillStyle(0x90a4ae, 1);
+      g.fillRect(46, 18, 4, 14);
+      g.fillRect(46, 58, 4, 18);
+      g.generateTexture('furn_fridge', 60, 96);
+      g.destroy();
+    }
+    // Gold bars pile
+    {
+      const g = this.g();
+      g.fillStyle(0x000000, 0.25);
+      g.fillEllipse(40, 52, 60, 14);
+      g.fillStyle(0xf9a825, 1);
+      g.fillRoundedRect(10, 28, 36, 14, 3);
+      g.fillRoundedRect(28, 20, 36, 14, 3);
+      g.fillRoundedRect(16, 12, 36, 14, 3);
+      g.fillStyle(0xffe082, 1);
+      g.fillRect(14, 30, 28, 4);
+      g.fillRect(32, 22, 28, 4);
+      g.fillRect(20, 14, 28, 4);
+      g.generateTexture('gold_pile', 80, 60);
+      g.destroy();
+    }
   }
 
   private makeTrailIcons(): void {

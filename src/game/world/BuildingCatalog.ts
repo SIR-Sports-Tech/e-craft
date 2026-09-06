@@ -11,6 +11,19 @@ export const CIVIC_INTERIOR = {
   exitY: 980,
 } as const;
 
+/** Craft-built house interiors (swap-in shell; same region as civic). */
+export const CRAFT_HOUSE_INTERIOR = {
+  id: 'craft_house_interior',
+  x: 200,
+  y: 900,
+  w: 700,
+  h: 480,
+  exitX: 280,
+  exitY: 980,
+  secretX: 780,
+  secretY: 1120,
+} as const;
+
 /** Hi-res facade textures are 512×448; door center sits 152px below image center. */
 export const BLDG_TEX = { w: 512, h: 448, doorLocalY: 152, doorTexW: 72 } as const;
 

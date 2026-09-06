@@ -58,4 +58,28 @@ export class BuildingCollisionSystem {
   count(): number {
     return this.solids.getLength();
   }
+
+  /** Dynamic footprint for player-built craft houses (door apron left open south). */
+  addCraftHouse(id: string, buildingX: number, buildingY: number, scale = 0.46): void {
+    this.removeCraftHouse(id);
+    const bw = BLDG_TEX.w * scale * 0.78;
+    const bh = BLDG_TEX.h * scale * 0.58;
+    const cx = buildingX;
+    const cy = buildingY - bh * 0.12;
+    const body = this.solids.create(cx, cy, undefined) as Phaser.Physics.Arcade.Image;
+    body.setVisible(false);
+    body.setActive(true);
+    body.setSize(bw, bh);
+    body.refreshBody();
+    (body as unknown as { buildingId?: string }).buildingId = id;
+  }
+
+  removeCraftHouse(id: string): void {
+    for (const child of this.solids.getChildren()) {
+      const img = child as Phaser.Physics.Arcade.Image & { buildingId?: string };
+      if (img.buildingId === id) {
+        this.solids.remove(img, true, true);
+      }
+    }
+  }
 }

@@ -19,6 +19,7 @@ import { PigDropSystem } from '../systems/PigDropSystem';
 import { PatrolCarsSystem } from '../systems/PatrolCarsSystem';
 import { CraftBuildSystem } from '../systems/CraftBuildSystem';
 import { BuildingCollisionSystem } from '../systems/BuildingCollisionSystem';
+import { CraftHouseSystem, type SecretKind } from '../systems/CraftHouseSystem';
 import { audio } from '../systems/AudioSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
@@ -38,6 +39,7 @@ import {
   BLDG_TEX,
   CIVIC_INTERIOR,
   CIVIC_THEMES,
+  CRAFT_HOUSE_INTERIOR,
   buildingSpriteScale,
   facadeDoorAnchor,
   getEnterable,
@@ -117,7 +119,16 @@ export class GameScene extends Phaser.Scene {
   private tvOn = false;
   private craftBuild!: CraftBuildSystem;
   private buildingCollision!: BuildingCollisionSystem;
+  private craftHouses!: CraftHouseSystem;
   private craftLayer!: Phaser.GameObjects.Container;
+  private craftHouseNodes: Phaser.GameObjects.GameObject[] = [];
+  private craftHouseTitle?: Phaser.GameObjects.Text;
+  private craftHouseTip?: Phaser.GameObjects.Text;
+  private craftSecretDoor?: Phaser.GameObjects.Text;
+  private craftGoldPile?: Phaser.GameObjects.Image;
+  private craftGoldLbl?: Phaser.GameObjects.Text;
+  private craftSecretProps: Partial<Record<SecretKind, Phaser.GameObjects.Image>> = {};
+  private inCraftHouse = false;
   private houseTv?: Phaser.GameObjects.Image;
   private houseTvScreen?: Phaser.GameObjects.Image;
   private houseKitchen?: Phaser.GameObjects.Image;
@@ -191,6 +202,7 @@ export class GameScene extends Phaser.Scene {
     this.buildIndoorJail();
     this.buildIndoorHouse();
     this.buildIndoorCivic();
+    this.buildIndoorCraftHouse();
 
     this.trail = new TrailSystem(this, this.trailLayer);
     this.objectiveMarker = new ObjectiveMarker(this);
@@ -291,6 +303,8 @@ export class GameScene extends Phaser.Scene {
     this.buildingCollision = new BuildingCollisionSystem(this);
     this.buildingCollision.build();
     this.buildingCollision.bindMover(this.player);
+    this.craftHouses = new CraftHouseSystem(this, this.worldLayer, this.buildingCollision);
+    this.craftHouses.load();
     // Patrol cars bounce off buildings + craft walls (no ghosting through)
     for (const car of this.patrolCars.getSprites()) {
       this.buildingCollision.bindMover(car);
@@ -517,13 +531,36 @@ export class GameScene extends Phaser.Scene {
           this.exitCivic();
           return;
         }
+        if (this.inCraftHouse) {
+          this.exitCraftHouse();
+          return;
+        }
         this.statusLine = 'Already outside.';
         setDomStatus(this.statusLine);
       },
       enterBuilding: (id: string) => {
         this.paused = false;
         this.mapOpen = false;
+        if (id.startsWith('craft_house_')) {
+          this.enterCraftHouse(id, true);
+          return;
+        }
         this.enterBuilding(id, true);
+      },
+      placeHouse: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.craftBuild.setMode(true);
+        this.refreshBuildHotbar();
+        if (this.isIndoors() || this.flags.inVehicle) {
+          this.statusLine = 'Go outside on foot to place a craft house.';
+          setDomStatus(this.statusLine);
+          return;
+        }
+        const msg = this.craftHouses.placeNear(this.player.x, this.player.y, this.facing, this.facingDir);
+        this.statusLine = msg;
+        setDomStatus(msg);
+        audio.success();
       },
       runAcceptanceStep: (step: string) => this.runAcceptanceStep(step),
       runFullAcceptance: async () => {
@@ -1784,6 +1821,107 @@ export class GameScene extends Phaser.Scene {
     this.civicTip?.setText(theme.tip);
   }
 
+  /** Interior shell for builder-placed craft houses (secrets + gold). */
+  private buildIndoorCraftHouse(): void {
+    this.craftHouseNodes = [];
+    const cx = CRAFT_HOUSE_INTERIOR.x + CRAFT_HOUSE_INTERIOR.w / 2;
+    const cy = CRAFT_HOUSE_INTERIOR.y + CRAFT_HOUSE_INTERIOR.h / 2;
+    const shell = this.add
+      .rectangle(cx, cy, CRAFT_HOUSE_INTERIOR.w + 24, CRAFT_HOUSE_INTERIOR.h + 24, 0x4e342e, 1)
+      .setStrokeStyle(6, 0xffd54f, 0.85)
+      .setVisible(false);
+    const floor = this.add
+      .tileSprite(cx, cy, CRAFT_HOUSE_INTERIOR.w, CRAFT_HOUSE_INTERIOR.h, 'floor_wood')
+      .setVisible(false);
+    const wall = this.add
+      .rectangle(cx, CRAFT_HOUSE_INTERIOR.y + 55, CRAFT_HOUSE_INTERIOR.w, 110, 0xfff8e1, 1)
+      .setStrokeStyle(2, 0xffcc80, 0.7)
+      .setVisible(false);
+    const title = this.add
+      .text(cx, CRAFT_HOUSE_INTERIOR.y + 28, '🏠 Craft House', {
+        fontSize: '18px',
+        color: '#e65100',
+        backgroundColor: '#fff3e0cc',
+        padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    this.craftHouseTitle = title;
+
+    const rug = this.add.image(CRAFT_HOUSE_INTERIOR.x + 220, CRAFT_HOUSE_INTERIOR.y + 300, 'furn_rug').setScale(1.1).setVisible(false);
+    const table = this.add.image(CRAFT_HOUSE_INTERIOR.x + 220, CRAFT_HOUSE_INTERIOR.y + 240, 'furn_table').setScale(1.05).setVisible(false);
+    const picture = this.add.image(CRAFT_HOUSE_INTERIOR.x + 400, CRAFT_HOUSE_INTERIOR.y + 150, 'furn_picture').setScale(1.4).setVisible(false);
+    const cabinet = this.add.image(CRAFT_HOUSE_INTERIOR.x + 520, CRAFT_HOUSE_INTERIOR.y + 230, 'furn_cabinet').setScale(1.05).setVisible(false);
+    const fridge = this.add.image(CRAFT_HOUSE_INTERIOR.x + 120, CRAFT_HOUSE_INTERIOR.y + 230, 'furn_fridge').setScale(1.05).setVisible(false);
+    this.craftSecretProps = { rug, table, picture, cabinet, fridge };
+
+    const tip = this.add
+      .text(cx, CRAFT_HOUSE_INTERIOR.y + CRAFT_HOUSE_INTERIOR.h - 36, 'Search for a secret… gold is hidden!', {
+        fontSize: '12px',
+        color: '#263238',
+        backgroundColor: '#fff9c4aa',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    this.craftHouseTip = tip;
+
+    const secretDoor = this.add
+      .text(CRAFT_HOUSE_INTERIOR.secretX, CRAFT_HOUSE_INTERIOR.secretY - 40, '', {
+        fontSize: '13px',
+        color: '#ffe082',
+        backgroundColor: '#00000099',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    this.craftSecretDoor = secretDoor;
+
+    const gold = this.add
+      .image(CRAFT_HOUSE_INTERIOR.secretX, CRAFT_HOUSE_INTERIOR.secretY + 20, 'gold_pile')
+      .setScale(1.2)
+      .setVisible(false);
+    this.craftGoldPile = gold;
+    const goldLbl = this.add
+      .text(CRAFT_HOUSE_INTERIOR.secretX, CRAFT_HOUSE_INTERIOR.secretY + 55, '[E] Take gold', {
+        fontSize: '12px',
+        color: '#ffd54f',
+        backgroundColor: '#00000099',
+        padding: { x: 5, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    this.craftGoldLbl = goldLbl;
+
+    const exit = this.add
+      .text(CRAFT_HOUSE_INTERIOR.exitX, CRAFT_HOUSE_INTERIOR.exitY - 8, '[E] Exit craft house', {
+        fontSize: '13px',
+        color: '#a5d6a7',
+        backgroundColor: '#00000088',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0, 0)
+      .setVisible(false);
+
+    this.pushIndoor(
+      this.craftHouseNodes,
+      shell,
+      floor,
+      wall,
+      title,
+      rug,
+      table,
+      picture,
+      cabinet,
+      fridge,
+      tip,
+      secretDoor,
+      gold,
+      goldLbl,
+      exit,
+    );
+  }
+
   // —— Public API for UIScene ——
   getHud() {
     const advanced = [
@@ -1879,6 +2017,10 @@ export class GameScene extends Phaser.Scene {
         count: this.craftBuild?.count?.() ?? 0,
         types: this.craftBuild?.blockCount?.() ?? 0,
         floor: this.craftBuild?.isFloorMode?.() ?? false,
+        houses: this.craftHouses?.count?.() ?? 0,
+        gold: this.craftHouses?.getGoldTotal?.() ?? 0,
+        inCraftHouse: this.inCraftHouse,
+        activeHouse: this.craftHouses?.activeHouseId ?? null,
       },
     };
   }
@@ -2808,6 +2950,29 @@ export class GameScene extends Phaser.Scene {
   }
 
   private describeInteract(): string | null {
+    if (this.inCraftHouse) {
+      if (this.craftBuild?.isMode()) {
+        return `[E] Place ${this.craftBuild.selectedName()} · BREAK removes`;
+      }
+      const rec = this.craftHouses.list().find((h) => h.id === this.craftHouses.activeHouseId);
+      if (rec?.secretFound && !rec.goldCollected && this.craftGoldPile && this.near(this.craftGoldPile.x, this.craftGoldPile.y, 70)) {
+        return '[E] Take gold';
+      }
+      for (const kind of ['rug', 'cabinet', 'picture', 'table', 'fridge'] as SecretKind[]) {
+        const img = this.craftSecretProps[kind];
+        if (img && this.near(img.x, img.y, 70)) {
+          if (kind === 'rug') return '[E] Check under the rug';
+          if (kind === 'cabinet') return '[E] Search behind the cabinet';
+          if (kind === 'picture') return '[E] Look behind the picture';
+          if (kind === 'table') return '[E] Look under the table';
+          return '[E] Open the refrigerator';
+        }
+      }
+      if (this.near(CRAFT_HOUSE_INTERIOR.exitX + 40, CRAFT_HOUSE_INTERIOR.exitY + 40, 110)) {
+        return '[E] Exit craft house';
+      }
+      return 'Search for the secret gold room…';
+    }
     if (this.civicId) {
       if (this.craftBuild?.isMode()) {
         return `[E] Place ${this.craftBuild.selectedName()} · BREAK removes`;
@@ -2864,6 +3029,8 @@ export class GameScene extends Phaser.Scene {
     }
     const nearCop = this.patrolCars?.nearestCar?.(this.player.x, this.player.y, 100);
     if (nearCop) return '[E] Hop in POLICE CAR';
+    const nearCraft = this.craftHouses?.nearest(this.player.x, this.player.y, 95);
+    if (nearCraft) return `[E] Enter ${nearCraft.name}`;
     const nearBldg = this.findNearbyEnterable(95);
     if (nearBldg) {
       if (nearBldg.id === 'super_jail' && this.flags.sasquatchJailed) return '[E] Visit Sasquatch in jail';
@@ -2905,6 +3072,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tryInteract(): void {
+    if (this.inCraftHouse) {
+      if (this.craftBuild?.isMode()) {
+        this.placeCraftBlock();
+        return;
+      }
+      if (this.tryCraftHouseSecret()) return;
+      if (this.near(CRAFT_HOUSE_INTERIOR.exitX + 40, CRAFT_HOUSE_INTERIOR.exitY + 40, 110)) {
+        this.exitCraftHouse();
+        return;
+      }
+      this.statusLine = 'Search furniture for secrets · EXIT to leave';
+      setDomStatus(this.statusLine);
+      return;
+    }
+
     if (this.civicId) {
       if (this.craftBuild?.isMode()) {
         this.placeCraftBlock();
@@ -3011,6 +3193,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     const hq = CITY_ZONES.find((z) => z.id === 'security_hq')!;
+
+    // Craft-built house door
+    const nearCraft = this.craftHouses?.nearest(this.player.x, this.player.y, 95);
+    if (nearCraft && !this.flags.inVehicle) {
+      this.enterCraftHouse(nearCraft.id);
+      return;
+    }
 
     // Any building door / front works — go inside
     const nearBldg = this.findNearbyEnterable(95);
@@ -3241,6 +3430,7 @@ export class GameScene extends Phaser.Scene {
     if (this.flags.inLair) this.exitLair();
     if (this.flags.inJailBuilding) this.exitJail();
     if (this.civicId) this.exitCivic();
+    if (this.inCraftHouse) this.exitCraftHouse();
   }
 
   /** One-tap car — no robot required. Prefers nearby AI police cruiser if close. */
@@ -3427,7 +3617,7 @@ export class GameScene extends Phaser.Scene {
     this.persistSave();
   }
 
-  private showIndoor(kind: 'lair' | 'jail' | 'house' | 'civic'): void {
+  private showIndoor(kind: 'lair' | 'jail' | 'house' | 'civic' | 'craftHouse'): void {
     this.indoorLayer.setVisible(true);
     this.lairNodes.forEach((n) =>
       (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(kind === 'lair'),
@@ -3441,10 +3631,19 @@ export class GameScene extends Phaser.Scene {
     this.civicNodes.forEach((n) =>
       (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(kind === 'civic'),
     );
+    this.craftHouseNodes.forEach((n) =>
+      (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(kind === 'craftHouse'),
+    );
   }
 
   private isIndoors(): boolean {
-    return this.flags.inLair || this.flags.inJailBuilding || this.flags.inHouse || this.civicId != null;
+    return (
+      this.flags.inLair ||
+      this.flags.inJailBuilding ||
+      this.flags.inHouse ||
+      this.civicId != null ||
+      this.inCraftHouse
+    );
   }
 
   /** Enter any catalog building by id (door anim for first entry). */
@@ -3472,6 +3671,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.leaveOtherIndoorsExceptCivic();
+    this.inCraftHouse = false;
+    this.craftHouses.activeHouseId = null;
     this.civicId = b.id;
     this.flags.inHouse = false;
     this.flags.inLair = false;
@@ -3493,6 +3694,146 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.centerOn(CIVIC_INTERIOR.x + CIVIC_INTERIOR.w / 2, CIVIC_INTERIOR.y + CIVIC_INTERIOR.h / 2);
     this.statusLine = `Door opened — ${b.label}. Walk around · EXIT to leave.`;
     setDomStatus(this.statusLine);
+  }
+
+  private enterCraftHouse(houseId: string, skipDoorAnim = false): void {
+    const live = this.craftHouses.getById(houseId);
+    const rec = this.craftHouses.list().find((x) => x.id === houseId);
+    if (!rec || !live) return;
+    if (!skipDoorAnim) {
+      this.outdoorDoors[houseId] = live.door;
+      this.doorRest[houseId] = { x: 0, y: live.door.y, scale: live.door.scaleX, localY: live.door.y };
+      this.openDoorThen(houseId, () => this.enterCraftHouse(houseId, true));
+      return;
+    }
+    this.leaveIndoorsIfNeeded();
+    this.inCraftHouse = true;
+    this.craftHouses.activeHouseId = houseId;
+    this.craftHouses.secretRoomOpen = rec.secretFound;
+    this.flags.inHouse = false;
+    this.flags.inLair = false;
+    this.flags.inJailBuilding = false;
+    this.civicId = null;
+    this.flags.inVehicle = false;
+    this.ensurePlayerOnFootSheet();
+    this.updatePlayerAnim(false);
+    this.craftHouseTitle?.setText(`🏠 ${rec.name}`);
+    this.refreshCraftHouseSecretUi(rec.secret, rec.secretFound, rec.goldCollected);
+    this.showIndoor('craftHouse');
+    this.worldLayer.setVisible(false);
+    this.trailLayer.setVisible(false);
+    this.vehicle.setVisible(false);
+    if (this.raceCar) this.raceCar.setVisible(false);
+    this.sasquatch.setVisible(false);
+    this.robot.setVisible(false);
+    if (this.heldTracker) this.heldTracker.setVisible(false);
+    this.player.setPosition(CRAFT_HOUSE_INTERIOR.exitX + 100, CRAFT_HOUSE_INTERIOR.exitY + 100);
+    this.cameras.main.stopFollow();
+    this.cameras.main.centerOn(
+      CRAFT_HOUSE_INTERIOR.x + CRAFT_HOUSE_INTERIOR.w / 2,
+      CRAFT_HOUSE_INTERIOR.y + CRAFT_HOUSE_INTERIOR.h / 2,
+    );
+    this.statusLine = `${rec.name} — search rugs, cabinets, pictures, tables, fridges for secret gold!`;
+    setDomStatus(this.statusLine);
+  }
+
+  private refreshCraftHouseSecretUi(secret: SecretKind, found: boolean, goldTaken: boolean): void {
+    this.craftHouseTip?.setText(
+      found
+        ? goldTaken
+          ? 'Secret cleared — gold already collected. EXIT to leave.'
+          : 'Secret room open! Walk to the gold pile · [E] Take gold'
+        : 'Secret gold is hidden — try the rug, cabinet, picture, table, or fridge [E]',
+    );
+    this.craftSecretDoor?.setText(found ? '🗝️ Secret room' : '');
+    this.craftSecretDoor?.setVisible(found);
+    this.craftGoldPile?.setVisible(found && !goldTaken);
+    this.craftGoldLbl?.setVisible(found && !goldTaken);
+    // Soft highlight on the real secret prop
+    (Object.keys(this.craftSecretProps) as SecretKind[]).forEach((k) => {
+      const img = this.craftSecretProps[k];
+      if (!img) return;
+      img.setTint(found && k === secret ? 0xffffff : 0xffffff);
+      img.setAlpha(1);
+      if (!found && k === secret) {
+        // subtle pulse cue only after a few failed searches would be nicer; keep fair
+      }
+    });
+  }
+
+  private exitCraftHouse(): void {
+    const id = this.craftHouses.activeHouseId;
+    const rec = id ? this.craftHouses.list().find((h) => h.id === id) : undefined;
+    this.inCraftHouse = false;
+    this.craftHouses.activeHouseId = null;
+    this.craftHouses.secretRoomOpen = false;
+    this.indoorLayer.setVisible(false);
+    this.craftHouseNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
+    this.worldLayer.setVisible(true);
+    this.trailLayer.setVisible(true);
+    if (!this.flags.inVehicle) {
+      this.vehicle.setVisible(true);
+      if (this.raceCar) this.raceCar.setVisible(true);
+    }
+    this.sasquatch.setVisible(!this.flags.sasquatchJailed);
+    if (rec) this.player.setPosition(rec.doorX, rec.doorY + 18);
+    else this.player.setPosition(SPAWN.playerOutdoor.x, SPAWN.playerOutdoor.y);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    if (this.flags.hasTracker) this.equipTracker(true);
+    if (this.flags.robotActive) {
+      this.syncRobotBesidePlayer();
+      this.robot.setVisible(true);
+    }
+    this.statusLine = rec ? `Left ${rec.name}.` : 'Back outside.';
+    setDomStatus(this.statusLine);
+  }
+
+  private tryCraftHouseSecret(): boolean {
+    if (!this.inCraftHouse || !this.craftHouses.activeHouseId) return false;
+    const rec = this.craftHouses.list().find((h) => h.id === this.craftHouses.activeHouseId);
+    if (!rec) return false;
+
+    // Collect gold if secret open
+    if (rec.secretFound && !rec.goldCollected && this.craftGoldPile) {
+      if (this.near(this.craftGoldPile.x, this.craftGoldPile.y, 70)) {
+        const msg = this.craftHouses.collectGold(rec.id);
+        this.refreshCraftHouseSecretUi(rec.secret, true, true);
+        this.statusLine = msg;
+        setDomStatus(msg);
+        audio.success();
+        return true;
+      }
+    }
+
+    // Probe furniture
+    const checks: Array<{ kind: SecretKind; img?: Phaser.GameObjects.Image; hint: string }> = [
+      { kind: 'rug', img: this.craftSecretProps.rug, hint: 'You lift the rug…' },
+      { kind: 'cabinet', img: this.craftSecretProps.cabinet, hint: 'You check behind the cabinet…' },
+      { kind: 'picture', img: this.craftSecretProps.picture, hint: 'You peek behind the picture…' },
+      { kind: 'table', img: this.craftSecretProps.table, hint: 'You look under the table…' },
+      { kind: 'fridge', img: this.craftSecretProps.fridge, hint: 'You open the refrigerator…' },
+    ];
+    for (const c of checks) {
+      if (!c.img || !this.near(c.img.x, c.img.y, 70)) continue;
+      if (rec.secretFound) {
+        this.statusLine = `Already found — it was the ${this.craftHouses.secretLabel(rec.secret)}.`;
+        setDomStatus(this.statusLine);
+        return true;
+      }
+      if (c.kind === rec.secret) {
+        this.craftHouses.markSecretFound(rec.id);
+        this.refreshCraftHouseSecretUi(rec.secret, true, false);
+        this.statusLine = `🗝️ Secret room! Hidden in the ${this.craftHouses.secretLabel(c.kind)}. Gold is inside!`;
+        setDomStatus(this.statusLine);
+        audio.success();
+        return true;
+      }
+      this.statusLine = `${c.hint} nothing but dust.`;
+      setDomStatus(this.statusLine);
+      audio.talk();
+      return true;
+    }
+    return false;
   }
 
   private leaveOtherIndoorsExceptCivic(): void {
@@ -3569,6 +3910,8 @@ export class GameScene extends Phaser.Scene {
     this.flags.inHouse = false;
     this.flags.inJailBuilding = false;
     this.civicId = null;
+    this.inCraftHouse = false;
+    this.craftHouses.activeHouseId = null;
     this.showIndoor('lair');
     this.worldLayer.setVisible(false);
     this.trailLayer.setVisible(false);
@@ -3624,6 +3967,8 @@ export class GameScene extends Phaser.Scene {
     this.flags.inHouse = false;
     this.flags.inLair = false;
     this.civicId = null;
+    this.inCraftHouse = false;
+    this.craftHouses.activeHouseId = null;
     this.flags.inVehicle = false;
     this.ensurePlayerOnFootSheet();
     this.updatePlayerAnim(false);
@@ -3724,6 +4069,8 @@ export class GameScene extends Phaser.Scene {
     this.flags.inLair = false;
     this.flags.inJailBuilding = false;
     this.civicId = null;
+    this.inCraftHouse = false;
+    this.craftHouses.activeHouseId = null;
     this.flags.inVehicle = false;
     this.ensurePlayerOnFootSheet();
     this.updatePlayerAnim(false);

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.15.0 — 2026-09-06 — CRAFT HOUSES + SECRET GOLD
+
+### Added
+- **BUILD HOUSE** — place walk-in craft houses from Builder (solid walls + door)
+- Each house has a **secret gold room** randomized behind:
+  rug · cabinet · picture · table · refrigerator
+- Search with **E**, open secret, collect gold bars (vault count)
+- Houses persist (`ecraft_craft_houses_v1`)
+
 ## 1.14.0 — 2026-09-05 — SOLID WALLS + CRAFT BUILDER EXPANSION
 
 ### Added
