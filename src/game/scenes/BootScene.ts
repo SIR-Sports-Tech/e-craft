@@ -26,6 +26,7 @@ export class BootScene extends Phaser.Scene {
     this.makeTree();
     this.makeCitizen();
     this.makePanther();
+    this.makeTiger();
     this.makePig();
     this.makeBloodPool();
     generateHiResBuildings(this);
@@ -1071,6 +1072,102 @@ export class BootScene extends Phaser.Scene {
       key: 'panther-run',
       frames: this.anims.generateFrameNumbers('panther_sheet', { start: 0, end: 3 }),
       frameRate: 12,
+      repeat: -1,
+    });
+  }
+
+  /** Orange jungle tiger pack — striped run sheet (original art). */
+  private makeTiger(): void {
+    const fw = 72;
+    const fh = 48;
+    const frames = 4;
+    const sheet = this.make.graphics({ x: 0, y: 0 });
+
+    const drawFrame = (g: Phaser.GameObjects.Graphics, ox: number, frame: number) => {
+      const stretch = frame % 2 === 0 ? 0 : 4;
+      const leg = (frame % 2 === 0 ? -1 : 1) * 5;
+      const bob = frame % 2 === 0 ? 0 : -2;
+
+      g.fillStyle(0x000000, 0.28);
+      g.fillEllipse(ox + 36, fh - 4, 42 + stretch, 8);
+
+      // orange body
+      g.fillStyle(0xf57c00, 1);
+      g.fillEllipse(ox + 34, 26 + bob, 46 + stretch, 20);
+      g.fillStyle(0xef6c00, 1);
+      g.fillEllipse(ox + 22, 24 + bob, 18, 16);
+      g.fillEllipse(ox + 48, 26 + bob, 16, 14);
+
+      // black stripes
+      g.fillStyle(0x212121, 1);
+      g.fillRect(ox + 18, 20 + bob, 4, 14);
+      g.fillRect(ox + 28, 18 + bob, 3, 16);
+      g.fillRect(ox + 38, 20 + bob, 4, 14);
+      g.fillRect(ox + 48, 19 + bob, 3, 15);
+
+      // cream belly
+      g.fillStyle(0xffe0b2, 0.85);
+      g.fillEllipse(ox + 34, 32 + bob, 28, 10);
+
+      // head
+      g.fillStyle(0xfb8c00, 1);
+      g.fillCircle(ox + 58 + stretch * 0.3, 18 + bob, 12);
+      g.fillStyle(0x212121, 1);
+      g.fillTriangle(ox + 52, 8 + bob, ox + 56, 16 + bob, ox + 48, 14 + bob);
+      g.fillTriangle(ox + 64, 8 + bob, ox + 68, 16 + bob, ox + 60, 14 + bob);
+      // white ear tips
+      g.fillStyle(0xfff3e0, 1);
+      g.fillCircle(ox + 52, 10 + bob, 2);
+      g.fillCircle(ox + 64, 10 + bob, 2);
+      // eyes
+      g.fillStyle(0xffeb3b, 1);
+      g.fillEllipse(ox + 56, 17 + bob, 5, 3.5);
+      g.fillEllipse(ox + 63, 17 + bob, 5, 3.5);
+      g.fillStyle(0x000000, 1);
+      g.fillRect(ox + 55, 16 + bob, 2, 3);
+      g.fillRect(ox + 62, 16 + bob, 2, 3);
+      g.fillStyle(0x3e2723, 1);
+      g.fillCircle(ox + 68, 20 + bob, 2);
+
+      // legs
+      g.fillStyle(0xef6c00, 1);
+      g.fillRoundedRect(ox + 18 + leg, 32 + bob, 7, 12, 2);
+      g.fillRoundedRect(ox + 28 - leg, 32 + bob, 7, 12, 2);
+      g.fillRoundedRect(ox + 40 + leg * 0.6, 33 + bob, 7, 11, 2);
+      g.fillRoundedRect(ox + 50 - leg * 0.6, 33 + bob, 7, 11, 2);
+      g.fillStyle(0x212121, 1);
+      g.fillEllipse(ox + 21 + leg, 44 + bob, 9, 4);
+      g.fillEllipse(ox + 31 - leg, 44 + bob, 9, 4);
+      g.fillEllipse(ox + 43 + leg * 0.6, 44 + bob, 9, 4);
+      g.fillEllipse(ox + 53 - leg * 0.6, 44 + bob, 9, 4);
+
+      // striped tail
+      g.lineStyle(4, 0xf57c00, 1);
+      g.beginPath();
+      g.moveTo(ox + 12, 24 + bob);
+      g.lineTo(ox + 4, 16 + bob - stretch * 0.5);
+      g.lineTo(ox + 2, 10 + bob);
+      g.strokePath();
+      g.fillStyle(0x212121, 1);
+      g.fillCircle(ox + 2, 9 + bob, 3.5);
+    };
+
+    for (let i = 0; i < frames; i++) drawFrame(sheet, i * fw, i);
+    sheet.generateTexture('tiger_sheet_img', fw * frames, fh);
+    sheet.destroy();
+
+    const srcImg = this.textures.get('tiger_sheet_img').getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    if (this.textures.exists('tiger_sheet')) this.textures.remove('tiger_sheet');
+    this.textures.addSpriteSheet('tiger_sheet', srcImg as HTMLImageElement, {
+      frameWidth: fw,
+      frameHeight: fh,
+    });
+
+    if (this.anims.exists('tiger-run')) this.anims.remove('tiger-run');
+    this.anims.create({
+      key: 'tiger-run',
+      frames: this.anims.generateFrameNumbers('tiger_sheet', { start: 0, end: 3 }),
+      frameRate: 14,
       repeat: -1,
     });
   }

@@ -67,6 +67,7 @@ type EcraftApi = {
   selectBlock?: (i: number) => void;
   layBed?: () => void;
   pantherJump?: () => void;
+  tigerAmbush?: () => void;
   pigDrop?: () => void;
   exitIndoor?: () => void;
   unpause?: () => void;
@@ -529,6 +530,7 @@ export function installDomOverlay(): void {
       <button type="button" class="bld" id="btn-place">PLACE</button>
       <button type="button" class="brk" id="btn-break">BREAK</button>
       <button type="button" class="pan" id="btn-panther">PANTHER!</button>
+      <button type="button" class="pan" id="btn-tigers" style="background:#e65100">TIGERS!</button>
       <button type="button" class="pig" id="btn-pig">PIG!</button>
       <button type="button" class="rec wide" id="btn-recover">UNFREEZE / SAVE</button>
       <button type="button" class="rst wide" id="btn-restart">RESTART</button>
@@ -732,6 +734,7 @@ export function installDomOverlay(): void {
     callApi('placeBlock', 'Placed block');
   });
   bindAction('btn-panther', 'pantherJump', 'Panther!');
+  bindAction('btn-tigers', 'tigerAmbush', 'Tigers!');
   bindAction('btn-pig', 'pigDrop', 'Oink!');
   bindAction('btn-car', 'enterCar', 'Patrol Car');
   bindAction('btn-race', 'enterRaceCar', 'Race Car');

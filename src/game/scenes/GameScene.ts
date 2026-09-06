@@ -14,6 +14,7 @@ import { InventorySystem } from '../systems/InventorySystem';
 import { MysterySystem } from '../systems/MysterySystem';
 import { PoliceSystem } from '../systems/PoliceSystem';
 import { PantherSystem } from '../systems/PantherSystem';
+import { TigerPackSystem } from '../systems/TigerPackSystem';
 import { PigDropSystem } from '../systems/PigDropSystem';
 import { PatrolCarsSystem } from '../systems/PatrolCarsSystem';
 import { CraftBuildSystem } from '../systems/CraftBuildSystem';
@@ -145,6 +146,7 @@ export class GameScene extends Phaser.Scene {
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
   private dayNight!: DayNightSystem;
   private panther!: PantherSystem;
+  private tigers!: TigerPackSystem;
   private pigDrop!: PigDropSystem;
   private patrolCars!: PatrolCarsSystem;
   private jobs = new JobSystem();
@@ -274,6 +276,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.dayNight = new DayNightSystem(this, WORLD.width, WORLD.height);
     this.panther = new PantherSystem(this);
+    this.tigers = new TigerPackSystem(this);
     this.pigDrop = new PigDropSystem(this);
     this.patrolCars = new PatrolCarsSystem(this);
     this.patrolCars.spawn();
@@ -423,6 +426,25 @@ export class GameScene extends Phaser.Scene {
           return;
         }
         this.panther.forceJump(this.player, (msg) => {
+          this.statusLine = msg;
+          setDomStatus(msg);
+          audio.talk();
+        });
+      },
+      tigerAmbush: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        if (this.isIndoors()) {
+          this.statusLine = 'Go outside near the jungle for tigers!';
+          setDomStatus(this.statusLine);
+          return;
+        }
+        // Place player near jungle edge so the pack reads clearly
+        const forest = CITY_ZONES.find((z) => z.id === 'forest')!;
+        if (this.player.x < forest.x - 80) {
+          this.player.setPosition(forest.x - 60, Phaser.Math.Clamp(this.player.y, forest.y + 200, forest.y + 900));
+        }
+        this.tigers.forceAmbush(this.player, (msg) => {
           this.statusLine = msg;
           setDomStatus(msg);
           audio.talk();
@@ -1793,6 +1815,8 @@ export class GameScene extends Phaser.Scene {
       flipX: !!this.player?.flipX,
       playerSheet: this.player?.texture?.key ?? null,
       pantherActive: this.panther?.isActive?.() ?? false,
+      tigersActive: this.tigers?.isActive?.() ?? false,
+      tigerCount: this.tigers?.countVisible?.() ?? 0,
       sunVisible: this.dayNight?.phase?.() !== 'night',
       policeCars: this.patrolCars?.count?.() ?? 0,
       policeCarPositions: this.patrolCars?.snapshots?.() ?? [],
@@ -1914,6 +1938,11 @@ export class GameScene extends Phaser.Scene {
         if (hit) this.flattenByPolice(hit.carX, hit.carY);
       }
       this.panther.update(d, this.player, outdoors, (msg) => {
+        this.statusLine = msg;
+        setDomStatus(msg);
+        audio.talk();
+      });
+      this.tigers.update(d, this.player, outdoors, (msg) => {
         this.statusLine = msg;
         setDomStatus(msg);
         audio.talk();

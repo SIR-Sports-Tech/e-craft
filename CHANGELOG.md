@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.13.0 — 2026-09-05 — JUNGLE TIGER PACK
+
+### Added
+- **10 tigers** burst from the jungle when you get too close to the forest edge
+- They **chase you toward the city**, then **run back into the jungle**
+- Orange striped tiger sprites + **TIGERS!** debug button
+- Cooldown between ambushes
+
 ## 1.12.1 — 2026-09-05 — NO MISSION COMPLETE SIGN
 
 ### Fixed
