@@ -12,9 +12,10 @@ await page.waitForFunction(() => !!window.__ecraft?.getState);
 
 const idle = await page.evaluate(() => window.__ecraft.getState());
 if (!idle.onFoot) throw new Error('player not on foot sheet at start');
-if (idle.playerAnim !== 'player-idle') throw new Error('expected idle anim, got ' + idle.playerAnim);
+if (!String(idle.playerAnim || '').includes('idle')) {
+  throw new Error('expected idle anim, got ' + idle.playerAnim);
+}
 
-// Hold right on D-pad — should switch to walk
 await page.locator('#ecraft-pad [data-dir="right"]').dispatchEvent('pointerdown');
 await page.waitForTimeout(450);
 const walking = await page.evaluate(() => window.__ecraft.getState());
@@ -24,9 +25,10 @@ const stopped = await page.evaluate(() => window.__ecraft.getState());
 
 const ok =
   errs.length === 0 &&
-  walking.playerAnim === 'player-walk' &&
+  String(walking.playerAnim || '').includes('walk') &&
   walking.onFoot === true &&
-  stopped.playerAnim === 'player-idle';
+  walking.facingDir === 'right' &&
+  String(stopped.playerAnim || '').includes('idle');
 
 console.log(
   JSON.stringify(
@@ -34,6 +36,7 @@ console.log(
       errs: errs.slice(0, 5),
       idle: idle.playerAnim,
       walking: walking.playerAnim,
+      facingDir: walking.facingDir,
       stopped: stopped.playerAnim,
       onFoot: walking.onFoot,
       ok,
