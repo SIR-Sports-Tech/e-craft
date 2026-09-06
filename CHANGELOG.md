@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.16.1 — 2026-09-06 — SASQUATCH ROPE DRAG
+
+### Fixed
+- After capture, Sasquatch stays **prone on the ground** and is **dragged with you**
+- **Rope** from your hand to a loop around his neck
+- Drag him to SUPER JAIL (or still optional GET IN CAR)
+
 ## 1.16.0 — 2026-09-06 — INSIDE BUILDINGS + HEIGHT STACK CRAFT
 
 ### Fixed

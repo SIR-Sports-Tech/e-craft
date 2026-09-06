@@ -137,6 +137,10 @@ export class GameScene extends Phaser.Scene {
   private cookedMeal = false;
   /** Close to Sasquatch → Siren Head horror form. */
   private sasquatchSirenMode = false;
+  /** After capture: prone on ground, rope around neck, dragged to jail. */
+  private sasquatchDragging = false;
+  private sasquatchDragAngle = 90;
+  private ropeGfx?: Phaser.GameObjects.Graphics;
   /** Flattened by a police car — can't move until recovered. */
   private flattened = false;
   private flattenInvuln = 0;
@@ -1993,6 +1997,8 @@ export class GameScene extends Phaser.Scene {
       pantherActive: this.panther?.isActive?.() ?? false,
       tigersActive: this.tigers?.isActive?.() ?? false,
       tigerCount: this.tigers?.countVisible?.() ?? 0,
+      sasquatchDragging: this.sasquatchDragging,
+      sasquatchAngle: this.sasquatch?.angle ?? 0,
       sunVisible: this.dayNight?.phase?.() !== 'night',
       policeCars: this.patrolCars?.count?.() ?? 0,
       policeCarPositions: this.patrolCars?.snapshots?.() ?? [],
@@ -2456,7 +2462,7 @@ export class GameScene extends Phaser.Scene {
       this.updatePlayerAnim(true);
     }
 
-    if (this.flags.sasquatchInVehicle && this.flags.inVehicle) {
+    if (this.flags.sasquatchInVehicle && this.flags.inVehicle && !this.sasquatchDragging) {
       this.sasquatch.setPosition(this.player.x - 28, this.player.y);
       this.sasquatch.setVisible(true).setAlpha(0.85);
     }
@@ -2731,25 +2737,37 @@ export class GameScene extends Phaser.Scene {
   private updateSasquatch(delta: number): void {
     if (this.flags.sasquatchJailed) {
       this.sasquatch.setVisible(false);
+      this.clearRope();
+      this.sasquatchDragging = false;
       return;
     }
     if (this.flags.sasquatchCaptured) {
-      if (this.flags.sasquatchInVehicle && this.flags.inVehicle) {
-        this.sasquatch.setPosition(this.player.x - 28, this.player.y);
+      // In a car: haul him in the trunk/seat (not rope-drag)
+      if (this.flags.inVehicle && this.flags.sasquatchInVehicle && !this.isIndoors()) {
+        this.clearRope();
+        this.sasquatchDragging = false;
+        this.sasquatch.setVisible(true).setAlpha(0.9);
+        this.sasquatch.setAngle(this.sasquatchDragAngle);
+        this.sasquatch.anims.stop();
+        this.sasquatch.setPosition(this.player.x - 28, this.player.y + 10);
         this.sasquatch.setVelocity(0);
         return;
       }
-      if (this.flags.sasquatchInVehicle && !this.flags.inVehicle) {
-        // On foot with "loaded" cargo — keep beside player for jail walk-in
-        this.physics.moveTo(this.sasquatch, this.player.x + 36, this.player.y + 8, 160);
-        this.updateSasquatchAnim();
+      // Default after capture: ROPE DRAG on the ground behind the player
+      if (!this.isIndoors()) {
+        this.sasquatchDragging = true;
+        this.updateSasquatchRopeDrag(delta);
         return;
       }
-      // Follow player to the vehicle
-      this.physics.moveTo(this.sasquatch, this.player.x + 40, this.player.y + 10, 140);
-      this.updateSasquatchAnim();
+      // Player went indoors without him — leave him outside at last spot, rope off
+      this.clearRope();
+      this.sasquatch.setVisible(true);
+      this.sasquatch.setAngle(this.sasquatchDragAngle);
+      this.sasquatch.setVelocity(0);
       return;
     }
+    this.clearRope();
+    this.sasquatchDragging = false;
 
     // Wander in forest
     const forest = CITY_ZONES.find((z) => z.id === 'forest')!;
@@ -3506,7 +3524,7 @@ export class GameScene extends Phaser.Scene {
   private tryCapture(): void {
     setDomStatus('CAPTURE pressed…');
     if (this.flags.sasquatchCaptured || this.flags.sasquatchJailed) {
-      setDomStatus('Already DOWN — tap GET IN CAR!');
+      setDomStatus('Already DOWN — drag him by the rope to SUPER JAIL!');
       return;
     }
     if (!this.flags.hasTracker) {
@@ -3617,11 +3635,109 @@ export class GameScene extends Phaser.Scene {
 
     this.setPhase(MissionPhase.FoundSasquatch);
     this.setPhase(MissionPhase.Captured);
+    this.sasquatchDragging = true;
+    this.sasquatchDragAngle = fallAngle;
+    // In custody for mission transport — rope-drag is the default haul
+    this.flags.sasquatchInVehicle = true;
     audio.capture();
-    this.statusLine = 'Sasquatch DOWN! Tap GET IN CAR to load him.';
+    this.statusLine =
+      'Sasquatch DOWN! Rope around his neck — DRAG him on the ground to SUPER JAIL (or GET IN CAR).';
     setDomStatus(this.statusLine);
+    (window as unknown as { __ecraftToast?: (m: string) => void }).__ecraftToast?.(
+      'Rope secured — drag Sasquatch to jail!',
+    );
     this.trail.clearFallback();
     this.persistSave();
+  }
+
+  /** Prone body dragged behind the player on a neck rope. */
+  private updateSasquatchRopeDrag(_delta: number): void {
+    this.ensureRopeGfx();
+    const body = this.sasquatch.body as Phaser.Physics.Arcade.Body | undefined;
+    if (body) {
+      body.enable = false;
+      body.setVelocity(0, 0);
+    }
+    this.sasquatch.anims.stop();
+    try {
+      this.sasquatch.setTexture('sasquatch_sheet', 0);
+    } catch {
+      /* ignore */
+    }
+    this.sasquatch.setVisible(true).setAlpha(1).setDepth(9);
+
+    // Drag offset: stay BEHIND wherever the player is facing
+    let ox = -64;
+    let oy = 18;
+    if (this.facingDir === 'left') {
+      ox = 64;
+      oy = 18;
+      this.sasquatchDragAngle = -90; // head toward player (right)
+    } else if (this.facingDir === 'right') {
+      ox = -64;
+      oy = 18;
+      this.sasquatchDragAngle = 90;
+    } else if (this.facingDir === 'up') {
+      ox = 10;
+      oy = 70;
+      this.sasquatchDragAngle = 90;
+    } else {
+      ox = -10;
+      oy = -70;
+      this.sasquatchDragAngle = -90;
+    }
+
+    const tx = this.player.x + ox;
+    const ty = this.player.y + oy;
+    // Heavy body on the ground — lag behind but always come with you
+    this.sasquatch.x = Phaser.Math.Linear(this.sasquatch.x, tx, 0.28);
+    this.sasquatch.y = Phaser.Math.Linear(this.sasquatch.y, ty, 0.28);
+    this.sasquatch.setAngle(this.sasquatchDragAngle);
+
+    // Neck attachment (head end of prone body)
+    const headTowardPlayer = this.sasquatchDragAngle > 0 ? 1 : -1;
+    const neckX = this.sasquatch.x + headTowardPlayer * 30;
+    const neckY = this.sasquatch.y - 4;
+    // Rope from player's hand toward neck
+    const handX = this.player.x + (this.facingDir === 'left' ? -14 : this.facingDir === 'right' ? 14 : 0);
+    const handY = this.player.y + 6;
+
+    const g = this.ropeGfx!;
+    g.clear();
+    g.lineStyle(3, 0x6d4c41, 1);
+    g.beginPath();
+    g.moveTo(handX, handY);
+    // slight slack curve
+    const mx = (handX + neckX) / 2;
+    const my = (handY + neckY) / 2 + 10;
+    g.lineTo(mx, my);
+    g.lineTo(neckX, neckY);
+    g.strokePath();
+    // rope loop / collar
+    g.lineStyle(2, 0x5d4037, 1);
+    g.strokeCircle(neckX, neckY, 6);
+    g.fillStyle(0x8d6e63, 1);
+    g.fillCircle(neckX, neckY, 3);
+
+    // Dust while being dragged
+    if (this.dust && (Math.abs(this.player.body!.velocity.x) > 20 || Math.abs(this.player.body!.velocity.y) > 20)) {
+      this.dust.setPosition(this.sasquatch.x, this.sasquatch.y + 8);
+      this.dust.emitting = true;
+    }
+  }
+
+  private ensureRopeGfx(): void {
+    if (!this.ropeGfx || !this.ropeGfx.active) {
+      this.ropeGfx = this.add.graphics().setDepth(12);
+    }
+    this.ropeGfx.setVisible(true);
+  }
+
+  private clearRope(): void {
+    if (this.ropeGfx) {
+      this.ropeGfx.clear();
+      this.ropeGfx.setVisible(false);
+    }
   }
 
   private showIndoor(kind: 'lair' | 'jail' | 'house' | 'civic' | 'craftHouse'): void {
@@ -4246,7 +4362,10 @@ export class GameScene extends Phaser.Scene {
     this.flags.sasquatchJailed = true;
     this.flags.sasquatchInVehicle = false;
     this.flags.sasquatchCaptured = true;
+    this.sasquatchDragging = false;
+    this.clearRope();
     this.sasquatch.setVisible(false);
+    this.sasquatch.setAngle(0);
     this.showJailedSasquatchVisit();
     if (this.jailedLabel) this.jailedLabel.setText('║ JAILED ║');
     this.cellMarker?.setVisible(true);
