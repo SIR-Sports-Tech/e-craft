@@ -76,6 +76,7 @@ type EcraftApi = {
   toggleBackpack?: () => void;
   usePhone?: () => void;
   closePhone?: () => void;
+  callContact?: (id: string) => void;
   equipWhip?: () => void;
   useWhip?: () => void;
   pickupItem?: () => void;
@@ -454,12 +455,51 @@ export function installDomOverlay(): void {
       background: #0d47a1;
       border-radius: 14px;
       min-height: 220px;
-      padding: 12px;
+      padding: 10px;
       color: #e3f2fd;
       font-size: 13px;
-      line-height: 1.45;
-      white-space: pre-wrap;
+      line-height: 1.4;
       text-align: left;
+    }
+    #ecraft-phone .phone-ask {
+      font-weight: 900;
+      font-size: 14px;
+      margin: 0 0 8px;
+      color: #fffde7;
+    }
+    #ecraft-phone .phone-status {
+      font-size: 12px;
+      color: #bbdefb;
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+      min-height: 36px;
+    }
+    #ecraft-phone .call-list {
+      display: grid;
+      gap: 6px;
+      max-height: min(42vh, 320px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #ecraft-phone .call-list button {
+      height: 40px;
+      border-radius: 10px;
+      border: 2px solid rgba(255,255,255,.35);
+      background: #1565c0;
+      color: #fff;
+      font-weight: 900;
+      font-size: 12px;
+      touch-action: manipulation;
+      text-align: left;
+      padding: 0 10px;
+    }
+    #ecraft-phone .call-list button.calling {
+      background: #2e7d32;
+      animation: phonePulse 0.8s ease infinite alternate;
+    }
+    @keyframes phonePulse {
+      from { filter: brightness(1); }
+      to { filter: brightness(1.25); }
     }
     #ecraft-phone #phone-close {
       margin-top: 10px;
@@ -736,8 +776,12 @@ export function installDomOverlay(): void {
     <div id="ecraft-phone" role="dialog" aria-modal="true" aria-label="field phone">
       <div class="device">
         <div class="notch"></div>
-        <div class="screen" id="phone-screen">📱 FIELD PHONE</div>
-        <button type="button" id="phone-close">CLOSE PHONE</button>
+        <div class="screen" id="phone-screen">
+          <div class="phone-ask">📱 Want to call somebody?</div>
+          <div class="phone-status" id="phone-status">Tap a contact — turn volume up to hear them.</div>
+          <div class="call-list" id="phone-call-list"></div>
+        </div>
+        <button type="button" id="phone-close">HANG UP / CLOSE</button>
       </div>
     </div>
     <div id="ecraft-computer" role="dialog" aria-modal="true" aria-label="computer">
@@ -937,12 +981,52 @@ export function installDomOverlay(): void {
   const setBackpackOpen = (open: boolean) => {
     backpackEl?.classList.toggle('show', open);
   };
+  const fillCallList = () => {
+    const list = document.getElementById('phone-call-list');
+    if (!list || list.dataset.ready === '1') return;
+    const contacts = [
+      { id: 'robot', label: '🤖 Call Robot' },
+      { id: 'sasquatch', label: '🦍 Call Sasquatch' },
+      { id: 'bigfoot', label: '🦶 Call Bigfoot' },
+      { id: 'police', label: '🚓 Call Police' },
+      { id: 'fire', label: '🚒 Call Fire Dept' },
+      { id: 'ambulance', label: '🚑 Call Ambulance' },
+      { id: 'zookeeper', label: '🐯 Call Zookeeper' },
+      { id: 'bank', label: '🏦 Call Bank Teller' },
+    ];
+    list.innerHTML = contacts
+      .map((c) => `<button type="button" data-call="${c.id}">${c.label}</button>`)
+      .join('');
+    list.dataset.ready = '1';
+    list.querySelectorAll<HTMLButtonElement>('button[data-call]').forEach((btn) => {
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        flash(btn);
+        list.querySelectorAll('button').forEach((b) => b.classList.remove('calling'));
+        btn.classList.add('calling');
+        const id = btn.dataset.call || '';
+        api()?.callContact?.(id);
+        showToast(`Calling…`);
+      });
+    });
+  };
   const setPhoneOpen = (open: boolean, lines?: string[]) => {
     phoneEl?.classList.toggle('show', open);
-    if (open && lines?.length) {
-      const screen = document.getElementById('phone-screen');
-      if (screen) screen.textContent = lines.join('\n');
+    if (open) {
+      fillCallList();
+      const st = document.getElementById('phone-status');
+      if (st && lines?.length) st.textContent = lines.join('\n');
+      else if (st && !lines?.length) {
+        st.textContent = 'Want to call somebody? Tap a contact — speak out loud on your speaker.';
+      }
+    } else {
+      document.querySelectorAll('#phone-call-list button').forEach((b) => b.classList.remove('calling'));
     }
+  };
+  (window as unknown as { __ecraftPhoneStatus?: (msg: string) => void }).__ecraftPhoneStatus = (msg: string) => {
+    const st = document.getElementById('phone-status');
+    if (st) st.textContent = msg;
   };
   const setWhipEquipped = (eq: boolean) => {
     whipBtn?.classList.toggle('show', eq);
@@ -1007,7 +1091,7 @@ export function installDomOverlay(): void {
     e.preventDefault();
     e.stopPropagation();
     setPhoneOpen(false);
-    callApi('closePhone', 'Phone away');
+    callApi('closePhone', 'Hung up');
   });
 
   const fillCraftUi = () => {

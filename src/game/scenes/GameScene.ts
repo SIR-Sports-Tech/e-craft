@@ -22,6 +22,7 @@ import { CraftBuildSystem } from '../systems/CraftBuildSystem';
 import { BuildingCollisionSystem } from '../systems/BuildingCollisionSystem';
 import { CraftHouseSystem, type SecretKind } from '../systems/CraftHouseSystem';
 import { audio } from '../systems/AudioSystem';
+import { getContact, nextLine } from '../systems/PhoneCallSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
 import {
@@ -182,6 +183,7 @@ export class GameScene extends Phaser.Scene {
   private phoneOpen = false;
   private atComputer = false;
   private whipEquipped = false;
+  private phoneCallCounts = new Map<string, number>();
   private whipCooldown = 0;
   private whipGfx?: Phaser.GameObjects.Graphics;
   private facing = 1; // -1 left, 1 right (for side flip + tracker)
@@ -536,8 +538,14 @@ export class GameScene extends Phaser.Scene {
       },
       closePhone: () => {
         this.phoneOpen = false;
-        this.statusLine = 'Phone put away.';
+        audio.stopSpeaking();
+        this.statusLine = 'Hung up. Phone put away.';
         setDomStatus(this.statusLine);
+      },
+      callContact: (id: string) => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.callPhoneContact(id);
       },
       equipWhip: () => {
         this.paused = false;
@@ -836,29 +844,71 @@ export class GameScene extends Phaser.Scene {
     (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi?.(this.backpackOpen);
   }
 
-  /** Use the field phone from the backpack. */
+  /** Use the field phone from the backpack — ask who to call. */
   private usePhone(): void {
-    if (!this.inventory.has('phone')) {
-      this.statusLine = 'No phone in backpack.';
+    if (!this.inventory.has('phone') && !this.inventory.has('desk_phone')) {
+      this.statusLine = 'No phone in backpack — pick one up inside a building.';
       setDomStatus(this.statusLine);
       return;
     }
     this.backpackOpen = false;
     this.phoneOpen = true;
     (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi?.(false);
+    const tip = this.tigers?.isActive?.()
+      ? '⚠️ Tigers out! Call Zookeeper or grab WHIP.'
+      : 'All quiet. Who do you want to call?';
     (window as unknown as { __ecraftPhoneUi?: (o: boolean, lines?: string[]) => void }).__ecraftPhoneUi?.(true, [
-      '📱 FIELD PHONE',
-      `Status: ${this.statusLine || 'On duty'}`,
-      `Day: ${this.dayNight?.phase?.() ?? 'day'} · Hour ${Math.floor(this.dayNight?.getHour?.() ?? 12)}`,
-      this.tigers?.isActive?.()
-        ? '⚠️ TIGER ALERT — open backpack → WHIP!'
-        : 'HQ: All clear on tiger channel.',
-      this.whipEquipped ? '🪢 Whip is in hand.' : 'Tip: Equip WHIP before jungle runs.',
-      'Tap CLOSE when done.',
+      tip,
+      'Turn volume UP — real voices talk through your speaker.',
     ]);
-    this.statusLine = '📱 Phone out — check HQ status.';
+    // Greeting spoken aloud
+    audio.dialTone();
+    window.setTimeout(() => {
+      audio.speak('Want to call somebody? Pick a contact on the phone.', {
+        pitch: 1.05,
+        rate: 1.0,
+        prefer: 'high',
+      });
+    }, 700);
+    this.statusLine = '📱 Phone — want to call somebody?';
     setDomStatus(this.statusLine);
-    audio.talk();
+  }
+
+  /** Dial a contact — unique dialogue spoken aloud on the device speaker. */
+  private callPhoneContact(id: string): void {
+    if (!this.phoneOpen) this.usePhone();
+    const contact = getContact(id);
+    if (!contact) {
+      this.statusLine = 'Unknown number.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    const n = this.phoneCallCounts.get(id) ?? 0;
+    this.phoneCallCounts.set(id, n + 1);
+    const line = nextLine(contact, n);
+    const spoken = `${contact.label.replace(/^Call /, '')} here. ${line}`;
+    audio.dialTone();
+    const status = `${contact.emoji} Calling ${contact.label.replace(/^Call /, '')}…\n\n“${line}”\n\n🔊 Listen — voice on your speaker!`;
+    (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(status);
+    this.statusLine = `${contact.emoji} On call with ${contact.label.replace(/^Call /, '')}`;
+    setDomStatus(this.statusLine);
+    window.setTimeout(() => {
+      const ok = audio.speak(spoken, {
+        pitch: contact.pitch,
+        rate: contact.rate,
+        prefer: contact.prefer,
+        onend: () => {
+          (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+            `${contact.emoji} Call ended.\n\n“${line}”\n\nTap another contact or HANG UP.`,
+          );
+        },
+      });
+      if (!ok) {
+        (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+          `${contact.emoji} ${line}\n\n(Voice not available on this device — text still shows.)`,
+        );
+      }
+    }, 550);
   }
 
   /** Take the whip out of the backpack (equip for quick WHIP taps). */
