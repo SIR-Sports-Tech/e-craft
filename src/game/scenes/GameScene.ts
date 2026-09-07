@@ -25,6 +25,7 @@ import { audio } from '../systems/AudioSystem';
 import { getContact, nextLine } from '../systems/PhoneCallSystem';
 import { freeVoice } from '../systems/FreeVoiceSystem';
 import { ForestBearSystem } from '../systems/ForestBearSystem';
+import { ForestSnakeSystem } from '../systems/ForestSnakeSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
 import {
@@ -181,7 +182,10 @@ export class GameScene extends Phaser.Scene {
   private pigDrop!: PigDropSystem;
   private patrolCars!: PatrolCarsSystem;
   private forestBears!: ForestBearSystem;
+  private forestSnakes!: ForestSnakeSystem;
   private forestTreeSpots: Array<{ x: number; y: number }> = [];
+  /** Snake bite slows movement briefly */
+  private snakeBittenT = 0;
   private jobs = new JobSystem();
   private inventory = new InventorySystem();
   private buildingLoot!: BuildingLootSystem;
@@ -327,6 +331,8 @@ export class GameScene extends Phaser.Scene {
     this.patrolCars.spawn();
     this.forestBears = new ForestBearSystem(this);
     this.forestBears.spawnBehindTrees(this.forestTreeSpots);
+    this.forestSnakes = new ForestSnakeSystem(this);
+    this.forestSnakes.spawnInTrees(this.forestTreeSpots);
     // Craft layer stays visible indoors (worldLayer hides) so builds persist on screen
     this.craftLayer = this.add.container(0, 0).setDepth(11);
     this.craftBuild = new CraftBuildSystem(this, this.craftLayer);
@@ -1432,7 +1438,7 @@ export class GameScene extends Phaser.Scene {
     // Trees across the expanded wilderness (~10× forest)
     const forest = CITY_ZONES.find((z) => z.id === 'forest')!;
     const treeSpots: Array<{ x: number; y: number }> = [];
-    const treeCount = 420;
+    const treeCount = 650;
     for (let i = 0; i < treeCount; i++) {
       const tx = forest.x + 40 + Math.random() * (forest.w - 80);
       const ty = forest.y + 40 + Math.random() * (forest.h - 80);
@@ -2494,6 +2500,8 @@ export class GameScene extends Phaser.Scene {
         h: CITY_ZONES.find((z) => z.id === 'forest')?.h ?? 0,
         bears: this.forestBears?.count?.() ?? 0,
         bearsPeeking: this.forestBears?.peekingCount?.() ?? 0,
+        snakes: this.forestSnakes?.count?.() ?? 0,
+        bitten: this.snakeBittenT > 0,
       },
       tigerNearDist: this.tigers?.nearestDist?.(this.player) ?? Infinity,
       backpackOpen: this.backpackOpen,
@@ -2621,6 +2629,10 @@ export class GameScene extends Phaser.Scene {
       this.patrolCars.update(d);
       this.forestBears?.setOutdoorVisible(outdoors);
       this.forestBears?.update(d, this.player, outdoors);
+      this.forestSnakes?.setOutdoorVisible(outdoors);
+      const bite = this.forestSnakes?.update(d, this.player, outdoors);
+      if (bite) this.applySnakeBite(bite);
+      if (this.snakeBittenT > 0) this.snakeBittenT = Math.max(0, this.snakeBittenT - d);
       // WALL LAW — shove cars/people out of building solids every frame
       if (outdoors) this.buildingCollision?.resolveAllBound?.();
       this.updatePlayerPoliceLights(d, outdoors);
@@ -2690,6 +2702,25 @@ export class GameScene extends Phaser.Scene {
       player: { x: this.player.x, y: this.player.y },
     });
     this.objectiveMarker.update(this.player.x, this.player.y, target);
+  }
+
+  private applySnakeBite(msg: string): void {
+    this.snakeBittenT = 3500;
+    this.player.setTint(0x81c784);
+    this.cameras.main.shake(160, 0.008);
+    this.statusLine = msg;
+    setDomStatus(this.statusLine);
+    audio.talk();
+    this.time.delayedCall(600, () => {
+      if (this.snakeBittenT > 0) this.player.setTint(0xc8e6c9);
+    });
+    this.time.delayedCall(3500, () => {
+      if (!this.flattened) this.player.clearTint();
+      if (this.snakeBittenT <= 0) {
+        this.statusLine = 'Venom wore off — you can run again.';
+        setDomStatus(this.statusLine);
+      }
+    });
   }
 
   private flattenByPolice(carX: number, carY: number): void {
@@ -2901,13 +2932,15 @@ export class GameScene extends Phaser.Scene {
       this.player.setVelocity(0, 0);
       return;
     }
-    const speed = this.flags.inVehicle
+    let speed = this.flags.inVehicle
       ? this.activeCarKey === 'race_car'
         ? 720
         : this.activeCarKey === 'police_car'
           ? 640
           : 560
       : 240;
+    // Snake bite venom — limp for a few seconds
+    if (this.snakeBittenT > 0 && !this.flags.inVehicle) speed *= 0.45;
     let vx = 0;
     let vy = 0;
     const left = this.cursors.left?.isDown || this.keys.A?.isDown;

@@ -25,6 +25,7 @@ export class BootScene extends Phaser.Scene {
     this.makeTracker();
     this.makeTree();
     this.makeBearHeads();
+    this.makeSnake();
     this.makeCitizen();
     this.makePanther();
     this.makeTiger();
@@ -1091,6 +1092,34 @@ export class BootScene extends Phaser.Scene {
     };
     mk('bear_brown_head', 0x6d4c41, 0xa1887f);
     mk('bear_black_head', 0x212121, 0x424242);
+  }
+
+  private makeSnake(): void {
+    const draw = (key: string, wave: number) => {
+      const g = this.g();
+      g.fillStyle(0x2e7d32, 1);
+      g.fillEllipse(28, 22 + wave, 40, 14);
+      g.fillStyle(0x1b5e20, 1);
+      g.fillEllipse(12, 20 - wave, 16, 13);
+      g.fillStyle(0xffeb3b, 1);
+      g.fillCircle(8, 18 - wave, 2.5);
+      g.fillStyle(0xc62828, 1);
+      g.fillTriangle(4, 22 - wave, -2, 24 - wave, 4, 26 - wave);
+      g.fillStyle(0xa5d6a7, 1);
+      g.fillCircle(20, 16 - wave * 0.5, 2);
+      g.fillCircle(20, 24 + wave * 0.5, 2);
+      g.generateTexture(key, 56, 40);
+      g.destroy();
+    };
+    draw('snake', 0);
+    draw('snake_f0', 0);
+    draw('snake_f1', 3);
+    this.anims.create({
+      key: 'snake-slither',
+      frames: [{ key: 'snake_f0' }, { key: 'snake_f1' }],
+      frameRate: 8,
+      repeat: -1,
+    });
   }
 
   private makeCitizen(): void {
