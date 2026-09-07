@@ -1,8 +1,9 @@
 /** Top-down world layout for E-CRAFT v0.1 (original placeholder geometry). */
 
 export const WORLD = {
-  width: 4200,
-  height: 2800,
+  // Expanded for ~10× forest wilderness (city stays west)
+  width: 8200,
+  height: 7600,
 } as const;
 
 export interface RectZone {
@@ -179,12 +180,13 @@ export const CITY_ZONES: RectZone[] = [
     color: 0xf9a825,
   },
   {
+    // ~10× area vs old 1600×2200 (3.52M → ~35.2M): 5060×6960
     id: 'forest',
     label: 'Forest / Wilderness',
     x: 2400,
-    y: 200,
-    w: 1600,
-    h: 2200,
+    y: 40,
+    w: 5060,
+    h: 6960,
     color: 0x1a4a28,
   },
 ];
@@ -241,7 +243,8 @@ export const HOUSE_INTERIOR = {
 /** Simple road rectangles (visual + driveable feel) */
 export const ROADS: RectZone[] = [
   { id: 'road_h1', label: 'Main Road', x: 100, y: 720, w: 2000, h: 80, color: 0x333340 },
-  { id: 'road_v1', label: 'Forest Road', x: 1900, y: 200, w: 80, h: 1600, color: 0x333340 },
+  { id: 'road_v1', label: 'Forest Road', x: 1900, y: 40, w: 80, h: 3200, color: 0x333340 },
+  { id: 'road_forest_deep', label: 'Deep Woods Track', x: 2400, y: 900, w: 2800, h: 60, color: 0x2e3d2e },
   { id: 'road_h2', label: 'HQ Drive', x: 200, y: 480, w: 80, h: 280, color: 0x333340 },
   { id: 'road_h3', label: 'Park Road', x: 100, y: 1000, w: 2200, h: 70, color: 0x333340 },
   { id: 'road_v2', label: 'Market Ave', x: 1450, y: 400, w: 70, h: 800, color: 0x333340 },
@@ -274,7 +277,7 @@ export const SPAWN = {
   playerOutdoor: { x: 320, y: 620 },
   vehicle: { x: 300, y: 545 },
   raceCar: { x: 480, y: 545 },
-  sasquatchForest: { x: 3000, y: 900 },
+  sasquatchForest: { x: 4200, y: 2800 },
   /** Updated at runtime to the house facade door (attached to building). */
   houseDoor: { x: 830, y: 980 } as { x: number; y: number },
 };

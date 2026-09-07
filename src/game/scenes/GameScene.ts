@@ -24,6 +24,7 @@ import { CraftHouseSystem, type SecretKind } from '../systems/CraftHouseSystem';
 import { audio } from '../systems/AudioSystem';
 import { getContact, nextLine } from '../systems/PhoneCallSystem';
 import { freeVoice } from '../systems/FreeVoiceSystem';
+import { ForestBearSystem } from '../systems/ForestBearSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
 import {
@@ -179,6 +180,8 @@ export class GameScene extends Phaser.Scene {
   private tigers!: TigerPackSystem;
   private pigDrop!: PigDropSystem;
   private patrolCars!: PatrolCarsSystem;
+  private forestBears!: ForestBearSystem;
+  private forestTreeSpots: Array<{ x: number; y: number }> = [];
   private jobs = new JobSystem();
   private inventory = new InventorySystem();
   private buildingLoot!: BuildingLootSystem;
@@ -322,6 +325,8 @@ export class GameScene extends Phaser.Scene {
     this.pigDrop = new PigDropSystem(this);
     this.patrolCars = new PatrolCarsSystem(this);
     this.patrolCars.spawn();
+    this.forestBears = new ForestBearSystem(this);
+    this.forestBears.spawnBehindTrees(this.forestTreeSpots);
     // Craft layer stays visible indoors (worldLayer hides) so builds persist on screen
     this.craftLayer = this.add.container(0, 0).setDepth(11);
     this.craftBuild = new CraftBuildSystem(this, this.craftLayer);
@@ -1424,18 +1429,23 @@ export class GameScene extends Phaser.Scene {
       this.labels.push(title);
     }
 
-    // Trees in forest
+    // Trees across the expanded wilderness (~10× forest)
     const forest = CITY_ZONES.find((z) => z.id === 'forest')!;
-    for (let i = 0; i < 55; i++) {
+    const treeSpots: Array<{ x: number; y: number }> = [];
+    const treeCount = 420;
+    for (let i = 0; i < treeCount; i++) {
       const tx = forest.x + 40 + Math.random() * (forest.w - 80);
       const ty = forest.y + 40 + Math.random() * (forest.h - 80);
       const tree = this.add
         .image(tx, ty, 'tree')
         .setDepth(4)
-        .setScale(0.9 + Math.random() * 0.5)
-        .setAngle(-6 + Math.random() * 12);
+        .setScale(0.85 + Math.random() * 0.55)
+        .setAngle(-8 + Math.random() * 16);
       this.worldLayer.add(tree);
+      treeSpots.push({ x: tx, y: ty });
     }
+    // Bears spawn after ForestBearSystem is constructed (create() continues later)
+    this.forestTreeSpots = treeSpots;
 
     
     // Placeholder citizens (living-city seed — original shapes only)
@@ -2479,6 +2489,12 @@ export class GameScene extends Phaser.Scene {
       pantherActive: this.panther?.isActive?.() ?? false,
       tigersActive: this.tigers?.isActive?.() ?? false,
       tigerCount: this.tigers?.countVisible?.() ?? 0,
+      forest: {
+        w: CITY_ZONES.find((z) => z.id === 'forest')?.w ?? 0,
+        h: CITY_ZONES.find((z) => z.id === 'forest')?.h ?? 0,
+        bears: this.forestBears?.count?.() ?? 0,
+        bearsPeeking: this.forestBears?.peekingCount?.() ?? 0,
+      },
       tigerNearDist: this.tigers?.nearestDist?.(this.player) ?? Infinity,
       backpackOpen: this.backpackOpen,
       phoneOpen: this.phoneOpen,
@@ -2603,6 +2619,8 @@ export class GameScene extends Phaser.Scene {
       this.dayNight.setOutdoorVisible(outdoors);
       this.patrolCars.setOutdoorVisible(outdoors);
       this.patrolCars.update(d);
+      this.forestBears?.setOutdoorVisible(outdoors);
+      this.forestBears?.update(d, this.player, outdoors);
       // WALL LAW — shove cars/people out of building solids every frame
       if (outdoors) this.buildingCollision?.resolveAllBound?.();
       this.updatePlayerPoliceLights(d, outdoors);

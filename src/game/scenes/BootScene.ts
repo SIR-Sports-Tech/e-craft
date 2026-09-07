@@ -24,6 +24,7 @@ export class BootScene extends Phaser.Scene {
     this.makeRaceCar();
     this.makeTracker();
     this.makeTree();
+    this.makeBearHeads();
     this.makeCitizen();
     this.makePanther();
     this.makeTiger();
@@ -1056,6 +1057,40 @@ export class BootScene extends Phaser.Scene {
     g.fillCircle(58, 28, 10);
     g.generateTexture('tree', 96, 120);
     g.destroy();
+  }
+
+  /** Peeking bear heads (brown + black) — hide behind trees. */
+  private makeBearHeads(): void {
+    const mk = (key: string, fur: number, snout: number) => {
+      const g = this.g();
+      g.fillStyle(0x000000, 0.2);
+      g.fillEllipse(32, 58, 36, 10);
+      // Head
+      g.fillStyle(fur, 1);
+      g.fillCircle(32, 34, 26);
+      // Ears
+      g.fillCircle(14, 14, 10);
+      g.fillCircle(50, 14, 10);
+      g.fillStyle(0x3e2723, 1);
+      g.fillCircle(14, 14, 5);
+      g.fillCircle(50, 14, 5);
+      // Snout
+      g.fillStyle(snout, 1);
+      g.fillEllipse(32, 42, 22, 16);
+      g.fillStyle(0x212121, 1);
+      g.fillCircle(32, 44, 4); // nose
+      // Eyes
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(22, 28, 5);
+      g.fillCircle(42, 28, 5);
+      g.fillStyle(0x000000, 1);
+      g.fillCircle(23, 29, 2.5);
+      g.fillCircle(43, 29, 2.5);
+      g.generateTexture(key, 64, 64);
+      g.destroy();
+    };
+    mk('bear_brown_head', 0x6d4c41, 0xa1887f);
+    mk('bear_black_head', 0x212121, 0x424242);
   }
 
   private makeCitizen(): void {
