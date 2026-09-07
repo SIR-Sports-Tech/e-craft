@@ -717,23 +717,80 @@ export class BootScene extends Phaser.Scene {
     food.generateTexture('food_plate', 48, 48);
     food.destroy();
 
-    // Original craft blocks (NOT Minecraft) — chunky cubes with top/side faces
+    // Voxel cubes (Minecraft-STYLE look — original art, NOT Mojang IP)
+    // Classic isometric cube: top diamond + left/right parallelogram faces
     const mkBlock = (key: string, side: number, lid: number, alpha = 1) => {
       const b = this.g();
-      b.fillStyle(side, alpha);
-      b.fillRoundedRect(4, 12, 40, 32, 2);
-      b.fillStyle(0x000000, 0.22 * alpha);
-      b.fillRect(4, 36, 40, 8);
-      b.fillStyle(0xffffff, 0.18 * alpha);
-      b.fillRect(4, 12, 6, 32);
-      b.fillStyle(lid, alpha);
-      b.fillTriangle(4, 12, 24, 2, 44, 12);
-      b.fillTriangle(4, 12, 44, 12, 24, 18);
-      b.lineStyle(2, 0x000000, 0.4);
-      b.strokeRoundedRect(4, 12, 40, 32, 2);
-      b.lineBetween(4, 12, 24, 2);
-      b.lineBetween(24, 2, 44, 12);
-      b.generateTexture(key, 48, 48);
+      const W = 64;
+      const H = 64;
+      const cx = W / 2;
+      const topY = 10;
+      const midY = 26;
+      const botY = 50;
+      const left = side;
+      // Darken right face, lighten top (Minecraft cube shading)
+      const right = Phaser.Display.Color.IntegerToColor(side).darken(28).color;
+      const top = lid;
+      // LEFT face
+      b.fillStyle(left, alpha);
+      b.fillPoints(
+        [
+          { x: 4, y: midY },
+          { x: cx, y: midY + 8 },
+          { x: cx, y: botY },
+          { x: 4, y: botY - 8 },
+        ],
+        true,
+      );
+      // RIGHT face
+      b.fillStyle(right, alpha);
+      b.fillPoints(
+        [
+          { x: cx, y: midY + 8 },
+          { x: W - 4, y: midY },
+          { x: W - 4, y: botY - 8 },
+          { x: cx, y: botY },
+        ],
+        true,
+      );
+      // TOP face (diamond)
+      b.fillStyle(top, alpha);
+      b.fillPoints(
+        [
+          { x: cx, y: topY },
+          { x: W - 4, y: midY },
+          { x: cx, y: midY + 8 },
+          { x: 4, y: midY },
+        ],
+        true,
+      );
+      // Edge lines
+      b.lineStyle(1.5, 0x000000, 0.45 * alpha);
+      b.strokePoints(
+        [
+          { x: cx, y: topY },
+          { x: W - 4, y: midY },
+          { x: cx, y: midY + 8 },
+          { x: 4, y: midY },
+          { x: cx, y: topY },
+        ],
+        false,
+      );
+      b.lineBetween(cx, midY + 8, cx, botY);
+      b.lineBetween(4, midY, 4, botY - 8);
+      b.lineBetween(W - 4, midY, W - 4, botY - 8);
+      // Specular strip on left (reads “solid cube”)
+      b.fillStyle(0xffffff, 0.12 * alpha);
+      b.fillPoints(
+        [
+          { x: 8, y: midY + 2 },
+          { x: cx - 4, y: midY + 8 },
+          { x: cx - 4, y: botY - 4 },
+          { x: 8, y: botY - 10 },
+        ],
+        true,
+      );
+      b.generateTexture(key, W, H);
       b.destroy();
     };
     mkBlock('block_dirt', 0x8d6e63, 0xa1887f);

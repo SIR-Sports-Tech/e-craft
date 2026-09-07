@@ -17,6 +17,7 @@ await page.evaluate(() => {
   localStorage.removeItem('ecraft_craft_blocks_v1');
   localStorage.removeItem('ecraft_craft_blocks_v2');
   localStorage.removeItem('ecraft_craft_blocks_v3');
+  localStorage.removeItem('ecraft_craft_blocks_v4');
   const s = window.__phaserGame.scene.getScene('Game');
   s.craftBuild?.clearAll?.();
 });

@@ -1102,6 +1102,7 @@ export function installDomOverlay(): void {
       localStorage.removeItem('ecraft_craft_blocks_v1');
       localStorage.removeItem('ecraft_craft_blocks_v2');
       localStorage.removeItem('ecraft_craft_blocks_v3');
+      localStorage.removeItem('ecraft_craft_blocks_v4');
       localStorage.removeItem('ecraft_craft_houses_v1');
     } catch {
       /* ignore */

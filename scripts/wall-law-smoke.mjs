@@ -31,6 +31,7 @@ const walk = await page.evaluate(async () => {
 
 // Place craft stone wall, walk into it
 const craft = await page.evaluate(async () => {
+  localStorage.removeItem('ecraft_craft_blocks_v4');
   localStorage.removeItem('ecraft_craft_blocks_v3');
   localStorage.removeItem('ecraft_craft_blocks_v2');
   localStorage.removeItem('ecraft_craft_blocks_v1');

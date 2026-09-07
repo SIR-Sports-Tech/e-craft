@@ -2689,7 +2689,7 @@ export class GameScene extends Phaser.Scene {
     const on = this.craftBuild.toggleMode();
     this.refreshBuildHotbar();
     this.statusLine = on
-      ? `🧱 CRAFT BUILD ON — ${this.craftBuild.selectedName()} · PLACE/E/tap · BREAK · hotbar 1-${this.craftBuild.blockCount()}`
+      ? `⬛ VOXEL BUILD ON — ${this.craftBuild.selectedName()} · PLACE stacks · BREAK digs · hotbar 1-${this.craftBuild.blockCount()}`
       : 'Craft Build off.';
     setDomStatus(this.statusLine);
     if (on) {
