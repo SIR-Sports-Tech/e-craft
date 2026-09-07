@@ -38,10 +38,34 @@ if (!existsSync('dist/index.html')) {
   process.exit(1);
 }
 
-ssh(`mkdir -p ${REMOTE_DIR}`);
+ssh(`mkdir -p ${REMOTE_DIR} /opt/e-craft/server`);
 run('rsync', ['-az', '--delete', 'dist/', `root@${HOST}:${REMOTE_DIR}/`]);
+run('rsync', ['-az', 'server/', `root@${HOST}:/opt/e-craft/server/`]);
 
-const snippet = `# E-CRAFT static game — Vultr only (scripts/deploy_vultr.mjs)
+// Phone AI env (key never printed). Free voice works without it; Grok chat needs credits.
+const xai = process.env.XAI_API_KEY || '';
+if (xai) {
+  const envBody = `XAI_API_KEY=${xai}\nECRAFT_PHONE_PORT=8791\nECRAFT_PHONE_MODEL=grok-4-1-fast-non-reasoning\n`;
+  const envFile = join(tmpdir(), 'ecraft-phone.env');
+  writeFileSync(envFile, envBody);
+  run('scp', ['-o', 'BatchMode=yes', envFile, `root@${HOST}:/opt/e-craft/server/.env`]);
+}
+
+ssh(
+  `cd /opt/e-craft/server && (pm2 delete e-craft-phone 2>/dev/null || true) && pm2 start phone-api.mjs --name e-craft-phone && pm2 save`,
+);
+
+const snippet = `# E-CRAFT — Vultr (scripts/deploy_vultr.mjs)
+# API first (more specific than static alias)
+location ^~ /e-craft/api/ {
+    proxy_pass http://127.0.0.1:8791/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    add_header Access-Control-Allow-Origin * always;
+    add_header X-ECRAFT-Origin "vultr-api" always;
+}
+
 location ^~ /e-craft/ {
     alias /opt/e-craft/public/;
     index index.html;
@@ -83,9 +107,12 @@ else:
 const pyFile = join(tmpdir(), 'ecraft_nginx_inject.py');
 writeFileSync(pyFile, injectPy);
 run('scp', ['-o', 'BatchMode=yes', pyFile, `root@${HOST}:/tmp/ecraft_nginx_inject.py`]);
-ssh('python3 /tmp/ecraft_nginx_inject.py && nginx -t && systemctl reload nginx && test -f /opt/e-craft/public/index.html && ls /opt/e-craft/public | head && echo DEPLOY_OK');
+ssh(
+  'python3 /tmp/ecraft_nginx_inject.py && nginx -t && systemctl reload nginx && curl -s http://127.0.0.1:8791/api/phone/health && test -f /opt/e-craft/public/index.html && echo DEPLOY_OK',
+);
 
 console.log(`
 E-CRAFT Vultr deploy complete.
 Live: https://linealgo.com/e-craft/?skiptitle=1
+Phone API: https://linealgo.com/e-craft/api/phone/health
 `);

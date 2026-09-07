@@ -77,6 +77,11 @@ type EcraftApi = {
   usePhone?: () => void;
   closePhone?: () => void;
   callContact?: (id: string) => void;
+  connectFreeVoice?: () => void;
+  phoneTalk?: () => void;
+  phoneSendText?: (text: string) => void;
+  getFreeVoiceStatus?: () => { connected: boolean; line: string; voices: Array<{ uri: string; name: string }> };
+  setFreeVoiceUri?: (uri: string) => void;
   equipWhip?: () => void;
   useWhip?: () => void;
   pickupItem?: () => void;
@@ -778,8 +783,15 @@ export function installDomOverlay(): void {
         <div class="notch"></div>
         <div class="screen" id="phone-screen">
           <div class="phone-ask">📱 Want to call somebody?</div>
-          <div class="phone-status" id="phone-status">Tap a contact — turn volume up to hear them.</div>
+          <div class="phone-status" id="phone-status">Connect Free AI Voice, then tap a contact. Talk with the mic!</div>
+          <button type="button" id="btn-free-voice" style="width:100%;height:40px;margin-bottom:8px;border-radius:10px;border:2px solid #69f0ae;background:#1b5e20;color:#b9f6ca;font-weight:900;font-size:12px;touch-action:manipulation">🔌 Connect Free AI Voice</button>
+          <select id="phone-voice-pick" style="width:100%;margin-bottom:8px;height:34px;border-radius:8px;background:#0d47a1;color:#fff;border:1px solid #90caf9;font-size:11px"></select>
           <div class="call-list" id="phone-call-list"></div>
+          <div id="phone-talk-row" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+            <button type="button" id="btn-phone-talk" style="height:42px;border-radius:10px;border:0;background:#c62828;color:#fff;font-weight:900;font-size:12px;touch-action:manipulation">🎙️ HOLD TO TALK</button>
+            <button type="button" id="btn-phone-send" style="height:42px;border-radius:10px;border:0;background:#1565c0;color:#fff;font-weight:900;font-size:12px;touch-action:manipulation">SEND TEXT</button>
+          </div>
+          <input id="phone-text-in" type="text" placeholder="Or type what you want to say…" style="width:100%;box-sizing:border-box;margin-top:6px;height:36px;border-radius:8px;border:1px solid #90caf9;background:#e3f2fd;color:#0d47a1;padding:0 8px;font-size:12px" />
         </div>
         <button type="button" id="phone-close">HANG UP / CLOSE</button>
       </div>
@@ -1011,14 +1023,24 @@ export function installDomOverlay(): void {
       });
     });
   };
+  const refreshVoicePick = () => {
+    const sel = document.getElementById('phone-voice-pick') as HTMLSelectElement | null;
+    if (!sel) return;
+    const st = api()?.getFreeVoiceStatus?.();
+    const voices = st?.voices || [];
+    sel.innerHTML =
+      `<option value="">Free voices (${voices.length})</option>` +
+      voices.map((v) => `<option value="${v.uri}">${v.name}</option>`).join('');
+  };
   const setPhoneOpen = (open: boolean, lines?: string[]) => {
     phoneEl?.classList.toggle('show', open);
     if (open) {
       fillCallList();
+      refreshVoicePick();
       const st = document.getElementById('phone-status');
       if (st && lines?.length) st.textContent = lines.join('\n');
       else if (st && !lines?.length) {
-        st.textContent = 'Want to call somebody? Tap a contact — speak out loud on your speaker.';
+        st.textContent = 'Connect Free AI Voice, pick a contact, then talk.';
       }
     } else {
       document.querySelectorAll('#phone-call-list button').forEach((b) => b.classList.remove('calling'));
@@ -1028,6 +1050,46 @@ export function installDomOverlay(): void {
     const st = document.getElementById('phone-status');
     if (st) st.textContent = msg;
   };
+  (window as unknown as { __ecraftRefreshVoices?: () => void }).__ecraftRefreshVoices = refreshVoicePick;
+
+  document.getElementById('btn-free-voice')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    flash(e.currentTarget as HTMLElement);
+    callApi('connectFreeVoice', 'Free AI Voice');
+    window.setTimeout(refreshVoicePick, 200);
+  });
+  document.getElementById('phone-voice-pick')?.addEventListener('change', (e) => {
+    const uri = (e.target as HTMLSelectElement).value;
+    if (uri) api()?.setFreeVoiceUri?.(uri);
+  });
+  document.getElementById('btn-phone-talk')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    flash(e.currentTarget as HTMLElement);
+    api()?.phoneTalk?.();
+    showToast('Listening…');
+  });
+  document.getElementById('btn-phone-send')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const inp = document.getElementById('phone-text-in') as HTMLInputElement | null;
+    const text = inp?.value || '';
+    if (!text.trim()) {
+      showToast('Type a message first');
+      return;
+    }
+    api()?.phoneSendText?.(text);
+    if (inp) inp.value = '';
+    showToast('Sent');
+  });
+  document.getElementById('phone-text-in')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const inp = e.currentTarget as HTMLInputElement;
+    api()?.phoneSendText?.(inp.value);
+    inp.value = '';
+  });
   const setWhipEquipped = (eq: boolean) => {
     whipBtn?.classList.toggle('show', eq);
   };

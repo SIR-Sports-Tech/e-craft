@@ -23,6 +23,7 @@ import { BuildingCollisionSystem } from '../systems/BuildingCollisionSystem';
 import { CraftHouseSystem, type SecretKind } from '../systems/CraftHouseSystem';
 import { audio } from '../systems/AudioSystem';
 import { getContact, nextLine } from '../systems/PhoneCallSystem';
+import { freeVoice } from '../systems/FreeVoiceSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
 import {
@@ -184,6 +185,7 @@ export class GameScene extends Phaser.Scene {
   private atComputer = false;
   private whipEquipped = false;
   private phoneCallCounts = new Map<string, number>();
+  private activePhoneContact: string | null = null;
   private whipCooldown = 0;
   private whipGfx?: Phaser.GameObjects.Graphics;
   private facing = 1; // -1 left, 1 right (for side flip + tracker)
@@ -538,7 +540,10 @@ export class GameScene extends Phaser.Scene {
       },
       closePhone: () => {
         this.phoneOpen = false;
+        this.activePhoneContact = null;
         audio.stopSpeaking();
+        freeVoice.stopSpeaking();
+        freeVoice.stopListening();
         this.statusLine = 'Hung up. Phone put away.';
         setDomStatus(this.statusLine);
       },
@@ -546,6 +551,31 @@ export class GameScene extends Phaser.Scene {
         this.paused = false;
         this.mapOpen = false;
         this.callPhoneContact(id);
+      },
+      connectFreeVoice: () => {
+        this.doConnectFreeVoice();
+      },
+      phoneTalk: () => {
+        void this.doPhoneTalk();
+      },
+      phoneSendText: (text: string) => {
+        void this.doPhoneSend(String(text || ''));
+      },
+      getFreeVoiceStatus: () => ({
+        connected: freeVoice.connected,
+        line: freeVoice.statusLine(),
+        voices: freeVoice.listVoices().map((v) => ({ uri: v.voiceURI, name: v.name })),
+      }),
+      setFreeVoiceUri: (uri: string) => {
+        const r = freeVoice.connect(String(uri || ''));
+        this.statusLine = r.msg;
+        setDomStatus(this.statusLine);
+        (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+          `${r.msg}\n\n${freeVoice.statusLine()}`,
+        );
+        if (r.ok) {
+          freeVoice.speak(`Free AI voice connected. Hi, I am ready to talk.`);
+        }
       },
       equipWhip: () => {
         this.paused = false;
@@ -856,25 +886,38 @@ export class GameScene extends Phaser.Scene {
     (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi?.(false);
     const tip = this.tigers?.isActive?.()
       ? '⚠️ Tigers out! Call Zookeeper or grab WHIP.'
-      : 'All quiet. Who do you want to call?';
+      : 'Connect Free AI Voice, then call someone and talk.';
     (window as unknown as { __ecraftPhoneUi?: (o: boolean, lines?: string[]) => void }).__ecraftPhoneUi?.(true, [
       tip,
-      'Turn volume UP — real voices talk through your speaker.',
+      freeVoice.statusLine(),
+      'Volume UP · 🔌 Connect Free AI Voice · then HOLD TO TALK',
     ]);
-    // Greeting spoken aloud
+    (window as unknown as { __ecraftRefreshVoices?: () => void }).__ecraftRefreshVoices?.();
     audio.dialTone();
     window.setTimeout(() => {
-      audio.speak('Want to call somebody? Pick a contact on the phone.', {
+      const speak = freeVoice.connected ? freeVoice.speak.bind(freeVoice) : audio.speak.bind(audio);
+      speak('Want to call somebody? First connect free AI voice, then pick a contact and talk.', {
         pitch: 1.05,
         rate: 1.0,
         prefer: 'high',
       });
     }, 700);
-    this.statusLine = '📱 Phone — want to call somebody?';
+    this.statusLine = '📱 Phone open — connect Free AI Voice to talk.';
     setDomStatus(this.statusLine);
   }
 
-  /** Dial a contact — unique dialogue spoken aloud on the device speaker. */
+  private doConnectFreeVoice(): void {
+    const r = freeVoice.connect();
+    this.statusLine = r.msg;
+    setDomStatus(this.statusLine);
+    (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+      `🔌 ${r.msg}\n\n${freeVoice.statusLine()}\n\nPick a contact, then HOLD TO TALK or type a message.`,
+    );
+    (window as unknown as { __ecraftRefreshVoices?: () => void }).__ecraftRefreshVoices?.();
+    if (r.ok) freeVoice.speak('Free AI voice is connected. You can talk to anyone on the phone now.');
+  }
+
+  /** Dial a contact — greeting + ready for two-way talk. */
   private callPhoneContact(id: string): void {
     if (!this.phoneOpen) this.usePhone();
     const contact = getContact(id);
@@ -883,32 +926,68 @@ export class GameScene extends Phaser.Scene {
       setDomStatus(this.statusLine);
       return;
     }
+    if (!freeVoice.connected) this.doConnectFreeVoice();
+    this.activePhoneContact = id;
+    freeVoice.clearHistory(id);
     const n = this.phoneCallCounts.get(id) ?? 0;
     this.phoneCallCounts.set(id, n + 1);
     const line = nextLine(contact, n);
-    const spoken = `${contact.label.replace(/^Call /, '')} here. ${line}`;
     audio.dialTone();
-    const status = `${contact.emoji} Calling ${contact.label.replace(/^Call /, '')}…\n\n“${line}”\n\n🔊 Listen — voice on your speaker!`;
+    const status = `${contact.emoji} Connected to ${contact.label.replace(/^Call /, '')}\n\n“${line}”\n\n🎙️ HOLD TO TALK or type below — they will answer out loud.`;
     (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(status);
-    this.statusLine = `${contact.emoji} On call with ${contact.label.replace(/^Call /, '')}`;
+    this.statusLine = `${contact.emoji} On call with ${contact.label.replace(/^Call /, '')} — talk!`;
     setDomStatus(this.statusLine);
     window.setTimeout(() => {
-      const ok = audio.speak(spoken, {
+      freeVoice.speak(`${contact.label.replace(/^Call /, '')} here. ${line} Go ahead — I am listening.`, {
         pitch: contact.pitch,
         rate: contact.rate,
-        prefer: contact.prefer,
-        onend: () => {
-          (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
-            `${contact.emoji} Call ended.\n\n“${line}”\n\nTap another contact or HANG UP.`,
-          );
-        },
       });
-      if (!ok) {
-        (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
-          `${contact.emoji} ${line}\n\n(Voice not available on this device — text still shows.)`,
-        );
-      }
-    }, 550);
+    }, 500);
+  }
+
+  private async doPhoneTalk(): Promise<void> {
+    if (!this.activePhoneContact) {
+      this.statusLine = 'Pick a contact first, then talk.';
+      setDomStatus(this.statusLine);
+      (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+        'Pick a contact from the list first, then HOLD TO TALK.',
+      );
+      return;
+    }
+    if (!freeVoice.connected) this.doConnectFreeVoice();
+    freeVoice.stopSpeaking();
+    (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+      '🎙️ Listening… speak now!',
+    );
+    const heard = await freeVoice.listenOnce(9000);
+    if (!heard) {
+      (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+        'Didn’t catch that. Tap HOLD TO TALK again, or type a message.',
+      );
+      return;
+    }
+    await this.doPhoneSend(heard);
+  }
+
+  private async doPhoneSend(text: string): Promise<void> {
+    const msg = text.trim();
+    if (!msg) return;
+    if (!this.activePhoneContact) {
+      this.statusLine = 'Pick a contact first.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    if (!freeVoice.connected) this.doConnectFreeVoice();
+    const contact = getContact(this.activePhoneContact);
+    (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+      `You: “${msg}”\n\n${contact?.emoji || '📱'} thinking…`,
+    );
+    const { reply, source } = await freeVoice.chat(this.activePhoneContact, msg);
+    (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+      `You: “${msg}”\n\n${contact?.emoji || '📱'} ${contact?.label.replace(/^Call /, '') || ''}:\n“${reply}”\n\n(${source === 'xai' ? 'AI' : 'Free AI Voice'}) · talk again anytime`,
+    );
+    this.statusLine = `${contact?.emoji || '📱'} Replied out loud`;
+    setDomStatus(this.statusLine);
   }
 
   /** Take the whip out of the backpack (equip for quick WHIP taps). */

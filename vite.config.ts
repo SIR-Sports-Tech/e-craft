@@ -5,7 +5,14 @@ const base = process.env.GITHUB_PAGES === '1' ? '/e-craft/' : '/';
 
 export default defineConfig({
   base,
-  server: { port: 5173, host: true },
+  server: {
+    port: 5173,
+    host: true,
+    proxy: {
+      // Local phone AI → node server/phone-api.mjs
+      '/api': { target: 'http://127.0.0.1:8791', changeOrigin: true },
+    },
+  },
   preview: { port: 4173, host: true },
   build: { target: 'es2020' },
 });

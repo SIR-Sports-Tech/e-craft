@@ -103,7 +103,16 @@ export class AudioSystem {
     u.pitch = opts?.pitch ?? 1;
     u.rate = opts?.rate ?? 1;
     u.volume = 1;
-    const voice = this.pickVoice(opts?.prefer ?? 'mid');
+    // Prefer user-connected Free AI Voice if set
+    let voice: SpeechSynthesisVoice | null = null;
+    try {
+      const uri = localStorage.getItem('ecraft_free_voice_uri');
+      const on = localStorage.getItem('ecraft_free_voice_on') === '1';
+      if (on && uri) voice = synth.getVoices().find((v) => v.voiceURI === uri) || null;
+    } catch {
+      /* ignore */
+    }
+    if (!voice) voice = this.pickVoice(opts?.prefer ?? 'mid');
     if (voice) u.voice = voice;
     if (opts?.onend) u.onend = () => opts.onend?.();
     // Resume AudioContext so SFX + speech share unlocked gesture on iPad
