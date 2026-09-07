@@ -185,6 +185,106 @@ export const CIVIC_THEMES: Record<string, CivicTheme> = {
     propB: 'Teller Computer',
     propC: 'Vault Floor',
   },
+  // Eastport mega-city
+  east_plaza: {
+    title: '🌆 Eastport Grand Plaza',
+    wall: 0xf3e5f5,
+    accent: 0x6a1b9a,
+    tip: 'Welcome to Eastport — take the train back west anytime.',
+    propA: 'Fountain',
+    propB: 'Info Kiosk',
+    propC: 'City Map',
+  },
+  east_tower: {
+    title: '🏢 Skyline Tower Lobby',
+    wall: 0xe3f2fd,
+    accent: 0x1565c0,
+    tip: 'Glass elevators and skyline views.',
+    propA: 'Reception',
+    propB: 'Elevator Bank',
+    propC: 'Lobby Art',
+  },
+  east_mall: {
+    title: '🛍️ Eastport Mall',
+    wall: 0xfce4ec,
+    accent: 0xad1457,
+    tip: 'Shops, snacks, and neon lights.',
+    propA: 'Food Court',
+    propB: 'Boutique',
+    propC: 'Escalator',
+  },
+  east_bank: {
+    title: '🏦 Eastport Gold Exchange',
+    wall: 0xfff8e1,
+    accent: 0xf9a825,
+    tip: 'Watch for robbers outside — gold moves fast here.',
+    propA: 'Teller Desk',
+    propB: 'Vault Door',
+    propC: 'Camera Bank',
+  },
+  east_police: {
+    title: '🚓 Eastport Precinct',
+    wall: 0xe8eaf6,
+    accent: 0x1a237e,
+    tip: 'Report robbers to the desk sergeant.',
+    propA: 'Booking Desk',
+    propB: 'Holding Cell',
+    propC: 'Radio Room',
+  },
+  east_hotel: {
+    title: '🏨 Neon Hotel Lobby',
+    wall: 0xf3e5f5,
+    accent: 0x6a1b9a,
+    tip: 'Check in after a long train ride.',
+    propA: 'Front Desk',
+    propB: 'Lounge',
+    propC: 'Key Rack',
+  },
+  east_casino: {
+    title: '🎰 Lucky Lantern Casino',
+    wall: 0xffebee,
+    accent: 0xb71c1c,
+    tip: 'Family-friendly lights and prizes — no real gambling stakes.',
+    propA: 'Prize Counter',
+    propB: 'Light Show',
+    propC: 'Snack Bar',
+  },
+  east_docks: {
+    title: '⚓ Eastport Harbor Office',
+    wall: 0xeceff1,
+    accent: 0x37474f,
+    tip: 'Ships, ropes, and harbor charts.',
+    propA: 'Harbor Desk',
+    propB: 'Tide Chart',
+    propC: 'Rope Coils',
+  },
+  east_park: {
+    title: '🌳 Harbor Park Pavilion',
+    wall: 0xe8f5e9,
+    accent: 0x2e7d32,
+    tip: 'A quiet green break from Eastport hustle.',
+    propA: 'Benches',
+    propB: 'Pond',
+    propC: 'Picnic Tables',
+  },
+  east_market: {
+    title: '🏮 Night Market Hall',
+    wall: 0xfff3e0,
+    accent: 0xe65100,
+    tip: 'Street food and souvenirs under lanterns.',
+    propA: 'Food Stall',
+    propB: 'Lanterns',
+    propC: 'Souvenir Cart',
+  },
+  east_arena: {
+    title: '🏟️ Eastport Arena Lobby',
+    wall: 0xe0f2f1,
+    accent: 0x00695c,
+    tip: 'Cheer night — tickets at the booth.',
+    propA: 'Ticket Booth',
+    propB: 'Trophy Case',
+    propC: 'Concession',
+  },
 };
 
 const SPECIAL: Record<string, { kind: BuildingKind; prompt: string }> = {
@@ -194,7 +294,14 @@ const SPECIAL: Record<string, { kind: BuildingKind; prompt: string }> = {
 };
 
 /** Zones that are props / outdoors only — no interior door. */
-const SKIP = new Set(['forest', 'vehicle_bay', 'race_bay', 'job_board']);
+const SKIP = new Set([
+  'forest',
+  'vehicle_bay',
+  'race_bay',
+  'job_board',
+  'train_west',
+  'train_east',
+]);
 
 /**
  * Every labeled city building you can walk up to and enter.

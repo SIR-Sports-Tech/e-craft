@@ -1,8 +1,8 @@
 /** Top-down world layout for E-CRAFT v0.1 (original placeholder geometry). */
 
 export const WORLD = {
-  // Even larger wilderness east of the city
-  width: 12000,
+  // Home city (west) → huge forest → Eastport mega-city (far east)
+  width: 16800,
   height: 11000,
 } as const;
 
@@ -189,7 +189,136 @@ export const CITY_ZONES: RectZone[] = [
     h: 10000,
     color: 0x1a4a28,
   },
+  // —— Train stations (board here to cross the forest) ——
+  {
+    id: 'train_west',
+    label: 'Westline Train Station',
+    x: 2180,
+    y: 640,
+    w: 220,
+    h: 160,
+    color: 0x37474f,
+    interact: 'board_train',
+  },
+  {
+    id: 'train_east',
+    label: 'Eastport Train Station',
+    x: 10840,
+    y: 640,
+    w: 260,
+    h: 180,
+    color: 0x455a64,
+    interact: 'board_train',
+  },
+  // —— EASTPORT mega-city (other side of the forest) ——
+  {
+    id: 'east_plaza',
+    label: 'Eastport Grand Plaza',
+    x: 11200,
+    y: 200,
+    w: 520,
+    h: 360,
+    color: 0x4a148c,
+  },
+  {
+    id: 'east_tower',
+    label: 'Skyline Tower',
+    x: 11800,
+    y: 160,
+    w: 280,
+    h: 420,
+    color: 0x1565c0,
+  },
+  {
+    id: 'east_mall',
+    label: 'Eastport Mall',
+    x: 12180,
+    y: 220,
+    w: 480,
+    h: 320,
+    color: 0xad1457,
+  },
+  {
+    id: 'east_bank',
+    label: 'Eastport Gold Exchange',
+    x: 11240,
+    y: 620,
+    w: 300,
+    h: 240,
+    color: 0xf9a825,
+  },
+  {
+    id: 'east_police',
+    label: 'Eastport Precinct',
+    x: 11640,
+    y: 620,
+    w: 320,
+    h: 260,
+    color: 0x1a237e,
+  },
+  {
+    id: 'east_hotel',
+    label: 'Neon Hotel',
+    x: 12080,
+    y: 600,
+    w: 360,
+    h: 280,
+    color: 0x6a1b9a,
+  },
+  {
+    id: 'east_casino',
+    label: 'Lucky Lantern Casino',
+    x: 12540,
+    y: 580,
+    w: 400,
+    h: 300,
+    color: 0xb71c1c,
+  },
+  {
+    id: 'east_docks',
+    label: 'Eastport Harbor',
+    x: 13040,
+    y: 700,
+    w: 520,
+    h: 280,
+    color: 0x263238,
+  },
+  {
+    id: 'east_park',
+    label: 'Harbor Park',
+    x: 11200,
+    y: 980,
+    w: 600,
+    h: 280,
+    color: 0x1b5e20,
+  },
+  {
+    id: 'east_market',
+    label: 'Night Market Row',
+    x: 11900,
+    y: 980,
+    w: 560,
+    h: 260,
+    color: 0xe65100,
+  },
+  {
+    id: 'east_arena',
+    label: 'Eastport Arena',
+    x: 12600,
+    y: 960,
+    w: 480,
+    h: 320,
+    color: 0x00695c,
+  },
 ];
+
+/** Train ride endpoints (platform centers). */
+export const TRAIN = {
+  west: { x: 2290, y: 720, label: 'Westline Station' },
+  east: { x: 10970, y: 730, label: 'Eastport Station' },
+  /** Track Y the train rides along */
+  trackY: 720,
+} as const;
 
 /** Indoor: underground gadget lair (shown when player is in lair mode) */
 export const LAIR = {
@@ -246,6 +375,9 @@ export const ROADS: RectZone[] = [
   { id: 'road_v1', label: 'Forest Road', x: 1900, y: 20, w: 80, h: 4800, color: 0x333340 },
   { id: 'road_forest_deep', label: 'Deep Woods Track', x: 2400, y: 900, w: 4800, h: 60, color: 0x2e3d2e },
   { id: 'road_forest_north', label: 'North Timber Trail', x: 3200, y: 400, w: 60, h: 5200, color: 0x2e3d2e },
+  { id: 'road_rail', label: 'Rail Corridor', x: 2100, y: 700, w: 9200, h: 48, color: 0x212121 },
+  { id: 'road_east_main', label: 'Eastport Main', x: 11000, y: 760, w: 2800, h: 90, color: 0x333340 },
+  { id: 'road_east_v1', label: 'Harbor Ave', x: 12400, y: 200, w: 70, h: 1100, color: 0x333340 },
   { id: 'road_h2', label: 'HQ Drive', x: 200, y: 480, w: 80, h: 280, color: 0x333340 },
   { id: 'road_h3', label: 'Park Road', x: 100, y: 1000, w: 2200, h: 70, color: 0x333340 },
   { id: 'road_v2', label: 'Market Ave', x: 1450, y: 400, w: 70, h: 800, color: 0x333340 },

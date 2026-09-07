@@ -26,6 +26,8 @@ export class BootScene extends Phaser.Scene {
     this.makeTree();
     this.makeBearHeads();
     this.makeSnake();
+    this.makeTrain();
+    this.makeRobber();
     this.makeCitizen();
     this.makePanther();
     this.makeTiger();
@@ -1120,6 +1122,79 @@ export class BootScene extends Phaser.Scene {
       frameRate: 8,
       repeat: -1,
     });
+  }
+
+  private makeTrain(): void {
+    // Engine
+    {
+      const g = this.g();
+      g.fillStyle(0x000000, 0.25);
+      g.fillEllipse(70, 78, 100, 16);
+      g.fillStyle(0xc62828, 1);
+      g.fillRoundedRect(20, 28, 100, 40, 6);
+      g.fillStyle(0x212121, 1);
+      g.fillRect(100, 18, 28, 36);
+      g.fillStyle(0x90a4ae, 1);
+      g.fillRect(108, 8, 14, 14); // stack
+      g.fillStyle(0xffee58, 1);
+      g.fillCircle(130, 48, 6); // headlight
+      g.fillStyle(0x37474f, 1);
+      g.fillCircle(40, 72, 12);
+      g.fillCircle(90, 72, 12);
+      g.fillStyle(0xbdbdbd, 1);
+      g.fillCircle(40, 72, 4);
+      g.fillCircle(90, 72, 4);
+      g.generateTexture('train_engine', 150, 88);
+      g.destroy();
+    }
+    // Passenger car
+    {
+      const g = this.g();
+      g.fillStyle(0x000000, 0.2);
+      g.fillEllipse(70, 70, 110, 14);
+      g.fillStyle(0x1565c0, 1);
+      g.fillRoundedRect(8, 22, 120, 38, 5);
+      g.fillStyle(0x81d4fa, 1);
+      g.fillRect(20, 30, 22, 16);
+      g.fillRect(50, 30, 22, 16);
+      g.fillRect(80, 30, 22, 16);
+      g.fillStyle(0x212121, 1);
+      g.fillCircle(30, 64, 10);
+      g.fillCircle(100, 64, 10);
+      g.generateTexture('train_car', 140, 80);
+      g.destroy();
+    }
+  }
+
+  private makeRobber(): void {
+    const g = this.g();
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(28, 70, 26, 8);
+    // striped shirt
+    g.fillStyle(0x212121, 1);
+    g.fillRoundedRect(14, 28, 28, 30, 4);
+    g.fillStyle(0xffffff, 1);
+    for (let i = 0; i < 4; i++) g.fillRect(14, 30 + i * 7, 28, 3);
+    // mask
+    g.fillStyle(0x212121, 1);
+    g.fillCircle(28, 16, 12);
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(18, 14, 8, 4);
+    g.fillRect(30, 14, 8, 4);
+    g.fillStyle(0x000000, 1);
+    g.fillCircle(22, 16, 2);
+    g.fillCircle(34, 16, 2);
+    // sack
+    g.fillStyle(0x6d4c41, 1);
+    g.fillEllipse(48, 40, 18, 16);
+    g.fillStyle(0xffd54f, 1);
+    g.fillCircle(48, 40, 4);
+    // legs
+    g.fillStyle(0x37474f, 1);
+    g.fillRect(18, 56, 8, 14);
+    g.fillRect(32, 56, 8, 14);
+    g.generateTexture('robber', 64, 80);
+    g.destroy();
   }
 
   private makeCitizen(): void {

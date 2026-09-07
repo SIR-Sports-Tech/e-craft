@@ -26,6 +26,8 @@ import { getContact, nextLine } from '../systems/PhoneCallSystem';
 import { freeVoice } from '../systems/FreeVoiceSystem';
 import { ForestBearSystem } from '../systems/ForestBearSystem';
 import { ForestSnakeSystem } from '../systems/ForestSnakeSystem';
+import { TrainSystem } from '../systems/TrainSystem';
+import { RobberSystem } from '../systems/RobberSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
 import {
@@ -183,6 +185,8 @@ export class GameScene extends Phaser.Scene {
   private patrolCars!: PatrolCarsSystem;
   private forestBears!: ForestBearSystem;
   private forestSnakes!: ForestSnakeSystem;
+  private train!: TrainSystem;
+  private robbers!: RobberSystem;
   private forestTreeSpots: Array<{ x: number; y: number }> = [];
   /** Snake bite slows movement briefly */
   private snakeBittenT = 0;
@@ -352,6 +356,21 @@ export class GameScene extends Phaser.Scene {
     this.tigers.setOnSpawn((s) => this.bindSolidMover(s));
     this.panther.setOnSpawn((s) => this.bindSolidMover(s));
     this.pigDrop.setOnSpawn((s) => this.bindSolidMover(s));
+    this.train = new TrainSystem(this);
+    this.train.spawn();
+    this.train.setHandlers(
+      (msg) => {
+        this.statusLine = msg;
+        setDomStatus(msg);
+      },
+      (side) => {
+        if (side === 'east') audio.success();
+        else audio.talk();
+      },
+    );
+    this.robbers = new RobberSystem(this);
+    this.robbers.spawn();
+    for (const r of this.robbers.getSprites()) this.bindSolidMover(r);
     this.buildingLoot = new BuildingLootSystem(this);
     // Tap/click world to aim + place (Minecraft-style pointer build)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -650,6 +669,16 @@ export class GameScene extends Phaser.Scene {
           setDomStatus(msg);
           audio.talk();
         });
+      },
+      boardTrain: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        if (this.isIndoors()) {
+          this.statusLine = 'Go outside to a train station to board.';
+          setDomStatus(this.statusLine);
+          return;
+        }
+        this.train.tryBoard(this.player);
       },
       forceFlatten: () => {
         this.paused = false;
@@ -1339,6 +1368,17 @@ export class GameScene extends Phaser.Scene {
       forest: 'bldg_forest_cabin',
       vehicle_bay: 'bldg_plaza',
       race_bay: 'bldg_plaza',
+      east_plaza: 'bldg_plaza',
+      east_tower: 'bldg_hq',
+      east_mall: 'bldg_plaza',
+      east_bank: 'bldg_jail',
+      east_police: 'bldg_hq',
+      east_hotel: 'bldg_house',
+      east_casino: 'bldg_plaza',
+      east_docks: 'bldg_plaza',
+      east_park: 'bldg_plaza',
+      east_market: 'bldg_plaza',
+      east_arena: 'bldg_plaza',
       player_house: 'bldg_house',
     };
     const enterableById = new Map(listEnterableBuildings().map((b) => [b.id, b]));
@@ -1362,6 +1402,13 @@ export class GameScene extends Phaser.Scene {
         const bay = this.add
           .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, 0x7f0000, 0.45)
           .setStrokeStyle(3, 0xff5252, 0.85)
+          .setDepth(2);
+        this.worldLayer.add(bay);
+      } else if (z.id === 'train_west' || z.id === 'train_east') {
+        // Platforms drawn by TrainSystem — station pad only
+        const bay = this.add
+          .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, 0x546e7a, 0.55)
+          .setStrokeStyle(3, 0xffe082, 0.9)
           .setDepth(2);
         this.worldLayer.add(bay);
       } else if (z.id !== 'forest') {
@@ -1614,7 +1661,20 @@ export class GameScene extends Phaser.Scene {
       market_row: 'RETAIL DISTRICT',
       docks: 'WATERFRONT',
       bank: 'GOLD VAULT · OPEN FLOOR',
-      forest: 'OPEN WILDERNESS — walk anywhere',
+      forest: 'OPEN WILDERNESS — watch for bears & snakes',
+      train_west: 'BOARD TRAIN → EASTPORT',
+      train_east: 'BOARD TRAIN → WESTLINE',
+      east_plaza: 'EASTPORT MEGA-CITY',
+      east_tower: 'SKYLINE DISTRICT',
+      east_mall: 'SHOPPING DISTRICT',
+      east_bank: 'GOLD EXCHANGE',
+      east_police: 'PRECINCT',
+      east_hotel: 'NEON DISTRICT',
+      east_casino: 'LUCKY LANTERN',
+      east_docks: 'HARBOR',
+      east_park: 'HARBOR PARK',
+      east_market: 'NIGHT MARKET',
+      east_arena: 'ARENA',
       vehicle_bay: 'FLEET PARKING',
       race_bay: 'HIGH-SPEED UNIT',
       player_house: 'PRIVATE RESIDENCE',
@@ -2507,6 +2567,11 @@ export class GameScene extends Phaser.Scene {
         snakes: this.forestSnakes?.count?.() ?? 0,
         bitten: this.snakeBittenT > 0,
       },
+      train: {
+        side: this.train?.currentSide?.() ?? 'west',
+        busy: this.train?.isBusy?.() ?? false,
+      },
+      robbers: this.robbers?.count?.() ?? 0,
       tigerNearDist: this.tigers?.nearestDist?.(this.player) ?? Infinity,
       backpackOpen: this.backpackOpen,
       phoneOpen: this.phoneOpen,
@@ -2637,6 +2702,13 @@ export class GameScene extends Phaser.Scene {
       const bite = this.forestSnakes?.update(d, this.player, outdoors, this.snakeBittenT > 0);
       if (bite) this.applySnakeBite(bite);
       if (this.snakeBittenT > 0) this.snakeBittenT = Math.max(0, this.snakeBittenT - d);
+      this.train?.update();
+      this.robbers?.setOutdoorVisible(outdoors);
+      this.robbers?.update(d, this.player, outdoors, (msg) => {
+        this.statusLine = msg;
+        setDomStatus(msg);
+        audio.talk();
+      });
       // WALL LAW — shove cars/people out of building solids every frame
       if (outdoors) this.buildingCollision?.resolveAllBound?.();
       this.updatePlayerPoliceLights(d, outdoors);
@@ -2926,7 +2998,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleMovement(): void {
-    if (this.flattened || this.lyingInBed || this.sleeping || this.atComputer) {
+    if (this.flattened || this.lyingInBed || this.sleeping || this.atComputer || this.train?.isBusy()) {
       this.player.setVelocity(0, 0);
       return;
     }
@@ -2939,12 +3011,18 @@ export class GameScene extends Phaser.Scene {
       : 240;
     // Snake bite — brief limp only (woods stay walkable)
     if (this.snakeBittenT > 0 && !this.flags.inVehicle) speed *= 0.7;
-    // Forest is fully open — slight trail speed so deep woods feel free
-    else if (
-      !this.flags.inVehicle &&
-      this.player.x >= (CITY_ZONES.find((z) => z.id === 'forest')?.x ?? 99999)
-    ) {
-      speed *= 1.2;
+    // Forest is fully open — slight trail speed in the woods only
+    else if (!this.flags.inVehicle) {
+      const forest = CITY_ZONES.find((z) => z.id === 'forest');
+      if (
+        forest &&
+        this.player.x >= forest.x &&
+        this.player.x <= forest.x + forest.w &&
+        this.player.y >= forest.y &&
+        this.player.y <= forest.y + forest.h
+      ) {
+        speed *= 1.2;
+      }
     }
     let vx = 0;
     let vy = 0;
@@ -3651,6 +3729,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tryInteract(): void {
+    // Board train at either station
+    if (!this.isIndoors() && this.train?.nearPlatform(this.player.x, this.player.y, 120)) {
+      this.train.tryBoard(this.player);
+      return;
+    }
+
     if (this.inCraftHouse) {
       if (this.craftBuild?.isMode()) {
         this.placeCraftBlock();
