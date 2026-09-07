@@ -927,104 +927,122 @@ export class GameScene extends Phaser.Scene {
       setDomStatus(this.statusLine);
       return;
     }
+    // Unlock speakers on the same tap (required for iPad/iPhone audio)
+    audio.unlock();
+    freeVoice.connect();
     this.backpackOpen = false;
     this.phoneOpen = true;
     (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi?.(false);
     const tip = this.tigers?.isActive?.()
       ? '⚠️ Tigers out! Call Zookeeper or grab WHIP.'
-      : 'Connect Free AI Voice, then call someone and talk.';
+      : 'Turn VOLUME UP — voices speak out loud.';
     (window as unknown as { __ecraftPhoneUi?: (o: boolean, lines?: string[]) => void }).__ecraftPhoneUi?.(true, [
       tip,
       freeVoice.statusLine(),
-      'Volume UP · 🔌 Connect Free AI Voice · then HOLD TO TALK',
+      'Tap a contact to HEAR them · TAP TO TALK or type',
     ]);
     (window as unknown as { __ecraftRefreshVoices?: () => void }).__ecraftRefreshVoices?.();
     audio.dialTone();
-    window.setTimeout(() => {
-      const speak = freeVoice.connected ? freeVoice.speak.bind(freeVoice) : audio.speak.bind(audio);
-      speak('Want to call somebody? First connect free AI voice, then pick a contact and talk.', {
-        pitch: 1.05,
-        rate: 1.0,
-        prefer: 'high',
-      });
-    }, 700);
-    this.statusLine = '📱 Phone open — connect Free AI Voice to talk.';
+    // Speak IMMEDIATELY (no setTimeout — iOS blocks delayed speech)
+    freeVoice.speak('Phone on. Want to call somebody? Tap a contact to hear their voice.', {
+      pitch: 1.05,
+      rate: 1.0,
+      prefer: 'high',
+    });
+    this.statusLine = '📱 Phone on — tap a contact to hear them!';
     setDomStatus(this.statusLine);
   }
 
   private doConnectFreeVoice(): void {
+    audio.unlock();
     const r = freeVoice.connect();
     this.statusLine = r.msg;
     setDomStatus(this.statusLine);
     (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
-      `🔌 ${r.msg}\n\n${freeVoice.statusLine()}\n\nPick a contact, then HOLD TO TALK or type a message.`,
+      `🔌 ${r.msg}\n\n${freeVoice.statusLine()}\n\nPick a contact — you will HEAR them. Then TAP TO TALK.`,
     );
     (window as unknown as { __ecraftRefreshVoices?: () => void }).__ecraftRefreshVoices?.();
-    if (r.ok) freeVoice.speak('Free AI voice is connected. You can talk to anyone on the phone now.');
+    freeVoice.speak(
+      r.ok
+        ? 'Free AI voice is connected. Tap a contact and you will hear them talk.'
+        : 'Could not connect a voice on this device. Try Chrome or Safari with volume up.',
+    );
   }
 
-  /** Dial a contact — greeting + ready for two-way talk. */
+  /** Dial a contact — greeting spoken NOW on the same tap. */
   private callPhoneContact(id: string): void {
-    if (!this.phoneOpen) this.usePhone();
+    audio.unlock();
+    if (!this.phoneOpen) {
+      this.phoneOpen = true;
+      (window as unknown as { __ecraftPhoneUi?: (o: boolean, lines?: string[]) => void }).__ecraftPhoneUi?.(true, [
+        'Calling…',
+      ]);
+    }
     const contact = getContact(id);
     if (!contact) {
       this.statusLine = 'Unknown number.';
       setDomStatus(this.statusLine);
       return;
     }
-    if (!freeVoice.connected) this.doConnectFreeVoice();
+    if (!freeVoice.connected) freeVoice.connect();
     this.activePhoneContact = id;
     freeVoice.clearHistory(id);
     const n = this.phoneCallCounts.get(id) ?? 0;
     this.phoneCallCounts.set(id, n + 1);
     const line = nextLine(contact, n);
+    const spoken = `${contact.label.replace(/^Call /, '')} here. ${line} Go ahead — I am listening.`;
     audio.dialTone();
-    const status = `${contact.emoji} Connected to ${contact.label.replace(/^Call /, '')}\n\n“${line}”\n\n🎙️ HOLD TO TALK or type below — they will answer out loud.`;
+    // Speak on THIS tap — critical for iPhone/iPad
+    freeVoice.speak(spoken, { pitch: contact.pitch, rate: contact.rate });
+    const status = `${contact.emoji} Connected to ${contact.label.replace(/^Call /, '')}\n\n“${line}”\n\n🔊 Speaking out loud!\n🎙️ TAP TO TALK or type / quick phrases.`;
     (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(status);
-    this.statusLine = `${contact.emoji} On call with ${contact.label.replace(/^Call /, '')} — talk!`;
+    this.statusLine = `${contact.emoji} On call — listen!`;
     setDomStatus(this.statusLine);
-    window.setTimeout(() => {
-      freeVoice.speak(`${contact.label.replace(/^Call /, '')} here. ${line} Go ahead — I am listening.`, {
-        pitch: contact.pitch,
-        rate: contact.rate,
-      });
-    }, 500);
   }
 
   private async doPhoneTalk(): Promise<void> {
+    audio.unlock();
     if (!this.activePhoneContact) {
+      freeVoice.speak('Pick a contact first, then tap to talk.');
       this.statusLine = 'Pick a contact first, then talk.';
       setDomStatus(this.statusLine);
       (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
-        'Pick a contact from the list first, then HOLD TO TALK.',
+        'Pick a contact from the list first, then TAP TO TALK.',
       );
       return;
     }
-    if (!freeVoice.connected) this.doConnectFreeVoice();
-    freeVoice.stopSpeaking();
+    if (!freeVoice.connected) freeVoice.connect();
+    freeVoice.speak('Listening. Go ahead.');
     (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
-      '🎙️ Listening… speak now!',
+      '🎙️ Listening… speak now into the mic!',
     );
-    const heard = await freeVoice.listenOnce(9000);
-    if (!heard) {
-      (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
-        'Didn’t catch that. Tap HOLD TO TALK again, or type a message.',
-      );
+    const result = await freeVoice.listenOnce(10000);
+    if (!result.text) {
+      const tip =
+        result.error === 'no-mic-api'
+          ? 'Mic not available here — type a message or tap a quick phrase below.'
+          : 'Didn’t catch that — allow microphone, or type / tap a quick phrase.';
+      freeVoice.speak(tip);
+      (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(tip);
+      (window as unknown as { __ecraftShowPhonePhrases?: () => void }).__ecraftShowPhonePhrases?.();
       return;
     }
-    await this.doPhoneSend(heard);
+    await this.doPhoneSend(result.text);
   }
 
   private async doPhoneSend(text: string): Promise<void> {
+    audio.unlock();
     const msg = text.trim();
     if (!msg) return;
     if (!this.activePhoneContact) {
+      freeVoice.speak('Pick a contact first.');
       this.statusLine = 'Pick a contact first.';
       setDomStatus(this.statusLine);
       return;
     }
-    if (!freeVoice.connected) this.doConnectFreeVoice();
+    if (!freeVoice.connected) freeVoice.connect();
     const contact = getContact(this.activePhoneContact);
+    freeVoice.speak('Okay.');
     (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
       `You: “${msg}”\n\n${contact?.emoji || '📱'} thinking…`,
     );

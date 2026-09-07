@@ -4,6 +4,7 @@
  */
 
 import { getContact } from './PhoneCallSystem';
+import { speakNow, unlockVoices } from './VoiceUnlock';
 
 const VOICE_KEY = 'ecraft_free_voice_uri';
 const CONNECTED_KEY = 'ecraft_free_voice_on';
@@ -60,28 +61,28 @@ export class FreeVoiceSystem {
   }
 
   connect(voiceURI?: string): { ok: boolean; msg: string; voiceName?: string } {
+    unlockVoices();
     if (!this.isSpeechAvailable()) {
       return { ok: false, msg: 'This device has no free speech voices.' };
     }
+    void window.speechSynthesis.getVoices();
     const voices = this.listVoices();
-    if (!voices.length) {
-      window.speechSynthesis.getVoices();
-      return { ok: false, msg: 'Loading free voices… tap Connect again in a second.' };
-    }
     const pick =
       (voiceURI && voices.find((v) => v.voiceURI === voiceURI)) ||
       (this.voiceURI && voices.find((v) => v.voiceURI === this.voiceURI)) ||
       voices.find((v) => /samantha|google|microsoft|enhanced|natural/i.test(v.name)) ||
       voices[0];
-    this.voiceURI = pick.voiceURI;
+    // Connect even if voice list is still empty — system default still speaks
+    this.voiceURI = pick?.voiceURI ?? this.voiceURI;
     this.connected = true;
     try {
-      localStorage.setItem(VOICE_KEY, this.voiceURI);
+      if (this.voiceURI) localStorage.setItem(VOICE_KEY, this.voiceURI);
       localStorage.setItem(CONNECTED_KEY, '1');
     } catch {
       /* ignore */
     }
-    return { ok: true, msg: `Connected free AI voice: ${pick.name}`, voiceName: pick.name };
+    const name = pick?.name || 'System voice';
+    return { ok: true, msg: `Connected free AI voice: ${name}`, voiceName: name };
   }
 
   disconnect(): void {
@@ -102,20 +103,15 @@ export class FreeVoiceSystem {
   }
 
   speak(text: string, opts?: { pitch?: number; rate?: number; onend?: () => void; prefer?: string }): boolean {
-    if (!this.connected && !this.connect().ok) return false;
-    const synth = window.speechSynthesis;
-    if (!synth) return false;
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.pitch = opts?.pitch ?? 1;
-    u.rate = opts?.rate ?? 1;
-    u.volume = 1;
-    const voice =
-      this.listVoices().find((v) => v.voiceURI === this.voiceURI) || this.listVoices()[0];
-    if (voice) u.voice = voice;
-    if (opts?.onend) u.onend = () => opts.onend?.();
-    synth.speak(u);
-    return true;
+    unlockVoices();
+    if (!this.connected) this.connect();
+    return speakNow(text, {
+      pitch: opts?.pitch,
+      rate: opts?.rate,
+      voiceURI: this.voiceURI,
+      prefer: (opts?.prefer as 'low' | 'mid' | 'high') || 'mid',
+      onend: opts?.onend,
+    });
   }
 
   stopSpeaking(): void {
@@ -126,12 +122,13 @@ export class FreeVoiceSystem {
     }
   }
 
-  listenOnce(timeoutMs = 8000): Promise<string | null> {
+  listenOnce(timeoutMs = 10000): Promise<{ text: string | null; error?: string }> {
     return new Promise((resolve) => {
+      unlockVoices();
       const w = window as unknown as { SpeechRecognition?: RecogCtor; webkitSpeechRecognition?: RecogCtor };
       const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
       if (!SR) {
-        resolve(null);
+        resolve({ text: null, error: 'no-mic-api' });
         return;
       }
       this.stopListening();
@@ -139,10 +136,11 @@ export class FreeVoiceSystem {
       this.recog = r;
       this.listening = true;
       r.lang = 'en-US';
-      r.interimResults = false;
+      r.interimResults = true;
       r.maxAlternatives = 1;
       let done = false;
-      const finish = (text: string | null) => {
+      let last = '';
+      const finish = (text: string | null, error?: string) => {
         if (done) return;
         done = true;
         this.listening = false;
@@ -151,21 +149,24 @@ export class FreeVoiceSystem {
         } catch {
           /* ignore */
         }
-        resolve(text);
+        resolve({ text: text || last || null, error });
       };
       r.onresult = (ev) => {
         const t = ev.results?.[0]?.[0]?.transcript?.trim() || '';
-        finish(t || null);
+        if (t) last = t;
+        // Final result
+        const isFinal = (ev.results?.[0] as unknown as { isFinal?: boolean })?.isFinal;
+        if (isFinal && t) finish(t);
       };
-      r.onerror = () => finish(null);
-      r.onend = () => finish(null);
+      r.onerror = () => finish(last || null, 'mic-error');
+      r.onend = () => finish(last || null, last ? undefined : 'mic-end');
       try {
         r.start();
       } catch {
-        finish(null);
+        finish(null, 'mic-start-failed');
         return;
       }
-      window.setTimeout(() => finish(null), timeoutMs);
+      window.setTimeout(() => finish(last || null, last ? undefined : 'timeout'), timeoutMs);
     });
   }
 
@@ -219,7 +220,14 @@ export class FreeVoiceSystem {
     hist.push({ role: 'assistant', content: reply });
     this.histories.set(contactId, hist.slice(-12));
     const contact = getContact(contactId);
+    // Speak reply (unlocked earlier on the same tap when possible)
     this.speak(reply, { pitch: contact?.pitch ?? 1, rate: contact?.rate ?? 1 });
+    // Extra retry for iOS delayed-speak after network
+    window.setTimeout(() => {
+      if (!window.speechSynthesis?.speaking) {
+        this.speak(reply, { pitch: contact?.pitch ?? 1, rate: contact?.rate ?? 1 });
+      }
+    }, 400);
     return { reply, source };
   }
 

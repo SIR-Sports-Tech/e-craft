@@ -1,5 +1,7 @@
 /** Tiny original WebAudio SFX + real spoken voices (SpeechSynthesis). */
 
+import { speakNow, unlockVoices } from './VoiceUnlock';
+
 export class AudioSystem {
   private ctx: AudioContext | null = null;
   private muted = false;
@@ -15,6 +17,12 @@ export class AudioSystem {
       warm();
       window.speechSynthesis.onvoiceschanged = warm;
     }
+  }
+
+  /** Unlock speakers from a tap (iOS). */
+  unlock(): void {
+    unlockVoices();
+    this.ensure();
   }
 
   private ensure(): AudioContext | null {
@@ -95,51 +103,24 @@ export class AudioSystem {
     opts?: { pitch?: number; rate?: number; prefer?: 'low' | 'mid' | 'high'; onend?: () => void },
   ): boolean {
     if (this.muted) return false;
-    const synth = window.speechSynthesis;
-    if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return false;
-    this.stopSpeaking();
     void this.voicesReady;
-    const u = new SpeechSynthesisUtterance(text);
-    u.pitch = opts?.pitch ?? 1;
-    u.rate = opts?.rate ?? 1;
-    u.volume = 1;
-    // Prefer user-connected Free AI Voice if set
-    let voice: SpeechSynthesisVoice | null = null;
+    this.ensure();
+    unlockVoices();
+    let voiceURI: string | null = null;
     try {
       const uri = localStorage.getItem('ecraft_free_voice_uri');
       const on = localStorage.getItem('ecraft_free_voice_on') === '1';
-      if (on && uri) voice = synth.getVoices().find((v) => v.voiceURI === uri) || null;
+      if (on && uri) voiceURI = uri;
     } catch {
       /* ignore */
     }
-    if (!voice) voice = this.pickVoice(opts?.prefer ?? 'mid');
-    if (voice) u.voice = voice;
-    if (opts?.onend) u.onend = () => opts.onend?.();
-    // Resume AudioContext so SFX + speech share unlocked gesture on iPad
-    this.ensure();
-    try {
-      synth.speak(u);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private pickVoice(prefer: 'low' | 'mid' | 'high'): SpeechSynthesisVoice | null {
-    const voices = window.speechSynthesis?.getVoices?.() || [];
-    if (!voices.length) return null;
-    const en = voices.filter((v) => /en(-|_|$)/i.test(v.lang) || /english/i.test(v.name));
-    const pool = en.length ? en : voices;
-    const score = (v: SpeechSynthesisVoice): number => {
-      const n = v.name.toLowerCase();
-      let s = 0;
-      if (prefer === 'low' && /(male|daniel|alex|fred|david|bruce|tom|aaron)/i.test(n)) s += 3;
-      if (prefer === 'high' && /(female|samantha|karen|moira|victoria|zira|siri|fiona)/i.test(n)) s += 3;
-      if (prefer === 'mid' && /(samantha|google|microsoft|natural)/i.test(n)) s += 2;
-      if (/google|microsoft|premium|enhanced/i.test(n)) s += 1;
-      return s;
-    };
-    return [...pool].sort((a, b) => score(b) - score(a))[0] || pool[0];
+    return speakNow(text, {
+      pitch: opts?.pitch,
+      rate: opts?.rate,
+      prefer: opts?.prefer ?? 'mid',
+      voiceURI,
+      onend: opts?.onend,
+    });
   }
 }
 

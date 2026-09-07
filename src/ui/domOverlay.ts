@@ -503,6 +503,16 @@ export function installDomOverlay(): void {
       background: #2e7d32;
       animation: phonePulse 0.8s ease infinite alternate;
     }
+    #ecraft-phone .phone-phrase {
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.35);
+      background: #00695c;
+      color: #e0f2f1;
+      font-weight: 800;
+      font-size: 11px;
+      touch-action: manipulation;
+    }
     @keyframes phonePulse {
       from { filter: brightness(1); }
       to { filter: brightness(1.25); }
@@ -790,10 +800,16 @@ export function installDomOverlay(): void {
           <select id="phone-voice-pick" style="width:100%;margin-bottom:8px;height:34px;border-radius:8px;background:#0d47a1;color:#fff;border:1px solid #90caf9;font-size:11px"></select>
           <div class="call-list" id="phone-call-list"></div>
           <div id="phone-talk-row" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
-            <button type="button" id="btn-phone-talk" style="height:42px;border-radius:10px;border:0;background:#c62828;color:#fff;font-weight:900;font-size:12px;touch-action:manipulation">🎙️ HOLD TO TALK</button>
+            <button type="button" id="btn-phone-talk" style="height:42px;border-radius:10px;border:0;background:#c62828;color:#fff;font-weight:900;font-size:12px;touch-action:manipulation">🎙️ TAP TO TALK</button>
             <button type="button" id="btn-phone-send" style="height:42px;border-radius:10px;border:0;background:#1565c0;color:#fff;font-weight:900;font-size:12px;touch-action:manipulation">SEND TEXT</button>
           </div>
           <input id="phone-text-in" type="text" placeholder="Or type what you want to say…" style="width:100%;box-sizing:border-box;margin-top:6px;height:36px;border-radius:8px;border:1px solid #90caf9;background:#e3f2fd;color:#0d47a1;padding:0 8px;font-size:12px" />
+          <div id="phone-phrases" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px">
+            <button type="button" data-phrase="Hello! How are you?" class="phone-phrase">👋 Hello</button>
+            <button type="button" data-phrase="Where are the tigers?" class="phone-phrase">🐯 Tigers?</button>
+            <button type="button" data-phrase="Tell me about the gold bank." class="phone-phrase">🥇 Gold?</button>
+            <button type="button" data-phrase="How do I get to Eastport?" class="phone-phrase">🚂 Eastport?</button>
+          </div>
         </div>
         <button type="button" id="phone-close">HANG UP / CLOSE</button>
       </div>
@@ -1020,8 +1036,9 @@ export function installDomOverlay(): void {
         list.querySelectorAll('button').forEach((b) => b.classList.remove('calling'));
         btn.classList.add('calling');
         const id = btn.dataset.call || '';
+        // Call on this tap so the voice speaks out loud (iOS gesture)
         api()?.callContact?.(id);
-        showToast(`Calling…`);
+        showToast('Calling — turn volume UP!');
       });
     });
   };
@@ -1069,8 +1086,9 @@ export function installDomOverlay(): void {
     e.preventDefault();
     e.stopPropagation();
     flash(e.currentTarget as HTMLElement);
+    // Must call talk on this same gesture so mic + speakers unlock on iOS
     api()?.phoneTalk?.();
-    showToast('Listening…');
+    showToast('Listening… speak now!');
   });
   document.getElementById('btn-phone-send')?.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -1083,7 +1101,7 @@ export function installDomOverlay(): void {
     }
     api()?.phoneSendText?.(text);
     if (inp) inp.value = '';
-    showToast('Sent');
+    showToast('Sent — listen for the reply!');
   });
   document.getElementById('phone-text-in')?.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
@@ -1092,6 +1110,20 @@ export function installDomOverlay(): void {
     api()?.phoneSendText?.(inp.value);
     inp.value = '';
   });
+  document.querySelectorAll<HTMLButtonElement>('#phone-phrases .phone-phrase').forEach((btn) => {
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      flash(btn);
+      const phrase = btn.dataset.phrase || btn.textContent || '';
+      api()?.phoneSendText?.(phrase);
+      showToast('Sent — listen!');
+    });
+  });
+  (window as unknown as { __ecraftShowPhonePhrases?: () => void }).__ecraftShowPhonePhrases = () => {
+    const el = document.getElementById('phone-phrases');
+    el?.scrollIntoView?.({ block: 'nearest' });
+  };
   const setWhipEquipped = (eq: boolean) => {
     whipBtn?.classList.toggle('show', eq);
   };
