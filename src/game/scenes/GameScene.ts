@@ -337,6 +337,8 @@ export class GameScene extends Phaser.Scene {
     this.craftLayer = this.add.container(0, 0).setDepth(11);
     this.craftBuild = new CraftBuildSystem(this, this.craftLayer);
     this.craftBuild.load();
+    // FOREST LAW — wilderness stays fully walkable (strip old craft hitboxes in woods)
+    this.craftBuild.clearForestSolids();
     this.buildingCollision = new BuildingCollisionSystem(this);
     this.buildingCollision.build();
     this.craftHouses = new CraftHouseSystem(this, this.worldLayer, this.buildingCollision);
@@ -1342,10 +1344,11 @@ export class GameScene extends Phaser.Scene {
     const enterableById = new Map(listEnterableBuildings().map((b) => [b.id, b]));
 
     for (const z of CITY_ZONES) {
-      // ground pad under zone
+      // ground pad under zone (forest: light tint only — never looks/acts like a wall)
+      const alpha = z.id === 'forest' ? 0.12 : 0.35;
       const pad = this.add
-        .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, z.color, 0.35)
-        .setStrokeStyle(2, 0xffffff, 0.2)
+        .rectangle(z.x + z.w / 2, z.y + z.h / 2, z.w, z.h, z.color, alpha)
+        .setStrokeStyle(z.id === 'forest' ? 0 : 2, 0xffffff, 0.2)
         .setDepth(2);
       this.worldLayer.add(pad);
 
@@ -1438,7 +1441,8 @@ export class GameScene extends Phaser.Scene {
     // Trees across the expanded wilderness (~10× forest)
     const forest = CITY_ZONES.find((z) => z.id === 'forest')!;
     const treeSpots: Array<{ x: number; y: number }> = [];
-    const treeCount = 650;
+    // Dense but not so heavy phones freeze (still fills the huge woods)
+    const treeCount = 380;
     for (let i = 0; i < treeCount; i++) {
       const tx = forest.x + 40 + Math.random() * (forest.w - 80);
       const ty = forest.y + 40 + Math.random() * (forest.h - 80);
@@ -1610,7 +1614,7 @@ export class GameScene extends Phaser.Scene {
       market_row: 'RETAIL DISTRICT',
       docks: 'WATERFRONT',
       bank: 'GOLD VAULT · OPEN FLOOR',
-      forest: 'RESTRICTED WOODS',
+      forest: 'OPEN WILDERNESS — walk anywhere',
       vehicle_bay: 'FLEET PARKING',
       race_bay: 'HIGH-SPEED UNIT',
       player_house: 'PRIVATE RESIDENCE',
@@ -2630,7 +2634,7 @@ export class GameScene extends Phaser.Scene {
       this.forestBears?.setOutdoorVisible(outdoors);
       this.forestBears?.update(d, this.player, outdoors);
       this.forestSnakes?.setOutdoorVisible(outdoors);
-      const bite = this.forestSnakes?.update(d, this.player, outdoors);
+      const bite = this.forestSnakes?.update(d, this.player, outdoors, this.snakeBittenT > 0);
       if (bite) this.applySnakeBite(bite);
       if (this.snakeBittenT > 0) this.snakeBittenT = Math.max(0, this.snakeBittenT - d);
       // WALL LAW — shove cars/people out of building solids every frame
@@ -2705,21 +2709,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private applySnakeBite(msg: string): void {
-    this.snakeBittenT = 3500;
+    if (this.snakeBittenT > 0) return; // already limping — keep moving
+    this.snakeBittenT = 1800;
     this.player.setTint(0x81c784);
-    this.cameras.main.shake(160, 0.008);
-    this.statusLine = msg;
+    this.cameras.main.shake(120, 0.006);
+    this.statusLine = msg + ' (still walkable — venom fades fast)';
     setDomStatus(this.statusLine);
     audio.talk();
-    this.time.delayedCall(600, () => {
-      if (this.snakeBittenT > 0) this.player.setTint(0xc8e6c9);
-    });
-    this.time.delayedCall(3500, () => {
+    this.time.delayedCall(1800, () => {
       if (!this.flattened) this.player.clearTint();
-      if (this.snakeBittenT <= 0) {
-        this.statusLine = 'Venom wore off — you can run again.';
-        setDomStatus(this.statusLine);
-      }
     });
   }
 
@@ -2939,8 +2937,15 @@ export class GameScene extends Phaser.Scene {
           ? 640
           : 560
       : 240;
-    // Snake bite venom — limp for a few seconds
-    if (this.snakeBittenT > 0 && !this.flags.inVehicle) speed *= 0.45;
+    // Snake bite — brief limp only (woods stay walkable)
+    if (this.snakeBittenT > 0 && !this.flags.inVehicle) speed *= 0.7;
+    // Forest is fully open — slight trail speed so deep woods feel free
+    else if (
+      !this.flags.inVehicle &&
+      this.player.x >= (CITY_ZONES.find((z) => z.id === 'forest')?.x ?? 99999)
+    ) {
+      speed *= 1.2;
+    }
     let vx = 0;
     let vy = 0;
     const left = this.cursors.left?.isDown || this.keys.A?.isDown;

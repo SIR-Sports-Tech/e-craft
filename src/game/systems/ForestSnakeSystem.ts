@@ -16,8 +16,8 @@ export class ForestSnakeSystem {
   private scene: Phaser.Scene;
   private snakes: TreeSnake[] = [];
   private outdoor = true;
-  private readonly dropDist = 70;
-  private readonly biteDist = 38;
+  private readonly dropDist = 58;
+  private readonly biteDist = 34;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -34,7 +34,9 @@ export class ForestSnakeSystem {
     for (const t of picks) {
       const sprite = this.scene.physics.add.sprite(t.x, t.y - 42, 'snake');
       sprite.setDepth(6).setScale(0.9).setVisible(false).setAlpha(0);
+      // Never block the player — snakes are VFX + bite trigger only
       sprite.body!.enable = false;
+      sprite.body!.checkCollision.none = true;
       this.snakes.push({
         treeX: t.x,
         treeY: t.y,
@@ -66,6 +68,7 @@ export class ForestSnakeSystem {
     delta: number,
     player: Phaser.Physics.Arcade.Sprite,
     outdoors: boolean,
+    alreadyBitten = false,
   ): string | null {
     if (!outdoors || !this.outdoor) {
       this.setOutdoorVisible(false);
@@ -78,6 +81,8 @@ export class ForestSnakeSystem {
       if (s.cooldown > 0) s.cooldown -= delta;
 
       if (s.state === 'hiding') {
+        // Don't rain snakes while already limping — keep woods walkable
+        if (alreadyBitten) continue;
         const d = Phaser.Math.Distance.Between(player.x, player.y, s.treeX, s.treeY);
         if (d < this.dropDist && s.cooldown <= 0) {
           this.drop(s);
@@ -154,7 +159,7 @@ export class ForestSnakeSystem {
     s.sprite.setVisible(false).setAlpha(0);
     s.sprite.anims.stop();
     s.state = 'hiding';
-    s.cooldown = Phaser.Math.Between(5000, 12000);
+    s.cooldown = Phaser.Math.Between(9000, 18000);
     s.sprite.setPosition(s.treeX, s.treeY - 42);
   }
 

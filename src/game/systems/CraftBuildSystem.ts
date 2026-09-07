@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { CITY_ZONES } from '../world/WorldLayout';
 
 /**
  * Voxel Creative builder — Minecraft-STYLE feel (original code + art).
@@ -7,6 +8,9 @@ import Phaser from 'phaser';
  *  - PLACE stacks on top (needs support)
  *  - BREAK removes the top block of the aimed column
  *  - Hotbar select · ghost preview · solid collision · save
+ *
+ * FOREST LAW: craft blocks in the wilderness never block walking —
+ * the woods stay fully walkable everywhere.
  */
 export const CRAFT_BLOCKS = [
   { id: 'block_dirt', name: 'DIRT', color: '#8d6e63', solid: true },
@@ -386,7 +390,8 @@ export class CraftBuildSystem {
     this.layer.add(sprite);
 
     let body: Phaser.Physics.Arcade.Image | undefined;
-    if (blockMeta(id).solid) {
+    // Never plant walk-blockers in the forest / wilderness
+    if (blockMeta(id).solid && !this.isForestWorld(x, y)) {
       body = this.solids.create(x, y - 6, id) as Phaser.Physics.Arcade.Image;
       body.setVisible(false);
       const size = id === 'block_fence' ? GRID - 18 : GRID - 4;
@@ -564,6 +569,31 @@ export class CraftBuildSystem {
 
   private key(gx: number, gz: number, h: number): CellKey {
     return `${gx},${gz},${h}`;
+  }
+
+  /** True if world point sits in the forest wilderness zone. */
+  private isForestWorld(x: number, y: number): boolean {
+    const forest = CITY_ZONES.find((z) => z.id === 'forest');
+    if (!forest) return false;
+    return (
+      x >= forest.x - 20 &&
+      x <= forest.x + forest.w + 20 &&
+      y >= forest.y - 20 &&
+      y <= forest.y + forest.h + 20
+    );
+  }
+
+  /** Strip any leftover solid hitboxes that land in the forest (old saves). */
+  clearForestSolids(): number {
+    let n = 0;
+    for (const p of this.cells.values()) {
+      if (!p.body) continue;
+      if (!this.isForestWorld(p.sprite.x, p.sprite.y)) continue;
+      p.body.destroy();
+      p.body = undefined;
+      n++;
+    }
+    return n;
   }
 
   private ensureGhost(): void {
