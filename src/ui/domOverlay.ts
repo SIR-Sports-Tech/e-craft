@@ -78,12 +78,19 @@ type EcraftApi = {
   closePhone?: () => void;
   equipWhip?: () => void;
   useWhip?: () => void;
+  pickupItem?: () => void;
+  dropItem?: () => void;
+  useComputer?: () => void;
+  closeComputer?: () => void;
   getBackpack?: () => {
     open: boolean;
     phoneOpen: boolean;
     whipEquipped: boolean;
-    items: Array<{ id: string; name: string; icon: string }>;
+    atComputer?: boolean;
+    items: Array<{ id: string; name: string; icon: string; qty?: number }>;
     inventory: string;
+    gold?: number;
+    bankGoldLeft?: number;
   };
   exitIndoor?: () => void;
   unpause?: () => void;
@@ -340,6 +347,22 @@ export function installDomOverlay(): void {
       background: #bf360c; color: #fffde7; display: none;
     }
     #ecraft-actions .whip.show { display: block; }
+    #ecraft-backpack .bp-row {
+      color: #ffe0b2; font-size: 13px; font-weight: 700;
+      padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,.12);
+    }
+    #ecraft-computer {
+      pointer-events: auto;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 49;
+      padding: 16px;
+    }
+    #ecraft-computer.show { display: flex; }
 
     /* Backpack panel */
     #ecraft-backpack {
@@ -676,6 +699,9 @@ export function installDomOverlay(): void {
       <button type="button" class="trk" id="btn-tracker">TRACKER</button>
       <button type="button" class="pack" id="btn-pack">🎒 PACK</button>
       <button type="button" class="whip" id="btn-whip">🪢 WHIP</button>
+      <button type="button" class="act" id="btn-pickup" style="background:#2e7d32">PICK UP</button>
+      <button type="button" class="act" id="btn-drop" style="background:#6d4c41">DROP</button>
+      <button type="button" class="bot" id="btn-computer" style="background:#1565c0">💻 COMPUTER</button>
       <button type="button" class="bot" id="btn-robot">ROBOT</button>
       <button type="button" class="exit wide" id="btn-exit">EXIT</button>
       <button type="button" class="home" id="btn-house">GO HOME</button>
@@ -698,7 +724,8 @@ export function installDomOverlay(): void {
     <div id="ecraft-backpack" role="dialog" aria-modal="true" aria-label="backpack">
       <div class="box">
         <h2>🎒 Field Backpack</h2>
-        <p>Gear you carry with you. Take out the phone or the whip.</p>
+        <p>Collected loot lives here. Use phone / whip, or DROP to put items down.</p>
+        <div id="bp-loot-list" class="items" style="text-align:left;max-height:120px;overflow:auto;margin-bottom:8px"></div>
         <div class="items">
           <button type="button" id="bp-phone">📱 Use Phone</button>
           <button type="button" id="bp-whip">🪢 Take Out Whip</button>
@@ -711,6 +738,14 @@ export function installDomOverlay(): void {
         <div class="notch"></div>
         <div class="screen" id="phone-screen">📱 FIELD PHONE</div>
         <button type="button" id="phone-close">CLOSE PHONE</button>
+      </div>
+    </div>
+    <div id="ecraft-computer" role="dialog" aria-modal="true" aria-label="computer">
+      <div class="device" style="width:min(94vw,420px);background:#1b5e20;border-radius:12px;padding:12px;border:4px solid #263238">
+        <div style="color:#b9f6ca;font-weight:900;margin-bottom:6px">💻 BUILDING COMPUTER</div>
+        <textarea id="computer-input" rows="8" placeholder="Type here… notes, passwords, city tips…"
+          style="width:100%;box-sizing:border-box;background:#003300;color:#69f0ae;border:2px solid #00c853;border-radius:8px;padding:8px;font-family:ui-monospace,monospace;font-size:13px"></textarea>
+        <button type="button" id="computer-close" style="margin-top:10px;width:100%;height:44px;border-radius:10px;border:0;background:#c62828;color:#fff;font-weight:900">STAND UP / CLOSE</button>
       </div>
     </div>
     <div id="ecraft-confirm" role="dialog" aria-modal="true" aria-labelledby="ecraft-confirm-title">
@@ -878,6 +913,9 @@ export function installDomOverlay(): void {
   bindAction('btn-tracker', 'holdTracker', 'Holding Tracker');
   bindAction('btn-pack', 'toggleBackpack', 'Backpack');
   bindAction('btn-whip', 'useWhip', 'Whip crack!');
+  bindAction('btn-pickup', 'pickupItem', 'Picked up');
+  bindAction('btn-drop', 'dropItem', 'Dropped');
+  bindAction('btn-computer', 'useComputer', 'Computer');
   bindAction('btn-robot', 'activateRobot', 'Robot ON');
   bindAction('btn-activate', 'activateRobot', 'Robot ON');
   bindAction('btn-exit', 'exitIndoor', 'Exited');
@@ -909,9 +947,40 @@ export function installDomOverlay(): void {
   const setWhipEquipped = (eq: boolean) => {
     whipBtn?.classList.toggle('show', eq);
   };
-  (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi = setBackpackOpen;
+  const computerEl = document.getElementById('ecraft-computer');
+  const setComputerOpen = (open: boolean) => {
+    computerEl?.classList.toggle('show', open);
+    if (open) {
+      const ta = document.getElementById('computer-input') as HTMLTextAreaElement | null;
+      window.setTimeout(() => ta?.focus(), 50);
+    }
+  };
+  (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi = (o: boolean) => {
+    setBackpackOpen(o);
+    if (o) {
+      const bp = api()?.getBackpack?.();
+      const list = document.getElementById('bp-loot-list');
+      if (list && bp?.items) {
+        list.innerHTML =
+          bp.items
+            .map(
+              (i) =>
+                `<div class="bp-row">${i.icon} ${i.name}${i.qty && i.qty > 1 ? ` ×${i.qty}` : ''}</div>`,
+            )
+            .join('') || '<div class="bp-row">Empty pockets</div>';
+      }
+    }
+  };
   (window as unknown as { __ecraftPhoneUi?: (o: boolean, lines?: string[]) => void }).__ecraftPhoneUi = setPhoneOpen;
   (window as unknown as { __ecraftWhipUi?: (eq: boolean) => void }).__ecraftWhipUi = setWhipEquipped;
+  (window as unknown as { __ecraftComputerUi?: (o: boolean) => void }).__ecraftComputerUi = setComputerOpen;
+
+  document.getElementById('computer-close')?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setComputerOpen(false);
+    callApi('closeComputer', 'Stood up');
+  });
 
   document.getElementById('bp-phone')?.addEventListener('pointerdown', (e) => {
     e.preventDefault();

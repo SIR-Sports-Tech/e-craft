@@ -10,7 +10,8 @@ import { ObjectiveMarker, objectiveFor } from '../systems/ObjectiveSystem';
 import { ConstructionSystem } from '../systems/ConstructionSystem';
 import { DayNightSystem } from '../systems/DayNightSystem';
 import { JobSystem } from '../systems/JobSystem';
-import { InventorySystem } from '../systems/InventorySystem';
+import { InventorySystem, type ItemId } from '../systems/InventorySystem';
+import { BuildingLootSystem } from '../systems/BuildingLootSystem';
 import { MysterySystem } from '../systems/MysterySystem';
 import { PoliceSystem } from '../systems/PoliceSystem';
 import { PantherSystem } from '../systems/PantherSystem';
@@ -176,8 +177,10 @@ export class GameScene extends Phaser.Scene {
   private patrolCars!: PatrolCarsSystem;
   private jobs = new JobSystem();
   private inventory = new InventorySystem();
+  private buildingLoot!: BuildingLootSystem;
   private backpackOpen = false;
   private phoneOpen = false;
+  private atComputer = false;
   private whipEquipped = false;
   private whipCooldown = 0;
   private whipGfx?: Phaser.GameObjects.Graphics;
@@ -328,6 +331,7 @@ export class GameScene extends Phaser.Scene {
     this.tigers.setOnSpawn((s) => this.bindSolidMover(s));
     this.panther.setOnSpawn((s) => this.bindSolidMover(s));
     this.pigDrop.setOnSpawn((s) => this.bindSolidMover(s));
+    this.buildingLoot = new BuildingLootSystem(this);
     // Tap/click world to aim + place (Minecraft-style pointer build)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.craftBuild?.isMode() || this.flags.inVehicle || this.paused) return;
@@ -549,9 +553,35 @@ export class GameScene extends Phaser.Scene {
         open: this.backpackOpen,
         phoneOpen: this.phoneOpen,
         whipEquipped: this.whipEquipped,
-        items: this.inventory.backpackContents().map((i) => ({ id: i.id, name: i.name, icon: i.icon })),
+        atComputer: this.atComputer,
+        items: this.inventory.backpackContents().map((i) => ({
+          id: i.id,
+          name: i.name,
+          icon: i.icon,
+          qty: i.qty,
+        })),
         inventory: this.inventory.summary(),
+        gold: this.inventory.count('gold_bar'),
+        bankGoldLeft: this.buildingLoot?.getBankGoldLeft?.() ?? 0,
       }),
+      pickupItem: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.doPickupItem();
+      },
+      dropItem: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.doDropItem();
+      },
+      useComputer: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.doUseComputer();
+      },
+      closeComputer: () => {
+        this.doCloseComputer();
+      },
       pigDrop: () => {
         this.paused = false;
         this.mapOpen = false;
@@ -792,17 +822,17 @@ export class GameScene extends Phaser.Scene {
     setDomStatus(this.statusLine);
   }
 
-  /** Open / close the field backpack (phone + whip inside). */
+  /** Open / close the field backpack (phone + whip + loot). */
   private toggleBackpack(): void {
     this.backpackOpen = !this.backpackOpen;
     if (this.backpackOpen) {
       this.phoneOpen = false;
-      this.statusLine = '🎒 Backpack open — Phone + Whip inside. Tap an item.';
+      this.refreshBackpackPanel();
+      this.statusLine = `🎒 Backpack — gold ×${this.inventory.count('gold_bar')} · loot listed`;
     } else {
       this.statusLine = 'Backpack closed.';
     }
     setDomStatus(this.statusLine);
-    // Sync DOM panel visibility
     (window as unknown as { __ecraftBackpackUi?: (o: boolean) => void }).__ecraftBackpackUi?.(this.backpackOpen);
   }
 
@@ -905,6 +935,117 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(0xfff59d, 0.55);
     g.fillCircle(x0 + dir * 148, y0 - 24, 6);
     this.time.delayedCall(180, () => g.clear());
+  }
+
+  /** PICK UP nearest indoor item / gold / desk phone into backpack. */
+  private doPickupItem(): void {
+    if (!this.isIndoors()) {
+      this.statusLine = 'Go inside a building to pick up items.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    if (this.atComputer) {
+      this.statusLine = 'Stand up from the computer first (CLOSE).';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    const near = this.buildingLoot.nearestLoot(this.player.x, this.player.y, 78);
+    if (!near) {
+      this.statusLine = 'Nothing nearby to pick up — walk closer to an item.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    const id = this.buildingLoot.takeLoot(near);
+    const qty = id === 'gold_bar' ? 1 : 1;
+    this.inventory.add(id, qty);
+    const def = this.inventory.def(id);
+    audio.pickup();
+    this.statusLine =
+      id === 'gold_bar'
+        ? `🥇 Gold bar scooped! Backpack gold ×${this.inventory.count('gold_bar')} · vault left ${this.buildingLoot.getBankGoldLeft()}`
+        : `${def.icon} Picked up ${def.name} → backpack`;
+    setDomStatus(this.statusLine);
+    this.refreshBackpackPanel();
+  }
+
+  /** DROP preferred loot item at your feet (indoors or out). */
+  private doDropItem(): void {
+    if (this.atComputer) {
+      this.statusLine = 'Stand up before dropping items.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    const id = this.inventory.preferredDropId();
+    if (!id) {
+      this.statusLine = 'Nothing droppable in backpack (loot / gold / snacks).';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    if (!this.inventory.remove(id, 1)) {
+      this.statusLine = 'Could not drop that item.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    this.buildingLoot.dropAt(id, this.player.x, this.player.y);
+    if (!this.isIndoors()) {
+      // Keep dropped sprite visible outdoors briefly
+      this.buildingLoot.setVisible(true);
+    }
+    const def = this.inventory.def(id);
+    this.statusLine = `${def.icon} Dropped ${def.name}`;
+    setDomStatus(this.statusLine);
+    audio.interact();
+    this.refreshBackpackPanel();
+  }
+
+  /** Sit at the building computer and open the typing screen. */
+  private doUseComputer(): void {
+    if (!this.isIndoors()) {
+      this.statusLine = 'Computers are inside buildings — walk in and sit down.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    if (!this.buildingLoot.nearComputer(this.player.x, this.player.y, 90)) {
+      this.statusLine = 'Walk up to the computer desk, then tap USE COMPUTER / E.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+    const seat = this.buildingLoot.computerSeat();
+    if (seat) this.player.setPosition(seat.x, seat.y);
+    this.player.setVelocity(0, 0);
+    this.buildingLoot.sitAtComputer();
+    this.atComputer = true;
+    (window as unknown as { __ecraftComputerUi?: (o: boolean) => void }).__ecraftComputerUi?.(true);
+    this.statusLine = '💻 Seated at computer — type on the screen!';
+    setDomStatus(this.statusLine);
+    audio.talk();
+  }
+
+  private doCloseComputer(): void {
+    this.atComputer = false;
+    this.buildingLoot.leaveComputer();
+    (window as unknown as { __ecraftComputerUi?: (o: boolean) => void }).__ecraftComputerUi?.(false);
+    this.statusLine = 'Stood up from the computer.';
+    setDomStatus(this.statusLine);
+  }
+
+  private refreshBackpackPanel(): void {
+    const list = document.getElementById('bp-loot-list');
+    if (!list) return;
+    const items = this.inventory.backpackContents();
+    list.innerHTML = items
+      .map((i) => `<div class="bp-row">${i.icon} ${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}</div>`)
+      .join('') || '<div class="bp-row">Empty pockets</div>';
+  }
+
+  private spawnRoomLoot(roomKey: string): void {
+    this.buildingLoot.spawnForRoom(roomKey);
+    this.buildingLoot.setVisible(true);
+  }
+
+  private clearRoomLoot(): void {
+    if (this.atComputer) this.doCloseComputer();
+    this.buildingLoot.clear();
   }
 
   private updateHeldTracker(delta: number): void {
@@ -1048,6 +1189,7 @@ export class GameScene extends Phaser.Scene {
       library: 'bldg_plaza',
       market_row: 'bldg_plaza',
       docks: 'bldg_plaza',
+      bank: 'bldg_jail',
       forest: 'bldg_forest_cabin',
       vehicle_bay: 'bldg_plaza',
       race_bay: 'bldg_plaza',
@@ -1318,6 +1460,7 @@ export class GameScene extends Phaser.Scene {
       library: 'ARCHIVES',
       market_row: 'RETAIL DISTRICT',
       docks: 'WATERFRONT',
+      bank: 'GOLD VAULT · OPEN FLOOR',
       forest: 'RESTRICTED WOODS',
       vehicle_bay: 'FLEET PARKING',
       race_bay: 'HIGH-SPEED UNIT',
@@ -2602,7 +2745,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleMovement(): void {
-    if (this.flattened || this.lyingInBed || this.sleeping) {
+    if (this.flattened || this.lyingInBed || this.sleeping || this.atComputer) {
       this.player.setVelocity(0, 0);
       return;
     }
@@ -3320,12 +3463,24 @@ export class GameScene extends Phaser.Scene {
         this.placeCraftBlock();
         return;
       }
+      if (this.atComputer) {
+        this.doCloseComputer();
+        return;
+      }
+      if (this.buildingLoot.nearComputer(this.player.x, this.player.y, 80)) {
+        this.doUseComputer();
+        return;
+      }
+      if (this.buildingLoot.nearestLoot(this.player.x, this.player.y, 70)) {
+        this.doPickupItem();
+        return;
+      }
       if (this.tryCraftHouseSecret()) return;
       if (this.near(CRAFT_HOUSE_INTERIOR.exitX + 40, CRAFT_HOUSE_INTERIOR.exitY + 40, 110)) {
         this.exitCraftHouse();
         return;
       }
-      this.statusLine = 'Search furniture for secrets · EXIT to leave';
+      this.statusLine = 'PICK UP · COMPUTER · search furniture · EXIT';
       setDomStatus(this.statusLine);
       return;
     }
@@ -3335,11 +3490,26 @@ export class GameScene extends Phaser.Scene {
         this.placeCraftBlock();
         return;
       }
+      if (this.atComputer) {
+        this.doCloseComputer();
+        return;
+      }
+      if (this.buildingLoot.nearComputer(this.player.x, this.player.y, 80)) {
+        this.doUseComputer();
+        return;
+      }
+      if (this.buildingLoot.nearestLoot(this.player.x, this.player.y, 70)) {
+        this.doPickupItem();
+        return;
+      }
       if (this.near(CIVIC_INTERIOR.exitX + 40, CIVIC_INTERIOR.exitY + 40, 110)) {
         this.exitCivic();
         return;
       }
-      this.statusLine = 'Look around · EXIT to leave';
+      this.statusLine =
+        this.civicId === 'bank'
+          ? '🏦 Gold everywhere! PICK UP / E on piles · USE COMPUTER · EXIT'
+          : 'PICK UP items · USE COMPUTER · EXIT';
       setDomStatus(this.statusLine);
       return;
     }
@@ -3351,6 +3521,18 @@ export class GameScene extends Phaser.Scene {
       }
       if (this.craftBuild?.isMode()) {
         this.placeCraftBlock();
+        return;
+      }
+      if (this.atComputer) {
+        this.doCloseComputer();
+        return;
+      }
+      if (this.buildingLoot.nearComputer(this.player.x, this.player.y, 80)) {
+        this.doUseComputer();
+        return;
+      }
+      if (this.buildingLoot.nearestLoot(this.player.x, this.player.y, 70)) {
+        this.doPickupItem();
         return;
       }
       if (this.near(HOUSE_INTERIOR.bedX, HOUSE_INTERIOR.bedY, 100)) {
@@ -4100,7 +4282,11 @@ export class GameScene extends Phaser.Scene {
     this.robot.setVisible(false);
     if (this.heldTracker) this.heldTracker.setVisible(false);
     this.beginIndoorPresence(CIVIC_INTERIOR.exitX + 120, CIVIC_INTERIOR.exitY + 120, CIVIC_INTERIOR);
-    this.statusLine = `You're inside ${b.label}. Walk around · E to use things · EXIT to leave.`;
+    this.spawnRoomLoot(b.theme || b.id);
+    this.statusLine =
+      b.id === 'bank' || b.theme === 'bank'
+        ? `🏦 ${b.label}: GOLD fills the vault — PICK UP piles · sit at computer · EXIT`
+        : `You're inside ${b.label}. PICK UP items · USE COMPUTER · EXIT.`;
     setDomStatus(this.statusLine);
   }
 
@@ -4140,7 +4326,8 @@ export class GameScene extends Phaser.Scene {
       CRAFT_HOUSE_INTERIOR.exitY + 120,
       CRAFT_HOUSE_INTERIOR,
     );
-    this.statusLine = `${rec.name}: YOU are inside — walk to rug/cabinet/picture/table/fridge · E to search.`;
+    this.spawnRoomLoot(houseId);
+    this.statusLine = `${rec.name}: PICK UP items · USE COMPUTER · search furniture for secret gold · EXIT.`;
     setDomStatus(this.statusLine);
   }
 
@@ -4171,6 +4358,7 @@ export class GameScene extends Phaser.Scene {
   private exitCraftHouse(): void {
     const id = this.craftHouses.activeHouseId;
     const rec = id ? this.craftHouses.list().find((h) => h.id === id) : undefined;
+    this.clearRoomLoot();
     this.inCraftHouse = false;
     this.craftHouses.activeHouseId = null;
     this.craftHouses.secretRoomOpen = false;
@@ -4262,6 +4450,7 @@ export class GameScene extends Phaser.Scene {
   private exitCivic(): void {
     const id = this.civicId;
     const b = id ? getEnterable(id) : undefined;
+    this.clearRoomLoot();
     this.civicId = null;
     this.indoorLayer.setVisible(false);
     this.civicNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
@@ -4330,12 +4519,14 @@ export class GameScene extends Phaser.Scene {
     this.robot.setVisible(false);
     if (this.heldTracker) this.heldTracker.setVisible(false);
     this.beginIndoorPresence(LAIR.exitX + 100, LAIR.exitY + 100, LAIR);
+    this.spawnRoomLoot('security_hq');
     this.setPhase(MissionPhase.InUndergroundLair);
-    this.statusLine = "You're inside the lair — walk to the tracker · E to grab it!";
+    this.statusLine = "You're inside the lair — tracker · PICK UP items · USE COMPUTER · EXIT.";
     setDomStatus(this.statusLine);
   }
 
   private exitLair(): void {
+    this.clearRoomLoot();
     this.flags.inLair = false;
     this.indoorLayer.setVisible(false);
     this.worldLayer.setVisible(true);
@@ -4386,6 +4577,7 @@ export class GameScene extends Phaser.Scene {
     this.robot.setVisible(false);
     if (this.heldTracker) this.heldTracker.setVisible(false);
     this.beginIndoorPresence(JAIL_INTERIOR.exitX + 120, JAIL_INTERIOR.exitY + 120, JAIL_INTERIOR);
+    this.spawnRoomLoot('super_jail');
 
     // Visiting jailed Sasquatch — show him in the cell
     if (this.flags.sasquatchJailed) {
@@ -4487,12 +4679,14 @@ export class GameScene extends Phaser.Scene {
     this.robot.setVisible(false);
     if (this.heldTracker) this.heldTracker.setVisible(false);
     this.beginIndoorPresence(HOUSE_INTERIOR.exitX + 120, HOUSE_INTERIOR.exitY + 120, HOUSE_INTERIOR);
-    this.statusLine = "You're INSIDE your house — walk around · E at TV/kitchen/bed · SLEEP · EXIT.";
+    this.spawnRoomLoot('player_house');
+    this.statusLine = "House: PICK UP items · USE COMPUTER · TV/kitchen/bed · EXIT.";
     setDomStatus(this.statusLine);
   }
 
   private exitHouse(): void {
     if (this.lyingInBed) this.getOutOfBed();
+    this.clearRoomLoot();
     this.flags.inHouse = false;
     this.indoorLayer.setVisible(false);
     this.houseNodes.forEach((n) => (n as unknown as Phaser.GameObjects.Components.Visible).setVisible(false));
@@ -4561,6 +4755,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private exitJail(): void {
+    this.clearRoomLoot();
     this.flags.inJailBuilding = false;
     this.indoorLayer.setVisible(false);
     this.cellMarker?.setVisible(this.flags.sasquatchJailed);

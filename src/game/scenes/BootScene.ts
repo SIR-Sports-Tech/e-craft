@@ -1626,6 +1626,57 @@ export class BootScene extends Phaser.Scene {
       g.generateTexture('gold_pile', 80, 60);
       g.destroy();
     }
+    // Computer workstation (sit & type)
+    {
+      const g = this.g();
+      g.fillStyle(0x5d4037, 1);
+      g.fillRoundedRect(4, 36, 100, 28, 3);
+      g.fillStyle(0x3e2723, 1);
+      g.fillRect(10, 64, 10, 16);
+      g.fillRect(88, 64, 10, 16);
+      // Monitor
+      g.fillStyle(0x263238, 1);
+      g.fillRoundedRect(28, 4, 52, 40, 3);
+      g.fillStyle(0x00e676, 1);
+      g.fillRect(34, 10, 40, 28);
+      g.fillStyle(0x1b5e20, 1);
+      g.fillRect(36, 14, 18, 3);
+      g.fillRect(36, 20, 28, 3);
+      g.fillRect(36, 26, 22, 3);
+      // Keyboard
+      g.fillStyle(0x37474f, 1);
+      g.fillRoundedRect(30, 44, 48, 12, 2);
+      g.fillStyle(0x90a4ae, 1);
+      for (let i = 0; i < 6; i++) g.fillRect(34 + i * 7, 47, 5, 3);
+      g.generateTexture('furn_computer', 108, 80);
+      g.destroy();
+    }
+    // Desk phone handset
+    {
+      const g = this.g();
+      g.fillStyle(0x212121, 1);
+      g.fillRoundedRect(8, 20, 40, 24, 4);
+      g.fillStyle(0x424242, 1);
+      g.fillRoundedRect(14, 8, 28, 16, 6);
+      g.fillStyle(0x69f0ae, 1);
+      g.fillCircle(40, 28, 3);
+      g.fillStyle(0x90caf9, 1);
+      g.fillRect(18, 12, 20, 4);
+      g.generateTexture('furn_phone', 56, 48);
+      g.destroy();
+    }
+    // Generic loot bag
+    {
+      const g = this.g();
+      g.fillStyle(0x6d4c41, 1);
+      g.fillEllipse(28, 34, 40, 28);
+      g.fillStyle(0x8d6e63, 1);
+      g.fillTriangle(28, 8, 12, 28, 44, 28);
+      g.fillStyle(0xffd54f, 1);
+      g.fillCircle(28, 30, 6);
+      g.generateTexture('loot_bag', 56, 52);
+      g.destroy();
+    }
   }
 
   private makeTrailIcons(): void {

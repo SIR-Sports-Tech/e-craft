@@ -176,6 +176,15 @@ export const CIVIC_THEMES: Record<string, CivicTheme> = {
     propB: 'Trail Map',
     propC: 'Water Fountain',
   },
+  bank: {
+    title: '🏦 City Gold Bank',
+    wall: 0xfff8e1,
+    accent: 0xf9a825,
+    tip: 'No safe — the WHOLE vault is gold! Pick up / break piles into your backpack.',
+    propA: 'Gold Piles',
+    propB: 'Teller Computer',
+    propC: 'Vault Floor',
+  },
 };
 
 const SPECIAL: Record<string, { kind: BuildingKind; prompt: string }> = {

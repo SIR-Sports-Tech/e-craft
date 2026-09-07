@@ -170,6 +170,15 @@ export const CITY_ZONES: RectZone[] = [
     color: 0x37474f,
   },
   {
+    id: 'bank',
+    label: 'City Gold Bank',
+    x: 640,
+    y: 500,
+    w: 240,
+    h: 200,
+    color: 0xf9a825,
+  },
+  {
     id: 'forest',
     label: 'Forest / Wilderness',
     x: 2400,
