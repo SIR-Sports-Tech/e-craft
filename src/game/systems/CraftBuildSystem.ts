@@ -193,9 +193,13 @@ export class CraftBuildSystem {
     if (this.ghost) this.ghost.setTexture(this.selectedId());
   }
 
+  /** Pointer/tap locks aim briefly (Minecraft crosshair on a cell). */
+  private pointerAimUntil = 0;
+
   aimAtWorld(wx: number, wy: number): void {
     const cell = this.worldToCell(wx, wy);
     this.lastAim = { gx: cell.gx, gz: cell.gz, h: this.columnPlaceHeight(cell.gx, cell.gz) };
+    this.pointerAimUntil = Date.now() + 2500;
     this.updateGhostSprite();
   }
 
@@ -205,11 +209,11 @@ export class CraftBuildSystem {
       return;
     }
     this.ensureGhost();
-    if (!this.lastAim) {
+    // Creative-style: ghost follows look direction unless a fresh tap locked a cell
+    if (!this.lastAim || Date.now() > this.pointerAimUntil) {
       const aim = this.aimFromPlayer(px, py, facing, facingDir);
       this.lastAim = { ...aim, h: this.columnPlaceHeight(aim.gx, aim.gz) };
     } else {
-      // Refresh height as stacks change
       this.lastAim.h = this.columnPlaceHeight(this.lastAim.gx, this.lastAim.gz);
     }
     this.updateGhostSprite();
@@ -217,17 +221,29 @@ export class CraftBuildSystem {
 
   clearPointerAim(): void {
     this.lastAim = null;
+    this.pointerAimUntil = 0;
   }
 
+  /**
+   * PLACE — Minecraft Creative feel:
+   * - Tap/lock cell → stack there
+   * - Else place on column you are facing
+   * - Always stacks on top of existing blocks in that column
+   */
   place(px: number, py: number, facing: number, facingDir: string): string {
-    const col = this.lastAim
-      ? { gx: this.lastAim.gx, gz: this.lastAim.gz }
+    const usePointer = !!this.lastAim && Date.now() <= this.pointerAimUntil;
+    const col = usePointer
+      ? { gx: this.lastAim!.gx, gz: this.lastAim!.gz }
       : this.aimFromPlayer(px, py, facing, facingDir);
     const h = this.columnPlaceHeight(col.gx, col.gz);
     if (!this.inReach(px, py, col.gx, col.gz, Math.max(0, h - 1))) {
-      return 'Too far — move closer (Creative reach).';
+      return 'Too far — walk closer (Creative reach).';
     }
-    return this.placeAt(col.gx, col.gz, h);
+    const msg = this.placeAt(col.gx, col.gz, h);
+    // Keep aiming this column so next PLACE stacks higher (like holding place)
+    this.lastAim = { gx: col.gx, gz: col.gz, h: this.columnPlaceHeight(col.gx, col.gz) };
+    this.pointerAimUntil = Date.now() + 2000;
+    return msg;
   }
 
   placeAt(gx: number, gz: number, h: number): string {
@@ -244,22 +260,38 @@ export class CraftBuildSystem {
     return this.spawnBlock(gx, gz, th, this.selectedId());
   }
 
+  /**
+   * BREAK — dig the looked-at / tapped column (top block first),
+   * else the nearest block in look direction (Creative dig).
+   */
   breakAt(px: number, py: number, facing: number, facingDir: string): string {
-    const aim = this.lastAim ?? {
-      ...this.aimFromPlayer(px, py, facing, facingDir),
-      h: 0,
-    };
-    // Break TOP of aimed column first (Minecraft dig)
+    const usePointer = !!this.lastAim && Date.now() <= this.pointerAimUntil;
+    const aim = usePointer
+      ? this.lastAim!
+      : { ...this.aimFromPlayer(px, py, facing, facingDir), h: 0 };
+
     for (let h = MAX_HEIGHT - 1; h >= 0; h--) {
       const hit = this.cells.get(this.key(aim.gx, aim.gz, h));
       if (hit) {
         if (!this.inReach(px, py, aim.gx, aim.gz, h)) return 'Too far to dig.';
-        return this.destroyPlaced(hit);
+        const msg = this.destroyPlaced(hit);
+        this.lastAim = { gx: aim.gx, gz: aim.gz, h: this.columnPlaceHeight(aim.gx, aim.gz) };
+        this.pointerAimUntil = Date.now() + 2000;
+        return msg;
       }
     }
-    // Fallback: nearest block sprite
+
+    // Sweep along look ray for a block (Minecraft-ish)
+    const ray = this.rayBlocks(px, py, facing, facingDir);
+    if (ray) {
+      const msg = this.destroyPlaced(ray);
+      this.lastAim = { gx: ray.gx, gz: ray.gz, h: this.columnPlaceHeight(ray.gx, ray.gz) };
+      this.pointerAimUntil = Date.now() + 2000;
+      return msg;
+    }
+
     let best: Placed | null = null;
-    let bestD = 100;
+    let bestD = GRID * 2.2;
     for (const p of this.cells.values()) {
       const d = Phaser.Math.Distance.Between(px, py, p.sprite.x, p.sprite.y);
       if (d < bestD) {
@@ -267,9 +299,31 @@ export class CraftBuildSystem {
         best = p;
       }
     }
-    if (!best) return 'No block to break nearby.';
-    if (!this.inReach(px, py, best.gx, best.gz, best.h)) return 'Too far to dig.';
+    if (!best) return 'No block to break — look at a block / tap it.';
     return this.destroyPlaced(best);
+  }
+
+  /** Walk forward up to REACH cells and return top block of first occupied column. */
+  private rayBlocks(
+    px: number,
+    py: number,
+    facing: number,
+    facingDir: string,
+  ): Placed | null {
+    for (let step = 1; step <= REACH_CELLS; step++) {
+      let ax = px;
+      let ay = py;
+      const dist = GRID * step;
+      if (facingDir === 'left' || facingDir === 'right') ax = px + facing * dist;
+      else if (facingDir === 'up') ay = py - dist;
+      else ay = py + dist;
+      const { gx, gz } = this.worldToCell(ax, ay);
+      for (let h = MAX_HEIGHT - 1; h >= 0; h--) {
+        const hit = this.cells.get(this.key(gx, gz, h));
+        if (hit) return hit;
+      }
+    }
+    return null;
   }
 
   load(): void {
@@ -432,10 +486,20 @@ export class CraftBuildSystem {
     facing: number,
     facingDir: string,
   ): { gx: number; gz: number } {
-    // Aim 1–2 cells ahead like Minecraft crosshair in front of player
+    // Prefer the nearest occupied column ahead (stack on it), else empty cell ahead
+    for (let step = 1; step <= 3; step++) {
+      let ax = px;
+      let ay = py;
+      const dist = GRID * step;
+      if (facingDir === 'left' || facingDir === 'right') ax = px + facing * dist;
+      else if (facingDir === 'up') ay = py - dist;
+      else ay = py + dist;
+      const cell = this.worldToCell(ax, ay);
+      if (this.columnPlaceHeight(cell.gx, cell.gz) > 0) return cell;
+    }
     let ax = px;
     let ay = py;
-    const step = GRID * 1.25;
+    const step = GRID * 1.15;
     if (facingDir === 'left' || facingDir === 'right') ax = px + facing * step;
     else if (facingDir === 'up') ay = py - step;
     else ay = py + step;

@@ -2837,8 +2837,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private placeCraftBlock(): void {
-    // Prefer column in front of player (ignore stale pointer aim height)
-    this.craftBuild.clearPointerAim();
+    // Keep tap-aim if set (Minecraft: place where you pointed). Do NOT clear first.
     const msg = this.craftBuild.place(this.player.x, this.player.y, this.facing, this.facingDir);
     this.statusLine = msg;
     setDomStatus(this.statusLine);

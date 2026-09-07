@@ -33,23 +33,27 @@ const placeBtn = await page.evaluate(() => !!document.getElementById('btn-place'
 await page.evaluate(() => window.__ecraft.selectBlock(2));
 await page.waitForTimeout(100);
 
-// Place a few blocks outdoors via direct craft API (stack height)
-await page.evaluate(() => {
+// Place via tap-aim (Minecraft: aim cell then place stacks there)
+const tapPlace = await page.evaluate(() => {
   const scene = window.__phaserGame.scene.getScene('Game');
   scene.player.setPosition(900, 760);
   scene.facing = 1;
   scene.facingDir = 'right';
   scene.craftBuild.clearPointerAim();
+  // Tap a world cell, then PLACE without clearing aim (must stack on tapped cell)
+  scene.craftBuild.aimAtWorld(980, 760);
   scene.craftBuild.place(900, 760, 1, 'right');
-  scene.craftBuild.place(940, 760, 1, 'right');
-  scene.craftBuild.place(980, 760, 1, 'right');
-  // stack on same cell
-  scene.craftBuild.place(980, 760, 1, 'right');
-  scene.craftBuild.place(980, 760, 1, 'right');
+  scene.craftBuild.place(900, 760, 1, 'right');
+  scene.craftBuild.place(900, 760, 1, 'right');
+  // Separate column in front
+  scene.craftBuild.clearPointerAim();
+  scene.craftBuild.place(900, 760, 1, 'right');
+  scene.craftBuild.place(900, 760, 1, 'right');
+  return { count: window.__ecraft.getState().craft?.count ?? 0 };
 });
 await page.waitForTimeout(200);
 st = await page.evaluate(() => window.__ecraft.getState());
-const placed = (st.craft?.count || 0) >= 5;
+const placed = (st.craft?.count || 0) >= 5 && tapPlace.count >= 5;
 const beforeBreak = st.craft?.count || 0;
 
 // Break one
