@@ -14,13 +14,13 @@ const tex = await page.evaluate(() => {
   const t = window.__phaserGame?.textures;
   return {
     sign: !!t?.exists?.('bldg_sign'),
-    siren: !!t?.exists?.('sirenhead_sheet'),
-    anim: !!window.__phaserGame?.anims?.exists?.('sirenhead-lunge'),
     signsFlag: !!window.__ecraft.getState().buildingSigns,
   };
 });
 
-// Force close to sasquatch
+const SCALE = 0.72;
+
+// Force close to sasquatch — must NOT grow
 await page.evaluate(() => {
   const scene = window.__phaserGame.scene.getScene('Game');
   scene.player.setPosition(scene.sasquatch.x - 80, scene.sasquatch.y);
@@ -36,26 +36,32 @@ const close = await page.evaluate(() => {
   };
 });
 
-// Move far away
+// Move far away — still same small size
 await page.evaluate(() => {
   const scene = window.__phaserGame.scene.getScene('Game');
   scene.player.setPosition(320, 620);
 });
 await page.waitForTimeout(400);
-const far = await page.evaluate(() => window.__ecraft.getState().sirenMode);
+const far = await page.evaluate(() => {
+  const scene = window.__phaserGame.scene.getScene('Game');
+  return {
+    sirenMode: window.__ecraft.getState().sirenMode,
+    scale: Math.round((scene.sasquatch?.scaleX || 0) * 100) / 100,
+    sheet: scene.sasquatch?.texture?.key,
+  };
+});
 
 const ok =
   errs.length === 0 &&
   tex.sign &&
-  tex.siren &&
-  tex.anim &&
   tex.signsFlag &&
-  close.sirenMode === true &&
-  close.sheet === 'sirenhead_sheet' &&
-  close.scale >= 2 &&
-  far === false;
+  close.sheet === 'sasquatch_sheet' &&
+  close.scale === SCALE &&
+  far.sheet === 'sasquatch_sheet' &&
+  far.scale === SCALE &&
+  far.sirenMode === false;
 
 console.log(JSON.stringify({ errs: errs.slice(0, 5), tex, close, far, ok }, null, 2));
 await browser.close();
 if (!ok) process.exit(1);
-console.log('SIGNS + SIREN HEAD SMOKE PASSED');
+console.log('SMALL BIGFOOT SIZE LOCK SMOKE PASSED');

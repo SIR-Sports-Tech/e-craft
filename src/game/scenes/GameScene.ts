@@ -53,6 +53,8 @@ import {
 type TouchVec = { x: number; y: number };
 
 export class GameScene extends Phaser.Scene {
+  /** Locked smaller Bigfoot size — never scales up (no giant siren morph). */
+  static readonly SASQUATCH_SCALE = 0.72;
   private player!: Phaser.Physics.Arcade.Sprite;
   private robot!: Phaser.Physics.Arcade.Sprite;
   private vehicle!: Phaser.Physics.Arcade.Sprite;
@@ -271,8 +273,9 @@ export class GameScene extends Phaser.Scene {
       0,
     );
     // Classic Bigfoot proportions (taller sheet) — still near player scale
-    this.sasquatch.setDepth(9).setCollideWorldBounds(true).setScale(0.92);
-    this.sasquatch.body!.setSize(36, 56).setOffset(18, 22);
+    // Always a smaller Bigfoot — never grow into giant form
+    this.sasquatch.setDepth(9).setCollideWorldBounds(true).setScale(GameScene.SASQUATCH_SCALE);
+    this.sasquatch.body!.setSize(32, 48).setOffset(20, 24);
     this.sasquatch.play('sasquatch-idle'); // idle includes mouth moving
     this.pickSasquatchWander();
     // Seed a clear trail from forest entrance → Sasquatch (so tracking works on arrival)
@@ -3303,12 +3306,7 @@ export class GameScene extends Phaser.Scene {
 
   private updateSasquatchAnim(): void {
     // Siren-Head close form handled separately
-    if (this.sasquatchSirenMode) {
-      if (this.sasquatch.anims.currentAnim?.key !== 'sirenhead-lunge') {
-        this.sasquatch.play('sirenhead-lunge', true);
-      }
-      return;
-    }
+    this.lockSasquatchSize();
     const body = this.sasquatch.body as Phaser.Physics.Arcade.Body;
     const speed = body ? Math.hypot(body.velocity.x, body.velocity.y) : 0;
     if (speed > 12) {
@@ -3322,8 +3320,12 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** When close: morph into towering Siren-Head nightmare. Far: classic Bigfoot. */
+  /**
+   * Bigfoot stays a SMALLER constant size forever — no giant morph.
+   * Close encounters may tint/scare slightly but never change scale.
+   */
   private updateSasquatchHorrorForm(): void {
+    this.lockSasquatchSize();
     if (
       this.flags.sasquatchCaptured ||
       this.flags.sasquatchJailed ||
@@ -3335,31 +3337,35 @@ export class GameScene extends Phaser.Scene {
     }
     const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.sasquatch.x, this.sasquatch.y);
     const close = d < 220;
+    // Scare tint only — SAME small size always
     if (close && !this.sasquatchSirenMode) this.setSasquatchForm(true);
     else if (!close && this.sasquatchSirenMode) this.setSasquatchForm(false);
   }
 
+  private lockSasquatchSize(): void {
+    if (!this.sasquatch) return;
+    if (Math.abs(this.sasquatch.scaleX - GameScene.SASQUATCH_SCALE) > 0.01) {
+      this.sasquatch.setScale(GameScene.SASQUATCH_SCALE);
+    }
+  }
+
   private setSasquatchForm(siren: boolean): void {
     this.sasquatchSirenMode = siren;
+    // Always smaller Bigfoot sheet + locked scale (never 2.35 giant)
+    this.sasquatch.setTexture('sasquatch_sheet', 0);
+    this.sasquatch.setScale(GameScene.SASQUATCH_SCALE);
+    this.sasquatch.setDepth(9);
+    const body = this.sasquatch.body as Phaser.Physics.Arcade.Body;
+    body.setSize(32, 48).setOffset(20, 24);
     if (siren) {
-      this.sasquatch.setTexture('sirenhead_sheet', 0);
-      this.sasquatch.setScale(2.35);
       this.sasquatch.setTint(0xffcdd2);
-      this.sasquatch.setDepth(18);
-      const body = this.sasquatch.body as Phaser.Physics.Arcade.Body;
-      body.setSize(40, 120).setOffset(28, 30);
-      this.sasquatch.play('sirenhead-lunge', true);
-      this.cameras.main.shake(220, 0.01);
-      this.statusLine = '⚠ SIREN HEAD!!! The forest monster towers over you!';
+      this.sasquatch.play('sasquatch-walk', true);
+      this.cameras.main.shake(120, 0.006);
+      this.statusLine = '⚠ Bigfoot noticed you — still the same size, just mad!';
       setDomStatus(this.statusLine);
       audio.talk();
     } else {
-      this.sasquatch.setTexture('sasquatch_sheet', 0);
-      this.sasquatch.setScale(0.92);
       this.sasquatch.clearTint();
-      this.sasquatch.setDepth(9);
-      const body = this.sasquatch.body as Phaser.Physics.Arcade.Body;
-      body.setSize(36, 56).setOffset(18, 22);
       this.sasquatch.play('sasquatch-idle', true);
     }
   }
