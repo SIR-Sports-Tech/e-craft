@@ -247,6 +247,7 @@ export class GameScene extends Phaser.Scene {
     this.robot.play('robot-idle');
 
     this.vehicle = this.physics.add.sprite(SPAWN.vehicle.x, SPAWN.vehicle.y, 'vehicle');
+    // Parked bay cars: immovable OK (body off until driven). Player body is the collider when driving.
     this.vehicle.setImmovable(true).setDepth(8).setScale(1.05);
     this.vehicle.body!.enable = false;
     this.raceCar = this.physics.add.sprite(SPAWN.raceCar.x, SPAWN.raceCar.y, 'race_car');
@@ -2599,6 +2600,8 @@ export class GameScene extends Phaser.Scene {
       this.dayNight.setOutdoorVisible(outdoors);
       this.patrolCars.setOutdoorVisible(outdoors);
       this.patrolCars.update(d);
+      // WALL LAW — shove cars/people out of building solids every frame
+      if (outdoors) this.buildingCollision?.resolveAllBound?.();
       this.updatePlayerPoliceLights(d, outdoors);
       if (outdoors) this.updateTrafficSignals(d);
       if (this.flattenInvuln > 0) this.flattenInvuln -= d;

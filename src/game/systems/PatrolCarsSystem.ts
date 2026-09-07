@@ -49,6 +49,10 @@ interface PatrolCar {
   lightRed: Phaser.GameObjects.Arc;
   lightBlue: Phaser.GameObjects.Arc;
   lightGlow: Phaser.GameObjects.Arc;
+  /** Stuck against a building — skip to next road point */
+  stuckT: number;
+  lastX: number;
+  lastY: number;
 }
 
 /**
@@ -89,6 +93,9 @@ export class PatrolCarsSystem {
         lightRed,
         lightBlue,
         lightGlow,
+        stuckT: 0,
+        lastX: start.x,
+        lastY: start.y,
       });
     }
   }
@@ -114,6 +121,19 @@ export class PatrolCarsSystem {
         c.sprite.setVelocity(0, 0);
         continue;
       }
+      // If pressed into a building wall and barely moving, skip waypoint (stay on roads)
+      const moved = Math.hypot(c.sprite.x - c.lastX, c.sprite.y - c.lastY);
+      if (moved < 2.5) c.stuckT += delta;
+      else c.stuckT = 0;
+      c.lastX = c.sprite.x;
+      c.lastY = c.sprite.y;
+      if (c.stuckT > 900) {
+        c.stuckT = 0;
+        c.idx = (c.idx + 1) % c.route.length;
+        c.sprite.setVelocity(0, 0);
+        continue;
+      }
+
       const target = c.route[c.idx];
       const dx = target.x - c.sprite.x;
       const dy = target.y - c.sprite.y;
@@ -122,7 +142,7 @@ export class PatrolCarsSystem {
         c.idx = (c.idx + 1) % c.route.length;
         continue;
       }
-      // Use velocity so Arcade colliders with buildings/craft walls apply
+      // Velocity so Arcade colliders stop cars at building walls (no ghost-through)
       c.sprite.setVelocity((dx / dist) * c.speed, (dy / dist) * c.speed);
       // Face travel direction (cars are side-view-ish / top-down oval)
       if (Math.abs(dx) > Math.abs(dy)) {
