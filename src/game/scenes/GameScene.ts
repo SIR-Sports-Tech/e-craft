@@ -2758,6 +2758,7 @@ export class GameScene extends Phaser.Scene {
         busy: this.train?.isBusy?.() ?? false,
       },
       robbers: this.robbers?.count?.() ?? 0,
+      robbersSquished: this.robbers?.squishedCount?.() ?? 0,
       tigerNearDist: this.tigers?.nearestDist?.(this.player) ?? Infinity,
       backpackOpen: this.backpackOpen,
       phoneOpen: this.phoneOpen,
@@ -2890,11 +2891,24 @@ export class GameScene extends Phaser.Scene {
       if (this.snakeBittenT > 0) this.snakeBittenT = Math.max(0, this.snakeBittenT - d);
       this.train?.update();
       this.robbers?.setOutdoorVisible(outdoors);
-      this.robbers?.update(d, this.player, outdoors, (msg) => {
-        this.statusLine = msg;
-        setDomStatus(msg);
-        audio.talk();
-      });
+      {
+        const body = this.player.body as Phaser.Physics.Arcade.Body | undefined;
+        const spd = body ? Math.hypot(body.velocity.x, body.velocity.y) : 0;
+        this.robbers?.update(
+          d,
+          this.player,
+          outdoors,
+          (msg) => {
+            this.statusLine = msg;
+            setDomStatus(msg);
+            audio.talk();
+          },
+          {
+            inPoliceCar: !!(this.flags.inVehicle && this.activeCarKey === 'police_car'),
+            playerSpeed: spd,
+          },
+        );
+      }
       // WALL LAW — shove cars/people out of building solids every frame
       if (outdoors) this.buildingCollision?.resolveAllBound?.();
       this.updatePlayerPoliceLights(d, outdoors);
