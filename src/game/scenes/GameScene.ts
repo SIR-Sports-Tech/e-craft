@@ -159,6 +159,8 @@ export class GameScene extends Phaser.Scene {
   };
   /** Flattened by a police car — can't move until recovered. */
   private flattened = false;
+  /** Player got arrested (false alarm / no Sasquatch). */
+  private playerArrested = false;
   private flattenInvuln = 0;
   private bloodPool?: Phaser.GameObjects.Image;
   private objectiveMarker!: ObjectiveMarker;
@@ -680,6 +682,11 @@ export class GameScene extends Phaser.Scene {
         }
         this.train.tryBoard(this.player);
       },
+      callPolice: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.callPolice();
+      },
       forceFlatten: () => {
         this.paused = false;
         this.mapOpen = false;
@@ -992,12 +999,168 @@ export class GameScene extends Phaser.Scene {
     const line = nextLine(contact, n);
     const spoken = `${contact.label.replace(/^Call /, '')} here. ${line} Go ahead — I am listening.`;
     audio.dialTone();
+    // Calling police from the phone runs the arrest check
+    if (id === 'police') {
+      this.callPolice();
+      return;
+    }
     // Speak on THIS tap — critical for iPhone/iPad
     freeVoice.speak(spoken, { pitch: contact.pitch, rate: contact.rate });
     const status = `${contact.emoji} Connected to ${contact.label.replace(/^Call /, '')}\n\n“${line}”\n\n🔊 Speaking out loud!\n🎙️ TAP TO TALK or type / quick phrases.`;
     (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(status);
     this.statusLine = `${contact.emoji} On call — listen!`;
     setDomStatus(this.statusLine);
+  }
+
+  /** True if Sasquatch is in your custody right now (drag / car / nearby after capture). */
+  private hasSasquatchWithMe(): boolean {
+    if (this.flags.sasquatchInVehicle) return true;
+    if (this.sasquatchDragging) return true;
+    if (this.flags.sasquatchCaptured && !this.flags.sasquatchJailed) {
+      const d = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        this.sasquatch.x,
+        this.sasquatch.y,
+      );
+      return d < 180;
+    }
+    return false;
+  }
+
+  /**
+   * CALL POLICE — if Sasquatch is NOT with you, they arrest YOU.
+   * If you already jailed him or have him in custody, they help.
+   */
+  private callPolice(): void {
+    audio.unlock();
+    freeVoice.connect();
+    audio.dialTone();
+
+    if (this.playerArrested) {
+      freeVoice.speak('You are already in custody. Sit tight.');
+      this.statusLine = '🚔 Already arrested — wait it out.';
+      setDomStatus(this.statusLine);
+      return;
+    }
+
+    // Already delivered Sasquatch — police are happy
+    if (this.flags.sasquatchJailed) {
+      const msg =
+        'Officer Pike here. Sasquatch is locked up. Thanks for the call — stay safe out there.';
+      freeVoice.speak(msg, { pitch: 0.95, rate: 1, prefer: 'mid' });
+      this.statusLine = '🚓 Police: Sasquatch is secure. Good work, Chief!';
+      setDomStatus(this.statusLine);
+      (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+        `🚓 ${msg}`,
+      );
+      return;
+    }
+
+    // Have Sasquatch with you — backup arrives
+    if (this.hasSasquatchWithMe()) {
+      const msg =
+        'Officer Pike here. We see you have Sasquatch. Nice work — drag him to SUPER JAIL. We are rolling backup!';
+      freeVoice.speak(msg, { pitch: 0.95, rate: 1, prefer: 'mid' });
+      this.statusLine = '🚓 Police backup inbound — get Sasquatch to SUPER JAIL!';
+      setDomStatus(this.statusLine);
+      (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+        `🚓 ${msg}`,
+      );
+      audio.success();
+      // Flash a nearby patrol for flavor
+      const cars = this.patrolCars?.getSprites?.() || [];
+      const flashCar = cars[0];
+      if (flashCar) {
+        this.tweens.add({
+          targets: flashCar,
+          alpha: 0.4,
+          yoyo: true,
+          repeat: 5,
+          duration: 120,
+        });
+      }
+      return;
+    }
+
+    // No Sasquatch — FALSE ALARM / SUSPICIOUS → ARREST the player
+    this.arrestPlayerByPolice();
+  }
+
+  private arrestPlayerByPolice(): void {
+    this.playerArrested = true;
+    this.paused = false;
+    this.mapOpen = false;
+    if (this.flags.inVehicle) {
+      this.flags.inVehicle = false;
+      this.ensurePlayerOnFootSheet();
+    }
+    this.player.setVelocity(0, 0);
+
+    const arrestLine =
+      'This is Officer Pike. You called without Sasquatch? That is a false report. You are under arrest!';
+    freeVoice.speak(arrestLine, { pitch: 0.9, rate: 1, prefer: 'mid' });
+    this.statusLine = '🚔 BUSTED! No Sasquatch — police are arresting YOU!';
+    setDomStatus(this.statusLine);
+    (window as unknown as { __ecraftPhoneStatus?: (m: string) => void }).__ecraftPhoneStatus?.(
+      `🚔 ${arrestLine}\n\nThey are taking you to SUPER JAIL…`,
+    );
+    audio.talk();
+    this.cameras.main.shake(280, 0.012);
+    this.player.setTint(0x90caf9);
+
+    // Cybertruck pulls up (visual)
+    const cop = this.physics.add.sprite(this.player.x - 120, this.player.y, 'police_car');
+    cop.setDepth(14).setScale(0.9);
+    this.tweens.add({
+      targets: cop,
+      x: this.player.x - 50,
+      duration: 500,
+      ease: 'Quad.easeOut',
+    });
+
+    // Cuff flash then haul to jail
+    this.time.delayedCall(900, () => {
+      freeVoice.speak('Hands behind your back. You are going downtown.');
+      this.player.setTint(0x1565c0);
+      this.tweens.add({
+        targets: this.player,
+        scaleX: 0.7,
+        scaleY: 0.7,
+        duration: 250,
+        yoyo: true,
+      });
+    });
+
+    this.time.delayedCall(1800, () => {
+      cop.destroy();
+      // Dump player in jail cell as the arrestee
+      this.enterJail(true);
+      this.player.setPosition(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY + 40);
+      this.player.setTint(0x90caf9);
+      this.statusLine = '🚔 Locked in SUPER JAIL for calling without Sasquatch! Wait…';
+      setDomStatus(this.statusLine);
+      freeVoice.speak('Welcome to SUPER JAIL. Next time, bring Sasquatch before you call.');
+      (window as unknown as { __ecraftPhoneUi?: (o: boolean) => void }).__ecraftPhoneUi?.(false);
+      this.phoneOpen = false;
+    });
+
+    // Release after a short sentence
+    this.time.delayedCall(4800, () => {
+      this.playerArrested = false;
+      this.player.clearTint();
+      this.player.setScale(1);
+      if (this.flags.inJailBuilding) this.exitJail();
+      // Drop outside jail door
+      const jail = CITY_ZONES.find((z) => z.id === 'super_jail');
+      if (jail) {
+        this.player.setPosition(jail.x + jail.w / 2, jail.y + jail.h + 50);
+      }
+      freeVoice.speak('You are free to go. Catch Sasquatch first — then call us.');
+      this.statusLine = '🚓 Released. Capture Sasquatch BEFORE you call the police!';
+      setDomStatus(this.statusLine);
+      audio.success();
+    });
   }
 
   private async doPhoneTalk(): Promise<void> {
@@ -3016,7 +3179,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleMovement(): void {
-    if (this.flattened || this.lyingInBed || this.sleeping || this.atComputer || this.train?.isBusy()) {
+    if (
+      this.flattened ||
+      this.lyingInBed ||
+      this.sleeping ||
+      this.atComputer ||
+      this.train?.isBusy() ||
+      this.playerArrested
+    ) {
       this.player.setVelocity(0, 0);
       return;
     }
