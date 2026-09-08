@@ -75,6 +75,7 @@ type EcraftApi = {
   pigDrop?: () => void;
   boardTrain?: () => void;
   callPolice?: () => void;
+  putInJail?: () => void;
   toggleBackpack?: () => void;
   usePhone?: () => void;
   closePhone?: () => void;
@@ -777,6 +778,7 @@ export function installDomOverlay(): void {
       <button type="button" class="pig" id="btn-pig">PIG!</button>
       <button type="button" class="act" id="btn-train" style="background:#37474f;color:#ffe082">🚂 TRAIN</button>
       <button type="button" class="cap wide" id="btn-call-police" style="background:#0d47a1;color:#fff;border-color:#90caf9">🚓 CALL POLICE</button>
+      <button type="button" class="jail wide" id="btn-put-jail" style="background:#4a148c;color:#ffe082;border-color:#ce93d8">🔒 PUT IN JAIL</button>
       <button type="button" class="rec wide" id="btn-recover">UNFREEZE / SAVE</button>
       <button type="button" class="rst wide" id="btn-restart">RESTART</button>
     </div>
@@ -1265,6 +1267,7 @@ export function installDomOverlay(): void {
   bindAction('btn-pig', 'pigDrop', 'Oink!');
   bindAction('btn-train', 'boardTrain', 'Boarding train…');
   bindAction('btn-call-police', 'callPolice', 'Calling police…');
+  bindAction('btn-put-jail', 'putInJail', 'Putting Sasquatch in jail…');
   bindAction('btn-car', 'enterCar', 'Patrol Car');
   bindAction('btn-race', 'enterRaceCar', 'Race Car');
   bindAction('btn-recover', 'recover', 'Recovered');

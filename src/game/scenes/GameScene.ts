@@ -687,6 +687,11 @@ export class GameScene extends Phaser.Scene {
         this.mapOpen = false;
         this.callPolice();
       },
+      putInJail: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        this.putSasquatchInJail();
+      },
       forceFlatten: () => {
         this.paused = false;
         this.mapOpen = false;
@@ -5242,6 +5247,56 @@ export class GameScene extends Phaser.Scene {
     if (this.flags.rewardClaimed) this.setPhase(MissionPhase.FreeExplore);
   }
 
+  /**
+   * PUT IN JAIL button — lock Sasquatch if you have him (drag / car / captured).
+   * Warps to the cell if needed, then locks him up.
+   */
+  private putSasquatchInJail(): void {
+    if (this.flags.sasquatchJailed) {
+      this.statusLine = '🔒 Sasquatch is already locked in SUPER JAIL.';
+      setDomStatus(this.statusLine);
+      freeVoice.speak('Sasquatch is already in jail.');
+      // Offer a visit
+      if (!this.flags.inJailBuilding) this.enterJail(true);
+      return;
+    }
+
+    const haveHim =
+      this.flags.sasquatchCaptured ||
+      this.flags.sasquatchInVehicle ||
+      this.sasquatchDragging ||
+      this.hasSasquatchWithMe();
+
+    if (!haveHim) {
+      this.statusLine = '❌ Capture Sasquatch first — then PUT IN JAIL.';
+      setDomStatus(this.statusLine);
+      freeVoice.speak('You do not have Sasquatch. Capture him first, then put him in jail.');
+      audio.talk();
+      return;
+    }
+
+    // Leave car / stop drag and haul him into the cell
+    if (this.flags.inVehicle) {
+      this.flags.inVehicle = false;
+      this.ensurePlayerOnFootSheet();
+    }
+    this.flags.sasquatchInVehicle = false;
+    this.sasquatchDragging = false;
+    this.clearRope();
+    this.player.setVelocity(0, 0);
+
+    if (!this.flags.inJailBuilding) {
+      this.enterJail(true);
+    }
+    this.player.setPosition(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY + 50);
+    this.sasquatch.setPosition(JAIL_INTERIOR.cellX, JAIL_INTERIOR.cellY);
+    this.jailSasquatch();
+    freeVoice.speak('Sasquatch is locked in the cell. Super Jail secure!');
+    audio.success();
+    this.cameras.main.shake(180, 0.008);
+    setDomStatus(this.statusLine);
+  }
+
   private jailSasquatch(): void {
     this.flags.sasquatchJailed = true;
     this.flags.sasquatchInVehicle = false;
@@ -5256,7 +5311,7 @@ export class GameScene extends Phaser.Scene {
     this.inventory.add('keycard');
     this.jobs.onMissionJailed();
     this.setPhase(MissionPhase.Jailed);
-    this.statusLine = 'Sasquatch secured! Head of Security unlocked — check Job Board.';
+    this.statusLine = '🔒 PUT IN JAIL — Sasquatch secured! Head of Security unlocked.';
     this.time.delayedCall(600, () => this.grantReward());
   }
 
