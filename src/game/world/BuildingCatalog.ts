@@ -296,6 +296,7 @@ const SPECIAL: Record<string, { kind: BuildingKind; prompt: string }> = {
 /** Zones that are props / outdoors only — no interior door. */
 const SKIP = new Set([
   'forest',
+  'tiger_kingdom',
   'vehicle_bay',
   'race_bay',
   'job_board',

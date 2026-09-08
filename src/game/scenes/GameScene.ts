@@ -28,6 +28,7 @@ import { ForestBearSystem } from '../systems/ForestBearSystem';
 import { ForestSnakeSystem } from '../systems/ForestSnakeSystem';
 import { TrainSystem } from '../systems/TrainSystem';
 import { RobberSystem } from '../systems/RobberSystem';
+import { TigerKingdomSystem } from '../systems/TigerKingdomSystem';
 import { loadGame, saveGame } from '../systems/SaveSystem';
 import { pollDomInput, setDomStatus, setDomMeta } from '../../ui/domOverlay';
 import {
@@ -39,6 +40,7 @@ import {
   LAIR,
   ROADS,
   SPAWN,
+  TIGER_KINGDOM,
   WORLD,
   pointInRect,
 } from '../world/WorldLayout';
@@ -189,6 +191,7 @@ export class GameScene extends Phaser.Scene {
   private forestSnakes!: ForestSnakeSystem;
   private train!: TrainSystem;
   private robbers!: RobberSystem;
+  private tigerKingdom!: TigerKingdomSystem;
   private forestTreeSpots: Array<{ x: number; y: number }> = [];
   /** Snake bite slows movement briefly */
   private snakeBittenT = 0;
@@ -373,6 +376,9 @@ export class GameScene extends Phaser.Scene {
     this.robbers = new RobberSystem(this);
     this.robbers.spawn();
     for (const r of this.robbers.getSprites()) this.bindSolidMover(r);
+    this.tigerKingdom = new TigerKingdomSystem(this);
+    this.tigerKingdom.setOnSpawn((s) => this.bindSolidMover(s));
+    this.tigerKingdom.build(this.worldLayer);
     this.buildingLoot = new BuildingLootSystem(this);
     // Tap/click world to aim + place (Minecraft-style pointer build)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -681,6 +687,21 @@ export class GameScene extends Phaser.Scene {
           return;
         }
         this.train.tryBoard(this.player);
+      },
+      goTigerKingdom: () => {
+        this.paused = false;
+        this.mapOpen = false;
+        if (this.isIndoors()) {
+          this.statusLine = 'Exit outdoors first — then go to Tiger Kingdom.';
+          setDomStatus(this.statusLine);
+          return;
+        }
+        this.leaveIndoorsIfNeeded();
+        this.player.setPosition(TIGER_KINGDOM.gateX, TIGER_KINGDOM.gateY + 80);
+        this.cameras.main.centerOn(this.player.x, this.player.y);
+        this.statusLine = '🐅 Arrived at TIGER KINGDOM (low south forest)! Dens · throne · tigers.';
+        setDomStatus(this.statusLine);
+        audio.talk();
       },
       callPolice: () => {
         this.paused = false;
@@ -1597,6 +1618,8 @@ export class GameScene extends Phaser.Scene {
           .setStrokeStyle(3, 0xffe082, 0.9)
           .setDepth(2);
         this.worldLayer.add(bay);
+      } else if (z.id === 'tiger_kingdom') {
+        // Built by TigerKingdomSystem (dens / throne) — skip facade
       } else if (z.id !== 'forest') {
         const key = buildingKey[z.id] || 'bldg_plaza';
         const enterable = enterableById.get(z.id);
@@ -1848,6 +1871,7 @@ export class GameScene extends Phaser.Scene {
       docks: 'WATERFRONT',
       bank: 'GOLD VAULT · OPEN FLOOR',
       forest: 'OPEN WILDERNESS — watch for bears & snakes',
+      tiger_kingdom: '🐅 TIGER KINGDOM — dens · throne · stripe royalty',
       train_west: 'BOARD TRAIN → EASTPORT',
       train_east: 'BOARD TRAIN → WESTLINE',
       east_plaza: 'EASTPORT MEGA-CITY',
@@ -2759,6 +2783,11 @@ export class GameScene extends Phaser.Scene {
       },
       robbers: this.robbers?.count?.() ?? 0,
       robbersSquished: this.robbers?.squishedCount?.() ?? 0,
+      tigerKingdom: {
+        tigers: this.tigerKingdom?.count?.() ?? 0,
+        here: this.tigerKingdom?.contains?.(this.player.x, this.player.y) ?? false,
+        gate: { x: TIGER_KINGDOM.gateX, y: TIGER_KINGDOM.gateY },
+      },
       tigerNearDist: this.tigers?.nearestDist?.(this.player) ?? Infinity,
       backpackOpen: this.backpackOpen,
       phoneOpen: this.phoneOpen,
@@ -2909,6 +2938,11 @@ export class GameScene extends Phaser.Scene {
           },
         );
       }
+      this.tigerKingdom?.setOutdoorVisible(outdoors);
+      this.tigerKingdom?.update(d, this.player, outdoors, (msg) => {
+        this.statusLine = msg;
+        setDomStatus(msg);
+      });
       // WALL LAW — shove cars/people out of building solids every frame
       if (outdoors) this.buildingCollision?.resolveAllBound?.();
       this.updatePlayerPoliceLights(d, outdoors);

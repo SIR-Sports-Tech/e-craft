@@ -189,6 +189,16 @@ export const CITY_ZONES: RectZone[] = [
     h: 10000,
     color: 0x1a4a28,
   },
+  // —— Tiger Kingdom (far south / low end of the forest) ——
+  {
+    id: 'tiger_kingdom',
+    label: '🐅 Tiger Kingdom',
+    x: 4200,
+    y: 8600,
+    w: 2800,
+    h: 1200,
+    color: 0xe65100,
+  },
   // —— Train stations (board here to cross the forest) ——
   {
     id: 'train_west',
@@ -318,6 +328,20 @@ export const TRAIN = {
   east: { x: 10970, y: 730, label: 'Eastport Station' },
   /** Track Y the train rides along */
   trackY: 720,
+} as const;
+
+/** Far-south Tiger Kingdom landmark (inside forest). */
+export const TIGER_KINGDOM = {
+  id: 'tiger_kingdom',
+  x: 4200,
+  y: 8600,
+  w: 2800,
+  h: 1200,
+  /** Throne / den center */
+  throneX: 5600,
+  throneY: 9200,
+  gateX: 5600,
+  gateY: 8650,
 } as const;
 
 /** Indoor: underground gadget lair (shown when player is in lair mode) */
